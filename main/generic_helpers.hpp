@@ -9,8 +9,8 @@ struct StrongType
 private:
     BaseType m_Data;
 
-    friend class Comparable;
-    friend class Oderable;
+    friend struct Comparable;
+    friend struct Oderable;
 };
 
 struct NonCopyable
@@ -27,15 +27,15 @@ struct NonMovable
 
 struct Comparable
 {
-    template<class T> bool operator==(this T const& lhs, T const& rhs) const { return lhs.m_Data == rhs.m_Data; }
+    template<class T> bool operator==(this T const& lhs, T const& rhs) { return lhs.m_Data == rhs.m_Data; }
 };
 
 struct Oderable: Comparable
 {
-    template<class T> bool operator<(this T const& lhs, T const& rhs) const { return lhs.m_Data < rhs.m_Data; }
-    template<class T> bool operator>(this T const& lhs, T const& rhs) const { return lhs.m_Data > rhs.m_Data; }
-    template<class T> bool operator<=(this T const& lhs, T const& rhs) const { return lhs.m_Data <= rhs.m_Data; }
-    template<class T> bool operator>=(this T const& lhs, T const& rhs) const { return lhs.m_Data >= rhs.m_Data; }
+    template<class T> bool operator<(this T const& lhs, T const& rhs) { return lhs.m_Data < rhs.m_Data; }
+    template<class T> bool operator>(this T const& lhs, T const& rhs) { return lhs.m_Data > rhs.m_Data; }
+    template<class T> bool operator<=(this T const& lhs, T const& rhs) { return lhs.m_Data <= rhs.m_Data; }
+    template<class T> bool operator>=(this T const& lhs, T const& rhs) { return lhs.m_Data >= rhs.m_Data; }
 };
 
 template<typename BaseType, BaseType kInv>

@@ -2,15 +2,15 @@
 #define I2C_HPP_
 
 #include "generic_helpers.hpp"
-#incldue "driver/i2c_master.h"
+#include "driver/i2c_master.h"
 
 namespace i2c
 {
-    class SDAType: private StrongType<gpio_num_t>, Comparable
+    class SDAType: private StrongType<gpio_num_t, struct SDATag>, Comparable
     {
     };
 
-    class SDCType: private StrongType<gpio_num_t>, Comparable
+    class SDCType: private StrongType<gpio_num_t, struct SDCTag>, Comparable
     {
     };
 
@@ -31,6 +31,7 @@ namespace i2c
     {
     public:
         I2CBusMaster(SDAType sda, SDCType sdc, I2CPort port, I2CClockSource clkSrc);
+        ~I2CBusMaster();
 
         void SetSDAPin(SDAType sda);
         SDAType GetSDAPin() const;
@@ -52,6 +53,9 @@ namespace i2c
 
         void SetEnableInternalPullup(bool enable);
         bool GetEnableInternalPullup() const;
+
+        bool Open();
+        void Close();
     private:
         i2c_master_bus_config_t m_Config;
     };
