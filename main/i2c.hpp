@@ -3,15 +3,18 @@
 
 #include "generic_helpers.hpp"
 #include "driver/i2c_master.h"
+#include <expected>
 
 namespace i2c
 {
-    class SDAType: private StrongType<gpio_num_t, struct SDATag>, Comparable
+    class SDAType: public StrongType<gpio_num_t, struct SDATag>//, Comparable
     {
+        using StrongType::StrongType;
     };
 
-    class SDCType: private StrongType<gpio_num_t, struct SDCTag>, Comparable
+    class SCLType: public StrongType<gpio_num_t, struct SCLTag>//, Comparable
     {
+        using StrongType::StrongType;
     };
 
     enum class I2CPort: int
@@ -21,29 +24,24 @@ namespace i2c
         Port1 = 1,
     };
 
-    enum class I2CClockSource: int
-    {
-        APB,
-        Default
-    };
+    class I2CDevice;
 
     class I2CBusMaster
     {
     public:
-        I2CBusMaster(SDAType sda, SDCType sdc, I2CPort port, I2CClockSource clkSrc);
+        I2CBusMaster(SDAType sda, SCLType sdc, I2CPort port = I2CPort::Auto);
+        I2CBusMaster(const I2CBusMaster &rhs) = delete;
+        I2CBusMaster(I2CBusMaster &&rhs);
         ~I2CBusMaster();
 
         void SetSDAPin(SDAType sda);
         SDAType GetSDAPin() const;
 
-        void SetSDCPin(SDCType sdc);
-        SDCType GetSDCPin() const;
+        void SetSCLPin(SCLType sdc);
+        SCLType GetSCLPin() const;
 
         void SetPort(I2CPort p);
         I2CPort GetPort() const;
-
-        void SetClockSource(I2CClockSource src);
-        I2CClockSource GetClockSource() const;
 
         void SetGlitchIgnoreCount(uint8_t c = 7);
         uint8_t GetGlitchIgnoreCount() const;
@@ -54,10 +52,36 @@ namespace i2c
         void SetEnableInternalPullup(bool enable);
         bool GetEnableInternalPullup() const;
 
-        bool Open();
+        std::expected<void, esp_err_t> Open();
         void Close();
+
+        std::expected<I2CDevice, esp_err_t> Add(uint16_t addr) const;
     private:
         i2c_master_bus_config_t m_Config;
+        i2c_master_bus_handle_t m_Handle = nullptr;
+
+        friend class I2CDevice;
+    };
+
+    class I2CDevice
+    {
+    public:
+        I2CDevice(const I2CBusMaster &bus, uint16_t addr = 0xff, uint32_t speed_hz = 100'000);
+        I2CDevice(const I2CDevice &rhs) = delete;
+        I2CDevice(I2CDevice &&rhs);
+
+        void SetAddress(uint16_t addr);
+        uint16_t GetAddress() const;
+
+        void SetSpeedHz(uint32_t hz);
+        uint32_t GetSpeedHz() const;
+
+        std::expected<void, esp_err_t> Open();
+        void Close();
+    private:
+        const I2CBusMaster &m_Bus;
+        i2c_master_dev_handle_t m_Handle = nullptr;
+        i2c_device_config_t m_Config;
     };
 }
 

@@ -13,6 +13,8 @@
 #include "esp_flash.h"
 #include "esp_system.h"
 
+#include "i2c.hpp"
+
 extern "C" void app_main(void)
 {
     printf("Hello world!\n");
@@ -31,6 +33,13 @@ extern "C" void app_main(void)
 
     unsigned major_rev = chip_info.revision / 100;
     unsigned minor_rev = chip_info.revision % 100;
+    i2c::I2CBusMaster bus(i2c::SDAType(gpio_num_t(6)), i2c::SCLType(gpio_num_t(7)));
+    auto d = bus.Add(0x11);
+    if (!d)
+    {
+        printf("i2c add device failed");
+        return;
+    }
     printf("silicon revision v%d.%d, ", major_rev, minor_rev);
     if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
         printf("Get flash size failed");
