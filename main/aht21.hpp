@@ -62,6 +62,7 @@ public:
 
     std::optional<Measurements> GetLastMeasurements() const;
 private:
+    void ResetReg(uint8_t reg);
     void ConvertTemperature(uint8_t *pData);
     void ConvertHumidity(uint8_t *pData);
     i2c::I2CDevice m_Device;

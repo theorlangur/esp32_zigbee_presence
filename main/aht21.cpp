@@ -21,22 +21,42 @@ AHT21::AHT21(i2c::I2CBusMaster &bus):
 {
 }
 
+void AHT21::ResetReg(uint8_t reg)
+{
+    m_Device.WriteReg16(reg, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    uint8_t values[3];
+    m_Device.Recv(values, sizeof(values));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    values[0] = reg | 0xb0;
+    m_Device.Send(values, sizeof(values));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+}
+
 AHT21::ExpectedResult AHT21::Init()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     auto *pThis = this;
     return m_Device.ReadReg8(0x71)
                    .transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_GetStatus}; })
                    .and_then([pThis](auto &&v)->ExpectedResult{
-                        printf("Status: %X\n", v.v);
                         if (!(v.v & 0x04))
                         {
-                            printf("Calibrating\n", v.v);
                             //not calibrated
                             return v.d.get().WriteReg16(0xbe, 0x0800)
                                        .transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_Calibration}; })
                                        .and_then([pThis](auto &&d)->ExpectedResult{
                                             std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                                            if (auto s = d.get().ReadReg8(0x71); s)
+                                            {
+                                                if ((s.value().v & 0x18) != 0x18)
+                                                {
+                                                    pThis->ResetReg(0x1b);
+                                                    pThis->ResetReg(0x1c);
+                                                    pThis->ResetReg(0x1e);
+                                                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                                                }
+                                            }
                                             return std::ref(*pThis);
                                        });
                         }
@@ -51,7 +71,7 @@ AHT21::ExpectedValue<AHT21::Measurements> AHT21::UpdateMeasurements()
         .and_then([this](i2c::I2CDevice &d)->ExpectedValue<Measurements>{
             std::this_thread::sleep_for(std::chrono::milliseconds(80));
             int retries = 3;
-            uint8_t data[6];
+            uint8_t data[7];
             do
             {
                 auto r = d.Recv(data, sizeof(data));
@@ -79,7 +99,6 @@ void AHT21::ConvertTemperature(uint8_t *data)
     temperature <<= 8;
     temperature  |= data[5];
     float _t = ((float)temperature / 0x100000) * 200 - 50;
-    printf("Measurements read temp: %.f\n", _t);
     m_Temperature.store(_t, std::memory_order_relaxed);
 }
 
@@ -94,7 +113,6 @@ void AHT21::ConvertHumidity(uint8_t *data)
     if (humidity > 0x100000) {humidity = 0x100000;}             //check if RH>100, no need to check for RH<0 since "humidity" is "uint"
 
     float _h = ((float)humidity / 0x100000) * 100;
-    printf("Measurements read hum: %.f\n", _h);
     m_Humidity.store(_h, std::memory_order_relaxed);
 }
 
