@@ -15,7 +15,7 @@ namespace i2c
             .clk_source = I2C_CLK_SRC_DEFAULT,
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
-            .trans_queue_depth = 32,
+            .trans_queue_depth = 0,
             .flags{0}
         }
     {
@@ -182,6 +182,15 @@ namespace i2c
     {
         if (!m_Handle) return std::unexpected(Err{"I2CDevice::Send", ESP_ERR_INVALID_STATE});
 
+        //printf("Send: Size=%d\n", len);
+        //printf("Bytes: ");
+        //if (len > 0) printf(" %X", pBuf[0]);
+        //if (len > 1) printf(" %X", pBuf[1]);
+        //if (len > 2) printf(" %X", pBuf[2]);
+        //if (len > 3) printf(" %X", pBuf[3]);
+        //printf("\n");
+        //fflush(stdout);
+
         CALL_ESP_EXPECTED("I2CDevice::Send", i2c_master_transmit(m_Handle, pBuf, len, d.count()));
         return std::ref(*this);
     }
@@ -211,6 +220,8 @@ namespace i2c
     I2CDevice::ExpectedResult I2CDevice::WriteReg16(uint8_t reg, uint16_t data, duration_t d )
     {
         uint8_t _d[] = {reg, uint8_t(data >> 8), uint8_t(data & 0xff)};
+        //printf("WriteReg16: %X %X %X; Size=%d\n", _d[0], _d[1], _d[2], sizeof(_d));
+        //fflush(stdout);
         return Send(_d, sizeof(_d), d);
     }
 
