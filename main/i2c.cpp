@@ -19,6 +19,7 @@ namespace i2c
             .flags{0}
         }
     {
+        m_Config.flags.enable_internal_pullup = true;
     }
 
     I2CBusMaster::I2CBusMaster(I2CBusMaster &&rhs):
