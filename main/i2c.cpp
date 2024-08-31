@@ -114,12 +114,10 @@ namespace i2c
         return std::ref(*this);
     }
 
-    std::expected<I2CDevice, I2CBusMaster::Err> I2CBusMaster::Add(uint16_t addr) const
+    std::expected<I2CDevice, Err> I2CBusMaster::Add(uint16_t addr) const
     {
         I2CDevice d(*this, addr);
-        return d.Open()
-            .transform([&](auto &&v){ return std::move(d);})
-            .transform_error([](auto &&e)->Err{ return Err{"I2CBusMaster::Add", e.code}; });
+        return d.Open().transform([&](auto &&v){ return std::move(d);});
     }
 
     I2CDevice::I2CDevice(const I2CBusMaster &bus, uint16_t addr, uint32_t speed_hz):
@@ -202,5 +200,35 @@ namespace i2c
 
         CALL_ESP_EXPECTED("I2CDevice::SendRecv", i2c_master_transmit_receive(m_Handle, pSendBuf, sendLen, pRecvBuf, recvLen, d.count()));
         return std::ref(*this);
+    }
+
+    I2CDevice::ExpectedResult I2CDevice::WriteReg8(uint8_t reg, uint8_t data, duration_t d )
+    {
+        uint8_t _d[] = {reg, data};
+        return Send(_d, sizeof(_d), d);
+    }
+
+    I2CDevice::ExpectedResult I2CDevice::WriteReg16(uint8_t reg, uint16_t data, duration_t d )
+    {
+        uint8_t _d[] = {reg, uint8_t(data >> 8), uint8_t(data & 0xff)};
+        return Send(_d, sizeof(_d), d);
+    }
+
+    I2CDevice::ExpectedValue<uint8_t> I2CDevice::ReadReg8(uint8_t reg, duration_t d )
+    {
+        uint8_t data;
+        return SendRecv(&reg, sizeof(reg), &data, sizeof(data), d)
+            .transform([&](I2CDevice &d)->RetValue<uint8_t>{
+                return RetValue{d, data};
+            });
+    }
+
+    I2CDevice::ExpectedValue<uint16_t> I2CDevice::ReadReg16(uint8_t reg, duration_t d )
+    {
+        uint16_t data;
+        return SendRecv(&reg, sizeof(reg), (uint8_t*)&data, sizeof(data), d)
+            .transform([&](I2CDevice &d)->RetValue<uint16_t>{
+                return RetValue{std::ref(d), data};
+            });
     }
 }

@@ -28,16 +28,17 @@ namespace i2c
         Port1 = 1,
     };
 
+    struct Err
+    {
+        const char *pLocation = "";
+        esp_err_t code = ESP_OK;
+    };
+
     class I2CDevice;
 
     class I2CBusMaster
     {
     public:
-        struct Err
-        {
-            const char *pLocation;
-            esp_err_t code;
-        };
         using BusRef = std::reference_wrapper<I2CBusMaster>;
         using ExpectedResult = std::expected<BusRef, Err>;
 
@@ -78,13 +79,17 @@ namespace i2c
     class I2CDevice
     {
     public:
-        struct Err
-        {
-            const char *pLocation;
-            esp_err_t code;
-        };
         using DevRef = std::reference_wrapper<I2CDevice>;
         using ExpectedResult = std::expected<DevRef, Err>;
+        template<typename V>
+        struct RetValue
+        {
+            DevRef d;
+            V v;
+        };
+        template<class V>
+        using ExpectedValue = std::expected<RetValue<V>, Err>;
+
         I2CDevice(const I2CBusMaster &bus, uint16_t addr = 0xff, uint32_t speed_hz = 100'000);
         I2CDevice(const I2CDevice &rhs) = delete;
         I2CDevice(I2CDevice &&rhs);
@@ -101,6 +106,12 @@ namespace i2c
         ExpectedResult Send(const uint8_t *pBuf, std::size_t len, duration_t d = kForever);
         ExpectedResult Recv(uint8_t *pBuf, std::size_t len, duration_t d = kForever);
         ExpectedResult SendRecv(const uint8_t *pSendBuf, std::size_t sendLen, uint8_t *pRecvBuf, std::size_t recvLen, duration_t d = kForever);
+
+        ExpectedResult WriteReg8(uint8_t reg, uint8_t data, duration_t d = kForever);
+        ExpectedResult WriteReg16(uint8_t reg, uint16_t data, duration_t d = kForever);
+
+        ExpectedValue<uint8_t> ReadReg8(uint8_t reg, duration_t d = kForever);
+        ExpectedValue<uint16_t> ReadReg16(uint8_t reg, duration_t d = kForever);
     private:
         const I2CBusMaster &m_Bus;
         i2c_master_dev_handle_t m_Handle = nullptr;

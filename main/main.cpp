@@ -14,7 +14,9 @@
 #include "esp_system.h"
 
 #include "i2c.hpp"
+#include "aht21.hpp"
 #include <thread>
+#include <atomic>
 
 extern "C" void app_main(void)
 {
@@ -34,111 +36,56 @@ extern "C" void app_main(void)
 
     unsigned major_rev = chip_info.revision / 100;
     unsigned minor_rev = chip_info.revision % 100;
+
+    auto print_error = [](auto &e) { printf("i2c Error at %s: %s\n", e.pLocation, esp_err_to_name(e.code)); fflush(stdout); };
+        
     i2c::I2CBusMaster bus(i2c::SDAType(gpio_num_t(6)), i2c::SCLType(gpio_num_t(5)));
-    bus.Open();
-    auto aht21 = bus.Add(0x38);
-    if (!aht21)
+    auto r = bus.Open();
+    if (!r)
     {
-        printf("i2c add device failed");
+        print_error(r.error());
         return;
     }
 
-    auto _aht21 = aht21
-        .transform([](i2c::I2CDevice &d) { return std::ref(d); })
-        .transform_error([](i2c::I2CBusMaster::Err e) { return i2c::I2CDevice::Err{e.pLocation, e.code};});
-
-    auto print_error = [](auto &e) { printf("i2c Error at %s: %s", e.pLocation, esp_err_to_name(e.code)); };
-    if (!_aht21)
+    auto print_aht21_error = [&](auto &e) 
+    { 
+        printf("AHT21 Error at %s: %s\n", e.pLocation, AHT21::err_to_str(e.code));
+        print_error(e.i2cErr);
+    };
+    AHT21 sensor(bus);
+    if (auto r = sensor.Init(); !r)
     {
-        print_error(_aht21.error());
+        print_aht21_error(r.error());
         return;
     }
 
-    auto read_status = [](i2c::I2CDevice &d){
-        uint8_t cmd = 0x71;
-        uint8_t status;
-        return d.SendRecv(&cmd, sizeof(cmd), &status, sizeof(status))
-        .transform([&](i2c::I2CDevice &d){
-            return std::make_tuple(std::ref(d), status);
-        });
-    };
-
-    auto init_aht21 = [&](i2c::I2CDevice &d)->i2c::I2CDevice::ExpectedResult{
-        std::this_thread::sleep_for(std::chrono::milliseconds(80));
-        return read_status(d)
-            .and_then([](auto &&dev_n_status)->i2c::I2CDevice::ExpectedResult{ 
-                    auto && [d,status] = dev_n_status;
-                    if (!(status & 0x04))
-                    {
-                        //not calibrated
-                        uint8_t init_cmd[] = {0xbe, 0x08, 0x00};
-                        return d.Send(init_cmd, sizeof(init_cmd)).and_then([](i2c::I2CDevice &d)->i2c::I2CDevice::ExpectedResult{ 
-                                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                return std::ref(d);
-                        });
-                    }
-                    return std::ref(d);
-            });
-    };
-
-    auto read_data = [&](i2c::I2CDevice &d){
-        uint8_t trigger_measurement[] = {0xac, 0x33, 0x00};
-        return d.Send(trigger_measurement, sizeof(trigger_measurement))
-            .and_then([&](i2c::I2CDevice &d)->std::expected<std::tuple<float,float>,i2c::I2CDevice::Err>{
-                    uint8_t data[7];
-                    auto r = d.Recv(data, sizeof(data));
-                    if (r)
-                    {
-                        if (data[0] & 0x80)//busy
-                        {
-                            std::this_thread::sleep_for(std::chrono::milliseconds(40));
-                            r = d.Recv(data, sizeof(data));
-                            if (r)
-                            {
-                                uint32_t temperature   = data[3] & 0x0F;                //20-bit raw temperature data
-                                temperature <<= 8;
-                                temperature  |= data[4];
-                                temperature <<= 8;
-                                temperature  |= data[5];
-                                float _t = ((float)temperature / 0x100000) * 200 - 50;
-
-                                uint32_t humidity   = data[1];                          //20-bit raw humidity data
-                                humidity <<= 8;
-                                humidity  |= data[2];
-                                humidity <<= 4;
-                                humidity  |= data[3] >> 4;
-
-                                if (humidity > 0x100000) {humidity = 0x100000;}             //check if RH>100, no need to check for RH<0 since "humidity" is "uint"
-
-                                float _h = ((float)humidity / 0x100000) * 100;
-                                return std::make_tuple(_t, _h);
-                            }
-                        }
-                    }
-                    return r.transform([&](auto &d){ return std::make_tuple(0.f, 0.f); });
-            });
-    };
-
-    auto init_res = init_aht21(_aht21.value());
-    if (!init_res)
+    std::atomic_flag sensorUpdateRunning{true};
+    std::jthread sensor_update([&]{
+            while(true)
+            {
+                if (auto r = sensor.UpdateMeasurements(); !r)
+                {
+                    print_aht21_error(r.error());
+                    sensorUpdateRunning.clear(std::memory_order_relaxed);
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+            }
+    });
+        
+    while(sensorUpdateRunning.test(std::memory_order_relaxed))
     {
-        print_error(init_res.error());
-        return;
-    }
-    while(true)
-    {
-        auto data = read_data(_aht21.value());
-        if (!data)
+        auto r = sensor.GetLastMeasurements();
+        if (r)
         {
-            print_error(data.error());
-            return;
+            auto [_t, _h] = r.value();
+            printf("Temp: %f; Hum: %f\n", _t, _h);
+            fflush(stdout);
         }
-        auto [_t, _h] = data.value();
-        printf("Temp: %f; Hum: %f\n", _t, _h);
-        fflush(stdout);
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
+    printf("Something happened with the sensor. Loop stopped");
 
     printf("silicon revision v%d.%d, ", major_rev, minor_rev);
     if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
