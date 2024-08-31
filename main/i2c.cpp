@@ -33,27 +33,30 @@ namespace i2c
         Close();
     }
 
-    void I2CBusMaster::SetSDAPin(SDAType sda)
+    I2CBusMaster& I2CBusMaster::SetSDAPin(SDAType sda)
     {
         m_Config.sda_io_num = sda.data();
+        return *this;
     }
     SDAType I2CBusMaster::GetSDAPin() const
     {
         return m_Config.sda_io_num;
     }
 
-    void I2CBusMaster::SetSCLPin(SCLType sdc)
+    I2CBusMaster& I2CBusMaster::SetSCLPin(SCLType sdc)
     {
         m_Config.scl_io_num = sdc.data();
+        return *this;
     }
     SCLType I2CBusMaster::GetSCLPin() const
     {
         return m_Config.scl_io_num;
     }
 
-    void I2CBusMaster::SetPort(I2CPort p)
+    I2CBusMaster& I2CBusMaster::SetPort(I2CPort p)
     {
         m_Config.i2c_port = (int)p;
+        return *this;
     }
 
     I2CPort I2CBusMaster::GetPort() const
@@ -61,9 +64,10 @@ namespace i2c
         return (I2CPort)m_Config.i2c_port;
     }
 
-    void I2CBusMaster::SetGlitchIgnoreCount(uint8_t c)
+    I2CBusMaster& I2CBusMaster::SetGlitchIgnoreCount(uint8_t c)
     {
         m_Config.glitch_ignore_cnt = c;
+        return *this;
     }
 
     uint8_t I2CBusMaster::GetGlitchIgnoreCount() const
@@ -71,9 +75,10 @@ namespace i2c
         return m_Config.glitch_ignore_cnt;
     }
 
-    void I2CBusMaster::SetInterruptPriority(int p)
+    I2CBusMaster& I2CBusMaster::SetInterruptPriority(int p)
     {
         m_Config.intr_priority = p;
+        return *this;
     }
 
     int I2CBusMaster::GetInterruptPriority() const
@@ -81,9 +86,10 @@ namespace i2c
         return m_Config.intr_priority;
     }
 
-    void I2CBusMaster::SetEnableInternalPullup(bool enable)
+    I2CBusMaster& I2CBusMaster::SetEnableInternalPullup(bool enable)
     {
         m_Config.flags.enable_internal_pullup = enable;
+        return *this;
     }
 
     bool I2CBusMaster::GetEnableInternalPullup() const
@@ -97,14 +103,14 @@ namespace i2c
         return std::ref(*this);
     }
 
-    void I2CBusMaster::Close()
+    I2CBusMaster::ExpectedResult I2CBusMaster::Close()
     {
         if (m_Handle)
         {
             i2c_del_master_bus(m_Handle);
             m_Handle = nullptr;
         }
-
+        return std::ref(*this);
     }
 
     std::expected<I2CDevice, I2CBusMaster::Err> I2CBusMaster::Add(uint16_t addr) const
@@ -135,10 +141,10 @@ namespace i2c
         rhs.m_Handle = nullptr;
     }
 
-    void I2CDevice::SetAddress(uint16_t addr)
+    I2CDevice& I2CDevice::SetAddress(uint16_t addr)
     {
-        if (!m_Handle)
-            m_Config.device_address = addr;
+        m_Config.device_address = addr;
+        return *this;
     }
 
     uint16_t I2CDevice::GetAddress() const
@@ -146,9 +152,10 @@ namespace i2c
         return m_Config.device_address;
     }
 
-    void I2CDevice::SetSpeedHz(uint32_t hz)
+    I2CDevice& I2CDevice::SetSpeedHz(uint32_t hz)
     {
         m_Config.scl_speed_hz = hz;
+        return *this;
     }
 
     uint32_t I2CDevice::GetSpeedHz() const
@@ -162,13 +169,14 @@ namespace i2c
         return std::ref(*this);
     }
 
-    void I2CDevice::Close()
+    I2CDevice::ExpectedResult I2CDevice::Close()
     {
         if (m_Handle)
         {
             i2c_master_bus_rm_device(m_Handle);
             m_Handle = nullptr;
         }
+        return std::ref(*this);
     }
 
     I2CDevice::ExpectedResult I2CDevice::Send(const uint8_t *pBuf, std::size_t len, duration_t d)

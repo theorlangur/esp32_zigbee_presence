@@ -46,26 +46,26 @@ namespace i2c
         I2CBusMaster(I2CBusMaster &&rhs);
         ~I2CBusMaster();
 
-        void SetSDAPin(SDAType sda);
+        I2CBusMaster& SetSDAPin(SDAType sda);
         SDAType GetSDAPin() const;
 
-        void SetSCLPin(SCLType sdc);
+        I2CBusMaster& SetSCLPin(SCLType sdc);
         SCLType GetSCLPin() const;
 
-        void SetPort(I2CPort p);
+        I2CBusMaster& SetPort(I2CPort p);
         I2CPort GetPort() const;
 
-        void SetGlitchIgnoreCount(uint8_t c = 7);
+        I2CBusMaster& SetGlitchIgnoreCount(uint8_t c = 7);
         uint8_t GetGlitchIgnoreCount() const;
 
-        void SetInterruptPriority(int p = 0);
+        I2CBusMaster& SetInterruptPriority(int p = 0);
         int GetInterruptPriority() const;
 
-        void SetEnableInternalPullup(bool enable);
+        I2CBusMaster& SetEnableInternalPullup(bool enable);
         bool GetEnableInternalPullup() const;
 
         ExpectedResult Open();
-        void Close();
+        ExpectedResult Close();
 
         std::expected<I2CDevice, Err> Add(uint16_t addr) const;
     private:
@@ -89,14 +89,14 @@ namespace i2c
         I2CDevice(const I2CDevice &rhs) = delete;
         I2CDevice(I2CDevice &&rhs);
 
-        void SetAddress(uint16_t addr);
+        I2CDevice& SetAddress(uint16_t addr);
         uint16_t GetAddress() const;
 
-        void SetSpeedHz(uint32_t hz);
+        I2CDevice& SetSpeedHz(uint32_t hz);
         uint32_t GetSpeedHz() const;
 
         ExpectedResult Open();
-        void Close();
+        ExpectedResult Close();
 
         ExpectedResult Send(const uint8_t *pBuf, std::size_t len, duration_t d = kForever);
         ExpectedResult Recv(uint8_t *pBuf, std::size_t len, duration_t d = kForever);

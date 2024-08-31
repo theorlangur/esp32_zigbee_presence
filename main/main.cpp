@@ -40,6 +40,21 @@ extern "C" void app_main(void)
         printf("i2c add device failed");
         return;
     }
+    uint8_t buf[10];
+    auto r = d
+        .transform([](i2c::I2CDevice &d) { return std::ref(d); })
+        .transform_error([](i2c::I2CBusMaster::Err e) { return i2c::I2CDevice::Err{e.pLocation, e.code};})
+        .and_then([&](i2c::I2CDevice &d){ return d.Send(buf, sizeof(buf)); })
+        .and_then([&](i2c::I2CDevice &d){ return d.Recv(buf, sizeof(buf)); })
+        .and_then([&](i2c::I2CDevice &d){ return d.Send(buf, sizeof(buf)); })
+        .and_then([&](i2c::I2CDevice &d){ return d.Close(); });
+
+    if (!r)
+    {
+        auto const& e = r.error();
+        printf("Error at %s: %s", e.pLocation, esp_err_to_name(e.code));
+    }
+
     printf("silicon revision v%d.%d, ", major_rev, minor_rev);
     if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
         printf("Get flash size failed");
