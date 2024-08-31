@@ -4,9 +4,13 @@
 #include "generic_helpers.hpp"
 #include "driver/i2c_master.h"
 #include <expected>
+#include <chrono>
 
 namespace i2c
 {
+    using duration_t = std::chrono::duration<int, std::milli>;
+    inline static constexpr const duration_t kForever = duration_t(-1);
+
     class SDAType: public StrongType<gpio_num_t, struct SDATag>//, Comparable
     {
         using StrongType::StrongType;
@@ -29,6 +33,14 @@ namespace i2c
     class I2CBusMaster
     {
     public:
+        struct Err
+        {
+            const char *pLocation;
+            esp_err_t code;
+        };
+        using BusRef = std::reference_wrapper<I2CBusMaster>;
+        using ExpectedResult = std::expected<BusRef, Err>;
+
         I2CBusMaster(SDAType sda, SCLType sdc, I2CPort port = I2CPort::Auto);
         I2CBusMaster(const I2CBusMaster &rhs) = delete;
         I2CBusMaster(I2CBusMaster &&rhs);
@@ -52,10 +64,10 @@ namespace i2c
         void SetEnableInternalPullup(bool enable);
         bool GetEnableInternalPullup() const;
 
-        std::expected<void, esp_err_t> Open();
+        ExpectedResult Open();
         void Close();
 
-        std::expected<I2CDevice, esp_err_t> Add(uint16_t addr) const;
+        std::expected<I2CDevice, Err> Add(uint16_t addr) const;
     private:
         i2c_master_bus_config_t m_Config;
         i2c_master_bus_handle_t m_Handle = nullptr;
@@ -66,6 +78,13 @@ namespace i2c
     class I2CDevice
     {
     public:
+        struct Err
+        {
+            const char *pLocation;
+            esp_err_t code;
+        };
+        using DevRef = std::reference_wrapper<I2CDevice>;
+        using ExpectedResult = std::expected<DevRef, Err>;
         I2CDevice(const I2CBusMaster &bus, uint16_t addr = 0xff, uint32_t speed_hz = 100'000);
         I2CDevice(const I2CDevice &rhs) = delete;
         I2CDevice(I2CDevice &&rhs);
@@ -76,8 +95,12 @@ namespace i2c
         void SetSpeedHz(uint32_t hz);
         uint32_t GetSpeedHz() const;
 
-        std::expected<void, esp_err_t> Open();
+        ExpectedResult Open();
         void Close();
+
+        ExpectedResult Send(const uint8_t *pBuf, std::size_t len, duration_t d = kForever);
+        ExpectedResult Recv(uint8_t *pBuf, std::size_t len, duration_t d = kForever);
+        ExpectedResult SendRecv(const uint8_t *pSendBuf, std::size_t sendLen, uint8_t *pRecvBuf, std::size_t recvLen, duration_t d = kForever);
     private:
         const I2CBusMaster &m_Bus;
         i2c_master_dev_handle_t m_Handle = nullptr;

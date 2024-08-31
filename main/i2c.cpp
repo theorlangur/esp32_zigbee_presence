@@ -1,4 +1,9 @@
 #include "i2c.hpp"
+#include <functional>
+
+#define CALL_ESP_EXPECTED(location, f) \
+    if (auto err = f; err != ESP_OK) \
+        return std::unexpected(Err{location, err})
 
 namespace i2c
 {
@@ -86,12 +91,10 @@ namespace i2c
         return m_Config.flags.enable_internal_pullup;
     }
 
-    std::expected<void, esp_err_t> I2CBusMaster::Open()
+    I2CBusMaster::ExpectedResult I2CBusMaster::Open()
     {
-        if (auto err = i2c_new_master_bus(&m_Config, &m_Handle); err != ESP_OK)
-            return std::unexpected(err);
-
-        return {};
+        CALL_ESP_EXPECTED("I2CBusMaster::Open", i2c_new_master_bus(&m_Config, &m_Handle));
+        return std::ref(*this);
     }
 
     void I2CBusMaster::Close()
@@ -104,10 +107,12 @@ namespace i2c
 
     }
 
-    std::expected<I2CDevice, esp_err_t> I2CBusMaster::Add(uint16_t addr) const
+    std::expected<I2CDevice, I2CBusMaster::Err> I2CBusMaster::Add(uint16_t addr) const
     {
         I2CDevice d(*this, addr);
-        return d.Open().transform([&]{ return std::move(d);});
+        return d.Open()
+            .transform([&](auto &&v){ return std::move(d);})
+            .transform_error([](auto &&e)->Err{ return Err{"I2CBusMaster::Add", e.code}; });
     }
 
     I2CDevice::I2CDevice(const I2CBusMaster &bus, uint16_t addr, uint32_t speed_hz):
@@ -151,12 +156,10 @@ namespace i2c
         return m_Config.scl_speed_hz;
     }
 
-    std::expected<void, esp_err_t> I2CDevice::Open()
+    I2CDevice::ExpectedResult I2CDevice::Open()
     {
-        if (auto err = i2c_master_bus_add_device(m_Bus.m_Handle, &m_Config, &m_Handle); err != ESP_OK)
-            return std::unexpected(err);
-
-        return {};
+        CALL_ESP_EXPECTED("I2CDevice::Open", i2c_master_bus_add_device(m_Bus.m_Handle, &m_Config, &m_Handle));
+        return std::ref(*this);
     }
 
     void I2CDevice::Close()
@@ -166,5 +169,29 @@ namespace i2c
             i2c_master_bus_rm_device(m_Handle);
             m_Handle = nullptr;
         }
+    }
+
+    I2CDevice::ExpectedResult I2CDevice::Send(const uint8_t *pBuf, std::size_t len, duration_t d)
+    {
+        if (!m_Handle) return std::unexpected(Err{"I2CDevice::Send", ESP_ERR_INVALID_STATE});
+
+        CALL_ESP_EXPECTED("I2CDevice::Send", i2c_master_transmit(m_Handle, pBuf, len, d.count()));
+        return std::ref(*this);
+    }
+
+    I2CDevice::ExpectedResult I2CDevice::Recv(uint8_t *pBuf, std::size_t len, duration_t d)
+    {
+        if (!m_Handle) return std::unexpected(Err{"I2CDevice::Recv", ESP_ERR_INVALID_STATE});
+
+        CALL_ESP_EXPECTED("I2CDevice::Recv", i2c_master_receive(m_Handle, pBuf, len, d.count()));
+        return std::ref(*this);
+    }
+
+    I2CDevice::ExpectedResult I2CDevice::SendRecv(const uint8_t *pSendBuf, std::size_t sendLen, uint8_t *pRecvBuf, std::size_t recvLen, duration_t d)
+    {
+        if (!m_Handle) return std::unexpected(Err{"I2CDevice::SendRecv", ESP_ERR_INVALID_STATE});
+
+        CALL_ESP_EXPECTED("I2CDevice::SendRecv", i2c_master_transmit_receive(m_Handle, pSendBuf, sendLen, pRecvBuf, recvLen, d.count()));
+        return std::ref(*this);
     }
 }
