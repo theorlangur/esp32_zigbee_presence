@@ -53,11 +53,7 @@ namespace uart
         using ExpectedResult = std::expected<Ref, Err>;
 
         template<typename V>
-        struct RetVal
-        {
-            Ref c;
-            V v;
-        };
+        using RetVal = RetValT<Ref, V>;
 
         template<typename V>
         using ExpectedValue = std::expected<RetVal<V>, Err>;
