@@ -21,21 +21,97 @@ LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
         | and_then([](uart::Channel &c)->ExpectedResult { return std::ref(static_cast<LD2420&>(c)); });
 }
 
-LD2420::ExpectedResult LD2420::SendFrame(const uint8_t *pData, uint16_t len)
+void LD2420::frame_t::WriteCustom(std::span<uint8_t> const d)
 {
-    uint8_t frame[64] = { 0xFD, 0xFC, 0xFB, 0xFA //header
-        , uint8_t(len & 0xff), uint8_t(len >> 8) //length
-    };
+    len = (uint16_t)d.size();
+    data[4] = uint8_t(len & 0xff);
+    data[5] = uint8_t(len >> 8);
+
     constexpr size_t kDataOffset = 4 + 2;//header + len
     //copy actual data in place
-    memcpy(frame + kDataOffset, pData, len);
+    memcpy(data + kDataOffset, d.data(), len);
     constexpr uint8_t kFooter[] = {0x04, 0x03, 0x02, 0x01};
     //footer
-    memcpy(frame + kDataOffset + len, kFooter, sizeof(kFooter));
+    memcpy(data + kDataOffset + len, kFooter, sizeof(kFooter));
+}
 
-    size_t sz = kDataOffset + len + sizeof(kFooter);
+void LD2420::frame_t::WriteCmd(uint16_t cmd, std::span<uint8_t> const d)
+{
+    len = (uint16_t)d.size() + 2;
+    data[4] = uint8_t(len & 0xff);
+    data[5] = uint8_t(len >> 8);
 
-    return Send(frame, sz) 
+    constexpr size_t kDataOffset = 4 + 2;//header + len
+    //cmd
+    data[6] = uint8_t(cmd & 0xff);
+    data[7] = uint8_t(cmd >> 8);
+    //copy actual data in place
+    memcpy(data + kDataOffset + 2, d.data(), d.size());
+    constexpr uint8_t kFooter[] = {0x04, 0x03, 0x02, 0x01};
+    //footer
+    memcpy(data + kDataOffset + len, kFooter, sizeof(kFooter));
+}
+
+bool LD2420::frame_t::VerifyHeader() const
+{
+    return (data[0] == 0xFD) && (data[1] ==  0xFC) && (data[2]== 0xFB) && (data[3] == 0xFA);
+}
+
+bool LD2420::frame_t::VerifyFooter() const
+{
+    return (data[6 + len + 0] == 0x04) && (data[6 + len + 1] ==  0x03) && (data[6 + len + 2]== 0x02) && (data[6 + len + 3] == 0x01);
+}
+
+LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
+{
+    return Send(frame.data, frame.len) 
             | transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::SendFrame", ErrorCode::SendFrame}; })
             | and_then([&](uart::Channel &c)->ExpectedResult{ return std::ref(static_cast<LD2420&>(c)); });
+}
+
+LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
+{
+    return Read(frame.data, 4)
+        | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
+                if (l != 4 || !frame.VerifyHeader())
+                    return std::unexpected(::Err{"LD2420::RecvFrame < 4"});
+                return c.Read(frame.data + 4, 2);
+          })
+        //| transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::RecvFrame", ErrorCode::RecvFrame_NoLength}; })
+        | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
+            if (l != 4)
+                return std::unexpected(::Err{"LD2420::RecvFrame < 2"});
+            frame.len = frame.data[4] + (frame.data[5] << 8);
+            return c.Read(frame.data + 6, frame.len);
+          })
+        | transform_error([](::Err uartErr){ return CmdErr{{uartErr, "LD2420::RecvFrame", ErrorCode::RecvFrame_Malformed}, 0}; })
+        | and_then([&](uart::Channel &c, size_t l)->ExpectedDataResult{
+            if (l != frame.len)
+                return std::unexpected(CmdErr{{::Err{}, "LD2420::RecvFrame < len", ErrorCode::RecvFrame_Incomplete}, 0});
+            if (!frame.VerifyFooter())
+                return std::unexpected(CmdErr{{::Err{}, "LD2420::RecvFrame < len", ErrorCode::RecvFrame_Malformed}, 0});
+
+            return DataRetVal{*this, std::span<uint8_t>(frame.data + 6, frame.len)};
+          });
+}
+
+LD2420::ExpectedDataResult LD2420::SendCommandOnly(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData)
+{
+    frame_t f;
+    f.WriteCmd(cmd, outData);
+    //incomplete
+    return SendFrame(f)
+        | transform_error([](Err e){ return CmdErr{e, 0}; })
+        | and_then([](LD2420 &c){ return c.WaitAllSent() | transform_error([](::Err e){ return CmdErr{Err{e, "SendCommandOnly", ErrorCode::SendCommand_FailedWrite}, 0};}); })
+        | and_then([&](uart::Channel &c){ return RecvFrame(f); })
+        | and_then([&](LD2420 &c, std::span<uint8_t> d) -> ExpectedDataResult{ 
+                uint16_t resp_cmd = d[0] + (d[1] << 8);
+                if (resp_cmd != (cmd | 0x0100))
+                    return std::unexpected(CmdErr{Err{{}, "SendCommandOnly", ErrorCode::SendCommand_InvalidResponse}, 0});
+
+                uint16_t status = d[2] + (d[3] << 8);
+                if (status != 0)
+                    return std::unexpected(CmdErr{Err{{}, "SendCommandOnly", ErrorCode::SendCommand_Failed}, status});
+                return DataRetVal{*this, d.subspan(4, d.size() - 4)};
+          });
 }

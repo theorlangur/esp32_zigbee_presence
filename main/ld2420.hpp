@@ -2,6 +2,7 @@
 #define LD2420_H_
 
 #include "uart.hpp"
+#include <span>
 
 class LD2420: protected uart::Channel
 {
@@ -12,6 +13,15 @@ public:
         Init,
         SendFrame,
         SendFrame_Incomplete,
+
+        SendCommand_InvalidResponse,
+        SendCommand_FailedWrite,
+        SendCommand_FailedRead,
+        SendCommand_WrongFormat,
+        SendCommand_Failed,
+
+        RecvFrame_Malformed,
+        RecvFrame_Incomplete,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -34,7 +44,26 @@ public:
 
     ExpectedResult Init(int txPin, int rxPin);
 private:
-    ExpectedResult SendFrame(const uint8_t *pData, uint16_t len);
+    struct frame_t
+    {
+        uint8_t data[64] = {0xFD, 0xFC, 0xFB, 0xFA};
+        uint16_t len;
+
+        void WriteCustom(std::span<uint8_t> const d);
+        void WriteCmd(uint16_t cmd, std::span<uint8_t> const d);
+        bool VerifyHeader() const;
+        bool VerifyFooter() const;
+    };
+    struct CmdErr
+    {
+        Err e;
+        uint16_t returnCode;
+    };
+    using DataRetVal = RetValT<Ref, std::span<uint8_t>>;
+    using ExpectedDataResult = std::expected<DataRetVal, CmdErr>;
+    ExpectedDataResult SendCommandOnly(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData);
+    ExpectedResult SendFrame(const frame_t &frame);
+    ExpectedDataResult RecvFrame(frame_t &frame);
 };
 
 #endif
