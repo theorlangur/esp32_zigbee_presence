@@ -22,13 +22,10 @@ public:
     using ExpectedResult = std::expected<Ref, Err>;
 
     template<typename V>
-    struct RetValue
-    {
-        Ref d;
-        V v;
-    };
+    using RetVal = RetValT<Ref, V>;
+
     template<class V>
-    using ExpectedValue = std::expected<RetValue<V>, Err>;
+    using ExpectedValue = std::expected<RetVal<V>, Err>;
 
     LD2420(uart::Port p, int txPin, int rxPin, int baud_rate = 115200);
 private:
