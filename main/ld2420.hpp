@@ -9,6 +9,7 @@ public:
     enum class ErrorCode: uint8_t
     {
         Ok,
+        Init,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -27,8 +28,11 @@ public:
     template<class V>
     using ExpectedValue = std::expected<RetVal<V>, Err>;
 
-    LD2420(uart::Port p, int txPin, int rxPin, int baud_rate = 115200);
+    LD2420(uart::Port p, int baud_rate = 115200);
+
+    ExpectedResult Init(int txPin, int rxPin);
 private:
+    ExpectedResult SendFrame(const uint8_t *pData, uint16_t len);
 };
 
 #endif
