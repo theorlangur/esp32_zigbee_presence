@@ -10,6 +10,8 @@ public:
     {
         Ok,
         Init,
+        SendFrame,
+        SendFrame_Incomplete,
     };
     static const char* err_to_str(ErrorCode e);
 
