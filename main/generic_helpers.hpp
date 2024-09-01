@@ -1,6 +1,7 @@
 #ifndef GENERIC_HELPERS_HPP_
 #define GENERIC_HELPERS_HPP_
 
+#include "esp_err.h"
 #include <thread>
 
 class ILockable
@@ -78,5 +79,16 @@ struct WithInvalidState
 {
     static constexpr BaseType kInvalidState = kInv;
 };
+
+struct Err
+{
+    const char *pLocation = "";
+    esp_err_t code = ESP_OK;
+};
+
+#define CALL_ESP_EXPECTED(location, f) \
+    if (auto err = f; err != ESP_OK) \
+        return std::unexpected(Err{location, err})
+
 
 #endif

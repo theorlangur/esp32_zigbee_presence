@@ -28,12 +28,6 @@ namespace i2c
         Port1 = 1,
     };
 
-    struct Err
-    {
-        const char *pLocation = "";
-        esp_err_t code = ESP_OK;
-    };
-
     class I2CDevice;
 
     class I2CBusMaster

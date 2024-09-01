@@ -1,10 +1,6 @@
 #include "i2c.hpp"
 #include <functional>
 
-#define CALL_ESP_EXPECTED(location, f) \
-    if (auto err = f; err != ESP_OK) \
-        return std::unexpected(Err{location, err})
-
 namespace i2c
 {
     I2CBusMaster::I2CBusMaster(SDAType sda, SCLType slc, I2CPort port):

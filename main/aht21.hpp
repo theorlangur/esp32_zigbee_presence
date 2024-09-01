@@ -23,7 +23,7 @@ public:
     using Ref = std::reference_wrapper<AHT21>;
     struct Err
     {
-        i2c::Err i2cErr;
+        ::Err i2cErr;
         const char *pLocation;
         ErrorCode code;
     };
