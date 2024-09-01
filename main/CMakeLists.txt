@@ -1,2 +1,2 @@
-idf_component_register(SRCS main.cpp i2c.cpp aht21.cpp uart.cpp
+idf_component_register(SRCS main.cpp i2c.cpp aht21.cpp uart.cpp ld2420.cpp
                     INCLUDE_DIRS "")
