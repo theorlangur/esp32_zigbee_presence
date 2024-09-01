@@ -24,9 +24,11 @@ namespace i2c
 
     I2CBusMaster::I2CBusMaster(I2CBusMaster &&rhs):
         m_Config(rhs.m_Config),
-        m_Handle(rhs.m_Handle)
+        m_Handle(rhs.m_Handle),
+        m_pLock(rhs.m_pLock)
     {
         rhs.m_Handle = nullptr;
+        rhs.m_pLock = nullptr;
     }
 
     I2CBusMaster::~I2CBusMaster()
