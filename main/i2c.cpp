@@ -164,6 +164,7 @@ namespace i2c
 
     I2CDevice::ExpectedResult I2CDevice::Open()
     {
+        LockGuard busLock{m_Bus.m_pLock};
         CALL_ESP_EXPECTED("I2CDevice::Open", i2c_master_bus_add_device(m_Bus.m_Handle, &m_Config, &m_Handle));
         return std::ref(*this);
     }
@@ -172,6 +173,7 @@ namespace i2c
     {
         if (m_Handle)
         {
+            LockGuard busLock{m_Bus.m_pLock};
             i2c_master_bus_rm_device(m_Handle);
             m_Handle = nullptr;
         }
@@ -191,6 +193,7 @@ namespace i2c
         //printf("\n");
         //fflush(stdout);
 
+        LockGuard busLock{m_Bus.m_pLock};
         CALL_ESP_EXPECTED("I2CDevice::Send", i2c_master_transmit(m_Handle, pBuf, len, d.count()));
         return std::ref(*this);
     }
@@ -199,6 +202,7 @@ namespace i2c
     {
         if (!m_Handle) return std::unexpected(Err{"I2CDevice::Recv", ESP_ERR_INVALID_STATE});
 
+        LockGuard busLock{m_Bus.m_pLock};
         CALL_ESP_EXPECTED("I2CDevice::Recv", i2c_master_receive(m_Handle, pBuf, len, d.count()));
         return std::ref(*this);
     }
@@ -207,6 +211,7 @@ namespace i2c
     {
         if (!m_Handle) return std::unexpected(Err{"I2CDevice::SendRecv", ESP_ERR_INVALID_STATE});
 
+        LockGuard busLock{m_Bus.m_pLock};
         CALL_ESP_EXPECTED("I2CDevice::SendRecv", i2c_master_transmit_receive(m_Handle, pSendBuf, sendLen, pRecvBuf, recvLen, d.count()));
         return std::ref(*this);
     }

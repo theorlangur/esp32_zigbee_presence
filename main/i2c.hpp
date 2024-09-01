@@ -47,6 +47,9 @@ namespace i2c
         I2CBusMaster(I2CBusMaster &&rhs);
         ~I2CBusMaster();
 
+        I2CBusMaster& SetAccessLock(ILockable *pLock){ m_pLock = pLock; return *this; }
+        ILockable* GetAccessLock() const { return m_pLock; }
+
         I2CBusMaster& SetSDAPin(SDAType sda);
         SDAType GetSDAPin() const;
 
@@ -72,6 +75,7 @@ namespace i2c
     private:
         i2c_master_bus_config_t m_Config;
         i2c_master_bus_handle_t m_Handle = nullptr;
+        ILockable              *m_pLock = nullptr;
 
         friend class I2CDevice;
     };
