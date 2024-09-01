@@ -35,11 +35,7 @@ public:
         float humidity;
     };
     template<typename V>
-    struct RetValue
-    {
-        Ref d;
-        V v;
-    };
+    using RetValue = RetValT<Ref, V>;
     template<class V>
     using ExpectedValue = std::expected<RetValue<V>, Err>;
 

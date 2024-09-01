@@ -233,7 +233,7 @@ namespace i2c
         uint8_t data;
         return SendRecv(&reg, sizeof(reg), &data, sizeof(data), d)
             .transform([&](I2CDevice &d)->RetValue<uint8_t>{
-                return RetValue{d, data};
+                return RetValue<uint8_t>{d, data};
             });
     }
 
@@ -242,7 +242,7 @@ namespace i2c
         uint16_t data;
         return SendRecv(&reg, sizeof(reg), (uint8_t*)&data, sizeof(data), d)
             .transform([&](I2CDevice &d)->RetValue<uint16_t>{
-                return RetValue{std::ref(d), data};
+                return RetValue<uint16_t>{std::ref(d), data};
             });
     }
 }

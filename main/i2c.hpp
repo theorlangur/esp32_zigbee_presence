@@ -80,11 +80,7 @@ namespace i2c
         using DevRef = std::reference_wrapper<I2CDevice>;
         using ExpectedResult = std::expected<DevRef, Err>;
         template<typename V>
-        struct RetValue
-        {
-            DevRef d;
-            V v;
-        };
+        using RetValue = RetValT<DevRef, V>;
         template<class V>
         using ExpectedValue = std::expected<RetValue<V>, Err>;
 

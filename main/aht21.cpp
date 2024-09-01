@@ -1,4 +1,5 @@
 #include "aht21.hpp"
+#include "functional_helpers.hpp"
 #include <thread>
 #include <cmath>
 
@@ -39,23 +40,24 @@ AHT21::ExpectedResult AHT21::Init()
     auto *pThis = this;
     return m_Device.ReadReg8(0x71)
                    .transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_GetStatus}; })
-                   .and_then([pThis](auto &&v)->ExpectedResult{
-                        if (!(v.v & 0x04))
+                   | and_then([pThis](i2c::I2CDevice &d, uint8_t status)->ExpectedResult{
+                        if (!(status & 0x04))
                         {
                             //not calibrated
-                            return v.d.get().WriteReg16(0xbe, 0x0800)
-                                       .transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_Calibration}; })
-                                       .and_then([pThis](auto &&d)->ExpectedResult{
+                            return d.WriteReg16(0xbe, 0x0800)
+                                       | transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_Calibration}; })
+                                       | and_then([](i2c::I2CDevice &d){
                                             std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                            if (auto s = d.get().ReadReg8(0x71); s)
+                                            return d.ReadReg8(0x71)
+                                                   | transform_error([](auto &&e){ return Err{e, "AHT21::Init 2", ErrorCode::Init_GetStatus}; });
+                                       })
+                                       | and_then([pThis](i2c::I2CDevice &d, uint8_t status)->ExpectedResult{
+                                            if ((status & 0x18) != 0x18)
                                             {
-                                                if ((s.value().v & 0x18) != 0x18)
-                                                {
-                                                    pThis->ResetReg(0x1b);
-                                                    pThis->ResetReg(0x1c);
-                                                    pThis->ResetReg(0x1e);
-                                                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                                }
+                                                pThis->ResetReg(0x1b);
+                                                pThis->ResetReg(0x1c);
+                                                pThis->ResetReg(0x1e);
+                                                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                                             }
                                             return std::ref(*pThis);
                                        });
