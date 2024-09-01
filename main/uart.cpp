@@ -186,4 +186,16 @@ namespace uart
 
         return RetVal<size_t>{*this, size_t(r)};
     }
+
+    Channel::ExpectedResult Channel::Flush()
+    {
+        CALL_ESP_EXPECTED("uart::Channel::Flush", uart_flush_input(m_Port));
+        return std::ref(*this);
+    }
+
+    Channel::ExpectedResult Channel::WaitAllSent()
+    {
+        CALL_ESP_EXPECTED("uart::Channel::WaitAllSent", uart_wait_tx_idle_polling(m_Port));
+        return std::ref(*this);
+    }
 }
