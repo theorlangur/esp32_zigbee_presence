@@ -17,6 +17,27 @@
 #include "aht21.hpp"
 #include <thread>
 #include <atomic>
+#include "ld2420.hpp"
+
+void print_ld2420_error(::Err &uartErr) 
+{ 
+    printf("uart Error at %s: %s\n", uartErr.pLocation, esp_err_to_name(uartErr.code)); 
+    fflush(stdout); 
+}
+
+void print_ld2420_error(LD2420::Err &e) 
+{ 
+    print_ld2420_error(e.uartErr);
+    printf("LD2420 Error at %s: %s\n", e.pLocation, LD2420::err_to_str(e.code)); 
+    fflush(stdout); 
+}
+
+void print_ld2420_error(LD2420::CmdErr &e) 
+{ 
+    print_ld2420_error(e.e);
+    printf("CmdStatus %d\n", e.returnCode);
+    fflush(stdout); 
+}
 
 extern "C" void app_main(void)
 {
@@ -36,6 +57,31 @@ extern "C" void app_main(void)
 
     unsigned major_rev = chip_info.revision / 100;
     unsigned minor_rev = chip_info.revision % 100;
+
+    LD2420 presence(uart::Port::Port1);
+    if (auto e = presence.Init(11, 10); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }
+
+    if (auto e = presence.OpenCommandMode(); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }else
+    {
+        auto v = e.value().v;
+        printf("Protocol: %d; Buffer=%d\n", v.protocol_version, v.buffer_size);
+    }
+
+    if (auto e = presence.CloseCommandMode(); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }
+    fflush(stdout);
+    return;
 
     auto print_error = [](auto &e) { printf("i2c Error at %s: %s\n", e.pLocation, esp_err_to_name(e.code)); fflush(stdout); };
         
