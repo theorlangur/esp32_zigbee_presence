@@ -159,6 +159,11 @@ namespace uart
 
     Channel::ExpectedResult Channel::Send(const uint8_t *pData, size_t len)
     {
+        //printf("Sending:");
+        //for(int i = 0; i < len; ++i)
+        //    printf(" %X", pData[i]);
+        //printf("\n");
+        //fflush(stdout);
         int r = uart_write_bytes(m_Port, pData, len);
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Send", ESP_ERR_INVALID_ARG});
@@ -178,9 +183,9 @@ namespace uart
         return std::ref(*this);
     }
 
-    Channel::ExpectedValue<size_t> Channel::Read(uint8_t *pBuf, size_t len)
+    Channel::ExpectedValue<size_t> Channel::Read(uint8_t *pBuf, size_t len, duration_ms_t wait)
     {
-        int r = uart_read_bytes(m_Port, pBuf, len, 0);
+        int r = uart_read_bytes(m_Port, pBuf, len, wait.count() / portTICK_PERIOD_MS);
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Read", ESP_ERR_INVALID_ARG});
 

@@ -98,7 +98,7 @@ namespace uart
         ExpectedResult Send(const uint8_t *pData, size_t len);
         ExpectedResult SendWithBreak(const uint8_t *pData, size_t len, size_t breakLen);
 
-        ExpectedValue<size_t> Read(uint8_t *pBuf, size_t len);
+        ExpectedValue<size_t> Read(uint8_t *pBuf, size_t len, duration_ms_t wait=duration_ms_t{0});
         ExpectedResult Flush();
         ExpectedResult WaitAllSent();
     private:
