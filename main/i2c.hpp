@@ -4,11 +4,10 @@
 #include "generic_helpers.hpp"
 #include "driver/i2c_master.h"
 #include <expected>
-#include <chrono>
 
 namespace i2c
 {
-    using duration_t = std::chrono::duration<int, std::milli>;
+    using duration_t = ::duration_ms_t;
     inline static constexpr const duration_t kForever = duration_t(-1);
 
     class SDAType: public StrongType<gpio_num_t, struct SDATag>//, Comparable

@@ -3,6 +3,9 @@
 
 #include "esp_err.h"
 #include <thread>
+#include <chrono>
+
+using duration_ms_t = std::chrono::duration<int, std::milli>;
 
 class ILockable
 {
