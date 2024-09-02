@@ -47,9 +47,13 @@ public:
 private:
     struct frame_t
     {
+        static constexpr size_t kDataOffset = 4 + 2;//header + len
+        static constexpr size_t kFooterSize = 4;
+
         uint8_t data[64] = {0xFD, 0xFC, 0xFB, 0xFA};
         uint16_t len;
 
+        uint16_t TotalSize() const;
         void WriteCustom(std::span<uint8_t> const d);
         void WriteCmd(uint16_t cmd, std::span<uint8_t> const d);
         bool VerifyHeader() const;
