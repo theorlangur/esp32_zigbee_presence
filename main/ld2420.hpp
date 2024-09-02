@@ -19,6 +19,7 @@ public:
         SendCommand_FailedRead,
         SendCommand_WrongFormat,
         SendCommand_Failed,
+        SendCommand_InsufficientSpace,
 
         RecvFrame_Malformed,
         RecvFrame_Incomplete,
@@ -61,7 +62,7 @@ private:
     };
     using DataRetVal = RetValT<Ref, std::span<uint8_t>>;
     using ExpectedDataResult = std::expected<DataRetVal, CmdErr>;
-    ExpectedDataResult SendCommandOnly(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData);
+    ExpectedDataResult SendCommand(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData);
     ExpectedResult SendFrame(const frame_t &frame);
     ExpectedDataResult RecvFrame(frame_t &frame);
 };
