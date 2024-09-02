@@ -55,6 +55,7 @@ private:
         bool VerifyHeader() const;
         bool VerifyFooter() const;
     };
+public:
     struct CmdErr
     {
         Err e;
@@ -62,9 +63,30 @@ private:
     };
     using DataRetVal = RetValT<Ref, std::span<uint8_t>>;
     using ExpectedDataResult = std::expected<DataRetVal, CmdErr>;
-    ExpectedDataResult SendCommand(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData);
+    ExpectedDataResult SendCommand(uint16_t cmd, const std::span<uint8_t> cmdData, std::span<uint8_t> respData);
+    template<class T>
+    ExpectedDataResult SendCommand(uint16_t cmd, T &&cmdData, frame_t &respData)
+    {
+        if constexpr (!std::is_same_v<T, std::span<uint8_t>>)
+            return SendCommand(cmd, std::span<uint8_t>((uint8_t*)&cmdData, sizeof(T)), std::span<uint8_t>((uint8_t*)&respData, sizeof(frame_t)));
+        else
+            return SendCommand(cmd, cmdData, std::span<uint8_t>((uint8_t*)&respData, sizeof(frame_t)));
+    }
     ExpectedResult SendFrame(const frame_t &frame);
     ExpectedDataResult RecvFrame(frame_t &frame);
+
+
+    struct OpenCmdModeResponse
+    {
+        uint16_t protocol_version;
+        uint16_t buffer_size;
+    };
+    using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
+    using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
+    using ExpectedCloseCmdModeResult = std::expected<Ref, CmdErr>;
+
+    ExpectedOpenCmdModeResult OpenCommandMode();
+    ExpectedCloseCmdModeResult CloseCommandMode();
 };
 
 #endif

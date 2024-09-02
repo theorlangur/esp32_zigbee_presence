@@ -118,3 +118,25 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
                 return DataRetVal{*this, d.subspan(4, d.size() - 4)};
           });
 }
+
+LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
+{
+    frame_t f;
+    uint16_t protocol_version = 2;
+    return SendCommand(0xff, protocol_version, f)
+        | and_then([&](LD2420 &d, std::span<uint8_t> res)->ExpectedOpenCmdModeResult{
+                if (res.size() != 4)
+                    return std::unexpected(CmdErr{Err{{}, "OpenCommandMode", ErrorCode::SendCommand_WrongFormat}, 0});
+                OpenCmdModeResponse r;
+                r.protocol_version = *(uint16_t*)res.data();
+                r.buffer_size = *(uint16_t*)(res.data() + 2);
+                return OpenCmdModeRetVal{std::ref(d), r};
+          });
+}
+
+LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
+{
+    frame_t f;
+    return SendCommand(0xfe, std::span<uint8_t>{}, f)
+        | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
+}
