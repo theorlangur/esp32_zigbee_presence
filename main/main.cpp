@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include "functional_helpers.hpp"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -65,21 +66,24 @@ extern "C" void app_main(void)
         return;
     }
 
-    if (auto e = presence.OpenCommandMode(); !e)
+    LD2420::version_buf_t verBuf;
+    auto e = presence.OpenCommandMode()
+                | and_then([&](LD2420 &d, LD2420::OpenCmdModeResponse prot){
+                        printf("Protocol: %d; Buffer=%d\n", prot.protocol_version, prot.buffer_size);
+                        return d.GetVersion(verBuf);
+                  })
+                | and_then([](LD2420 &d, std::string_view ver){
+                        ((char*)ver.data())[ver.size()] = 0;
+                        printf("Version: %s\n", ver.data());
+                        return d.CloseCommandMode();
+                  });
+
+    if (!e)
     {
         print_ld2420_error(e.error());
         return;
-    }else
-    {
-        auto v = e.value().v;
-        printf("Protocol: %d; Buffer=%d\n", v.protocol_version, v.buffer_size);
     }
 
-    if (auto e = presence.CloseCommandMode(); !e)
-    {
-        print_ld2420_error(e.error());
-        return;
-    }
     fflush(stdout);
     return;
 
