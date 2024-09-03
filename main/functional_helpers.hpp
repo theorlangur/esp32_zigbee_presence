@@ -48,15 +48,16 @@ template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Arg
 template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Args...) const> : std::integral_constant<unsigned, sizeof...(Args)> {};
 
 template<class ExpVal, class ExpErr, class AndThenV>
-auto invoke_continuation(std::expected<ExpVal, ExpErr> const &e, and_then_t<AndThenV> &&cont)
+auto invoke_continuation(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
 {
     if constexpr (get_arity<AndThenV>::value > 1)
     {
         static_assert(get_arity<AndThenV>::value <= std::tuple_size_v<ExpVal>, "Too many arguments");
         //destruct into separate
         return [&]<std::size_t... idx>(std::index_sequence<idx...>){
+            using namespace std;
             decltype(auto) v = std::move(e).value();
-            return cont.t(std::get<idx>(v)...);
+            return cont.t(get<idx>(v)...);
         }(std::make_index_sequence<get_arity<AndThenV>::value>{});
     }else if constexpr(get_arity<AndThenV>::value == 1)
         return cont.t(std::move(e).value());
