@@ -178,3 +178,14 @@ LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
     return SendCommand(0xfe, std::span<uint8_t>{}, f)
         | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
 }
+
+LD2420::ExpectedStrResult LD2420::GetVersion(version_buf_t &buf)
+{
+    frame_t &f = reinterpret_cast<frame_t &>(buf);
+    return SendCommand(0x0, std::span<uint8_t>{}, f)
+        | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedStrResult
+          { 
+              uint16_t *pLen = (uint16_t*)val.data();
+              return StrRetVal{std::ref(*this), std::string_view((char *)val.data() + 2, *pLen)}; 
+          });
+}

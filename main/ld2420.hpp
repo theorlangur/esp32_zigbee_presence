@@ -66,7 +66,9 @@ public:
         uint16_t returnCode;
     };
     using DataRetVal = RetValT<Ref, std::span<uint8_t>>;
+    using StrRetVal = RetValT<Ref, std::string_view>;
     using ExpectedDataResult = std::expected<DataRetVal, CmdErr>;
+    using ExpectedStrResult = std::expected<StrRetVal, CmdErr>;
     ExpectedDataResult SendCommand(uint16_t cmd, const std::span<uint8_t> cmdData, std::span<uint8_t> respData);
     template<class T>
     ExpectedDataResult SendCommand(uint16_t cmd, T &&cmdData, frame_t &respData)
@@ -91,6 +93,9 @@ public:
 
     ExpectedOpenCmdModeResult OpenCommandMode();
     ExpectedCloseCmdModeResult CloseCommandMode();
+
+    using version_buf_t = char [sizeof(frame_t)];
+    ExpectedStrResult GetVersion(version_buf_t &buf);
 };
 
 #endif
