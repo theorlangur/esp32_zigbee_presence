@@ -189,3 +189,29 @@ LD2420::ExpectedStrResult LD2420::GetVersion(version_buf_t &buf)
               return StrRetVal{std::ref(*this), std::string_view((char *)val.data() + 2, *pLen)}; 
           });
 }
+
+LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
+{
+    frame_t f;
+    std::span<uint8_t> data((uint8_t*)&param, sizeof(param));
+    printf("Param to obtain: %X\n", param);
+    return SendCommand(0x0008, data, f) 
+        | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedSingleRawADBResult{
+                if (val.size() < 4)
+                    return std::unexpected(CmdErr{Err{{}, "LD2420::ReadRawADBSingle", ErrorCode::SendCommand_WrongFormat}, (uint16_t)val.size()});
+                if (val.size() > 4)
+                {
+                    printf("Unexpected bytes: ");
+                    for(uint8_t b : val)
+                        printf(" %X", b);
+                    printf("\n");
+                    fflush(stdout);
+                }
+                return SingleRawADBRetVal{std::ref(d), *(uint32_t*)val.data()};
+          });
+}
+
+LD2420::ExpectedGenericCmdResult LD2420::SetSystemMode(uint16_t mode)
+{
+    return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), mode});
+}

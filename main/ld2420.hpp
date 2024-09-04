@@ -89,13 +89,123 @@ public:
     };
     using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
     using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
-    using ExpectedCloseCmdModeResult = std::expected<Ref, CmdErr>;
+    using ExpectedGenericCmdResult = std::expected<Ref, CmdErr>;
+    using ExpectedCloseCmdModeResult = ExpectedGenericCmdResult;
 
     ExpectedOpenCmdModeResult OpenCommandMode();
     ExpectedCloseCmdModeResult CloseCommandMode();
 
     using version_buf_t = char [sizeof(frame_t)];
     ExpectedStrResult GetVersion(version_buf_t &buf);
+
+
+    using SingleRawADBRetVal = RetValT<Ref, uint32_t>;
+    using ExpectedSingleRawADBResult = std::expected<SingleRawADBRetVal, CmdErr>;
+
+    ExpectedSingleRawADBResult ReadRawADBSingle(uint16_t param);
+
+    template<size_t N>
+    struct Params
+    {
+        uint32_t value[N];
+    };
+
+    template<size_t N>
+    using MultiRawADBRetVal = RetValT<Ref, Params<N>>;
+    template<size_t N>
+    using ExpectedMultiRawADBResult = std::expected<MultiRawADBRetVal<N>, CmdErr>;
+    template<size_t N>
+    ExpectedMultiRawADBResult<N> ReadRawADBMulti(uint16_t (&regs)[N])
+    {
+        frame_t f;
+        std::span<uint8_t> data((uint8_t*)&(regs[0]), sizeof(uint16_t) * N);
+        return SendCommand(0x0008, data, f) 
+            | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedMultiRawADBResult<N>{
+                    if (val.size() < (4 * N))
+                        return std::unexpected(CmdErr{Err{{}, "LD2420::ReadRawADBSingle", ErrorCode::SendCommand_WrongFormat}, (uint16_t)val.size()});
+                    MultiRawADBRetVal<N> ret{std::ref(d), {}};
+                    uint32_t *pRaw = (uint32_t*)val.data();
+                    for(int i = 0; i < N; ++i) ret.v.value[i] = pRaw[i];
+                    return ret;
+              });
+    }
+
+    template<typename... T>
+    auto ReadRawADBMulti(T... param)->ExpectedMultiRawADBResult<sizeof...(T)>
+    {
+        uint16_t buf[sizeof...(T)] = {param...};
+        return ReadRawADBMulti<sizeof...(T)>(buf);
+    }
+
+#pragma pack(push,1)
+    struct SetParam
+    {
+        uint16_t param;
+        uint32_t value;
+    };
+#pragma pack(pop)
+    using ADBParam = SetParam;
+
+    template<size_t N>
+    ExpectedGenericCmdResult WriteRawADBMulti(ADBParam (&pairs)[N])
+    {
+        frame_t f;
+        std::span<uint8_t> data((uint8_t*)&(pairs[0]), sizeof(ADBParam) * N);
+        return SendCommand(0x0007, data, f) 
+            | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedGenericCmdResult{ return std::ref(d); });
+    }
+
+    template<typename... T>
+    auto WriteRawADBMulti(T... param)
+    {
+        ADBParam buf[sizeof...(T)] = {param...};
+        return WriteRawADBMulti<sizeof...(T)>(buf);
+    }
+
+    template<size_t N>
+    using MultiRawSysRetVal = RetValT<Ref, Params<N>>;
+    template<size_t N>
+    using ExpectedMultiRawSysResult = std::expected<MultiRawSysRetVal<N>, CmdErr>;
+    template<size_t N>
+    ExpectedMultiRawSysResult<N> ReadRawSysMulti(uint16_t (&regs)[N])
+    {
+        frame_t f;
+        std::span<uint8_t> data((uint8_t*)&(regs[0]), sizeof(uint16_t) * N);
+        return SendCommand(0x0013, data, f) 
+            | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedMultiRawSysResult<N>{
+                    if (val.size() < (4 * N))
+                        return std::unexpected(CmdErr{Err{{}, "LD2420::ReadRawSysMulti", ErrorCode::SendCommand_WrongFormat}, (uint16_t)val.size()});
+                    MultiRawADBRetVal<N> ret{std::ref(d), {}};
+                    uint32_t *pRaw = (uint32_t*)val.data();
+                    for(int i = 0; i < N; ++i) ret.v.value[i] = pRaw[i];
+                    return ret;
+              });
+    }
+
+    template<typename... T>
+    auto ReadRawSysMulti(T... param)
+    {
+        uint16_t buf[sizeof...(T)] = {param...};
+        return ReadRawSysMulti<sizeof...(T)>(buf);
+    }
+
+    template<size_t N>
+    ExpectedGenericCmdResult WriteRawSysMulti(SetParam (&pairs)[N])
+    {
+        frame_t f;
+        std::span<uint8_t> data((uint8_t*)&pairs[0], sizeof(SetParam) * N);
+        return SendCommand(0x0012, data, f) 
+            | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedGenericCmdResult{ return std::ref(d); });
+    }
+
+    template<typename... T>
+    auto WriteRawSysMulti(T... param)
+    {
+        SetParam buf[sizeof...(T)] = {param...};
+        return WriteRawSysMulti<sizeof...(T)>(buf);
+    }
+
+    ExpectedGenericCmdResult SetSystemMode(uint16_t mode);
 };
 
 #endif
