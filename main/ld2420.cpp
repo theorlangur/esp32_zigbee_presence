@@ -88,10 +88,10 @@ bool LD2420::frame_t::VerifyFooter() const
 
 LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
 {
-    printf("Sending frame of %d bytes\n", frame.TotalSize());
-    for(int i = 0; i < frame.TotalSize(); ++i)
-        printf(" %X", frame.data[i]);
-    printf("\n");
+    //printf("Sending frame of %d bytes\n", frame.TotalSize());
+    //for(int i = 0; i < frame.TotalSize(); ++i)
+    //    printf(" %X", frame.data[i]);
+    //printf("\n");
     return Send(frame.data, frame.TotalSize()) 
             | transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::SendFrame", ErrorCode::SendFrame}; })
             | and_then([&](uart::Channel &c)->ExpectedResult{ return std::ref(static_cast<LD2420&>(c)); });
@@ -101,9 +101,9 @@ LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 {
     return Read(frame.data, 4, duration_ms_t(100))
         | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
-                printf("Read %d bytes\n", l);
-                printf("4 header bytes: %X %X %X %X\n", frame.data[0], frame.data[1], frame.data[2], frame.data[3]);
-                fflush(stdout);
+                //printf("Read %d bytes\n", l);
+                //printf("4 header bytes: %X %X %X %X\n", frame.data[0], frame.data[1], frame.data[2], frame.data[3]);
+                //fflush(stdout);
                 if (l != 4 || !frame.VerifyHeader())
                     return std::unexpected(::Err{"LD2420::RecvFrame < 4"});
                 return c.Read(frame.data + 4, 2);
@@ -162,7 +162,7 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
     return SendFrame(f) 
         | transform_error([](Err e){ return CmdErr{e, 0}; })
         | and_then([&]{ 
-                printf("Sleeping before sending actual command");
+                //printf("Sleeping before sending actual command");
                 std::this_thread::sleep_for(duration_ms_t(100)); 
                 return SendCommand(0xff, protocol_version, f); 
           })
@@ -198,7 +198,7 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
 {
     frame_t f;
     std::span<uint8_t> data((uint8_t*)&param, sizeof(param));
-    printf("Param to obtain: %X\n", param);
+    //printf("Param to obtain: %X\n", param);
     return SendCommand(0x0008, data, f) 
         | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedSingleRawADBResult{
                 if (val.size() < 4)
