@@ -73,7 +73,7 @@ public:
     template<class T>
     ExpectedDataResult SendCommand(uint16_t cmd, T &&cmdData, frame_t &respData)
     {
-        if constexpr (!std::is_same_v<T, std::span<uint8_t>>)
+        if constexpr (!std::is_same_v<std::remove_cvref_t<T>, std::span<uint8_t>>)
             return SendCommand(cmd, std::span<uint8_t>((uint8_t*)&cmdData, sizeof(T)), std::span<uint8_t>((uint8_t*)&respData, sizeof(frame_t)));
         else
             return SendCommand(cmd, cmdData, std::span<uint8_t>((uint8_t*)&respData, sizeof(frame_t)));
