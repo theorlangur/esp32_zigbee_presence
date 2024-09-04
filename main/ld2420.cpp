@@ -183,14 +183,23 @@ LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
         | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
 }
 
-LD2420::ExpectedStrResult LD2420::GetVersion(version_buf_t &buf)
+std::string_view LD2420::GetVersion() const
 {
-    frame_t &f = reinterpret_cast<frame_t &>(buf);
+    return m_Version;
+}
+
+LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion();
+{
+    frame_t f;
     return SendCommand(0x0, std::span<uint8_t>{}, f)
         | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedStrResult
           { 
               uint16_t *pLen = (uint16_t*)val.data();
-              return StrRetVal{std::ref(*this), std::string_view((char *)val.data() + 2, *pLen)}; 
+              if (*pLen >= sizeof(m_Version))
+                    return std::unexpected(CmdErr{Err{{}, "LD2420::UpdateVersion", ErrorCode::SendCommand_InsufficientSpace}, *pLen});
+              memcpy(m_Version, val.data(), *pLen);
+              m_Version[*pLen] = 0;
+              return std::ref(*this);
           });
 }
 
@@ -215,7 +224,7 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
           });
 }
 
-LD2420::ExpectedGenericCmdResult LD2420::SetSystemMode(uint16_t mode)
+LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 {
-    return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), mode});
+    return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), (uint32_t)mode});
 }

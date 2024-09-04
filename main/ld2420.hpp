@@ -4,7 +4,7 @@
 #include "uart.hpp"
 #include <span>
 
-class LD2420: public uart::Channel
+class LD2420: protected uart::Channel
 {
 public:
     enum class ErrorCode: uint8_t
@@ -26,6 +26,12 @@ public:
     };
     static const char* err_to_str(ErrorCode e);
 
+    enum class SystemMode: uint32_t
+    {
+        Simple = 0x64,
+        Energy = 0x04,
+    };
+
     using Ref = std::reference_wrapper<LD2420>;
     struct Err
     {
@@ -44,7 +50,14 @@ public:
     LD2420(uart::Port p, int baud_rate = 115200);
 
     ExpectedResult Init(int txPin, int rxPin);
-public:
+
+    void SetSystemMode(SystemMode mode);
+    SystemMode GetSystemMode() const { return m_SystemMode; }
+
+    ExpectedResult ReloadConfig();
+
+    std::string_view GetVersion() const;
+private:
     struct frame_t
     {
         static constexpr size_t kDataOffset = 4 + 2;//header + len
@@ -64,10 +77,43 @@ public:
         Err e;
         uint16_t returnCode;
     };
+    template<size_t N>
+    struct Params
+    {
+        uint32_t value[N];
+    };
+    struct OpenCmdModeResponse
+    {
+        uint16_t protocol_version;
+        uint16_t buffer_size;
+    };
+
+#pragma pack(push,1)
+    struct SetParam
+    {
+        uint16_t param;
+        uint32_t value;
+    };
+#pragma pack(pop)
+
+    using ADBParam = SetParam;
     using DataRetVal = RetValT<Ref, std::span<uint8_t>>;
     using StrRetVal = RetValT<Ref, std::string_view>;
     using ExpectedDataResult = std::expected<DataRetVal, CmdErr>;
-    using ExpectedStrResult = std::expected<StrRetVal, CmdErr>;
+
+    using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
+    using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
+    using ExpectedGenericCmdResult = std::expected<Ref, CmdErr>;
+    using ExpectedCloseCmdModeResult = ExpectedGenericCmdResult;
+
+    using SingleRawADBRetVal = RetValT<Ref, uint32_t>;
+    using ExpectedSingleRawADBResult = std::expected<SingleRawADBRetVal, CmdErr>;
+
+    template<size_t N>
+    using MultiRawADBRetVal = RetValT<Ref, Params<N>>;
+    template<size_t N>
+    using ExpectedMultiRawADBResult = std::expected<MultiRawADBRetVal<N>, CmdErr>;
+
     ExpectedDataResult SendCommand(uint16_t cmd, const std::span<uint8_t> cmdData, std::span<uint8_t> respData);
     template<class T>
     ExpectedDataResult SendCommand(uint16_t cmd, T &&cmdData, frame_t &respData)
@@ -80,39 +126,11 @@ public:
     ExpectedResult SendFrame(const frame_t &frame);
     ExpectedDataResult RecvFrame(frame_t &frame);
 
-
-    struct OpenCmdModeResponse
-    {
-        uint16_t protocol_version;
-        uint16_t buffer_size;
-    };
-    using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
-    using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
-    using ExpectedGenericCmdResult = std::expected<Ref, CmdErr>;
-    using ExpectedCloseCmdModeResult = ExpectedGenericCmdResult;
-
     ExpectedOpenCmdModeResult OpenCommandMode();
     ExpectedCloseCmdModeResult CloseCommandMode();
 
-    using version_buf_t = char [sizeof(frame_t)];
-    ExpectedStrResult GetVersion(version_buf_t &buf);
-
-
-    using SingleRawADBRetVal = RetValT<Ref, uint32_t>;
-    using ExpectedSingleRawADBResult = std::expected<SingleRawADBRetVal, CmdErr>;
-
     ExpectedSingleRawADBResult ReadRawADBSingle(uint16_t param);
 
-    template<size_t N>
-    struct Params
-    {
-        uint32_t value[N];
-    };
-
-    template<size_t N>
-    using MultiRawADBRetVal = RetValT<Ref, Params<N>>;
-    template<size_t N>
-    using ExpectedMultiRawADBResult = std::expected<MultiRawADBRetVal<N>, CmdErr>;
     template<size_t N>
     ExpectedMultiRawADBResult<N> ReadRawADBMulti(uint16_t (&regs)[N])
     {
@@ -135,15 +153,6 @@ public:
         uint16_t buf[sizeof...(T)] = {param...};
         return ReadRawADBMulti<sizeof...(T)>(buf);
     }
-
-#pragma pack(push,1)
-    struct SetParam
-    {
-        uint16_t param;
-        uint32_t value;
-    };
-#pragma pack(pop)
-    using ADBParam = SetParam;
 
     template<size_t N>
     ExpectedGenericCmdResult WriteRawADBMulti(ADBParam (&pairs)[N])
@@ -204,7 +213,25 @@ public:
         return WriteRawSysMulti<sizeof...(T)>(buf);
     }
 
-    ExpectedGenericCmdResult SetSystemMode(uint16_t mode);
+    ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
+    ExpectedGenericCmdResult UpdateVersion();
+    ExpectedGenericCmdResult UpdateSystemMode();
+    ExpectedGenericCmdResult UpdateMinMaxTimeout();
+    ExpectedGenericCmdResult UpdateGate(uint8_t gate);
+
+
+    char m_Version[10];
+    SystemMode m_Mode = SystemMode::Energy;
+    OpenCmdModeResponse m_ProtoInfo{0, 0};
+    uint32_t m_MinDistance;
+    uint32_t m_MaxDistance;
+    uint32_t m_Timeout;
+    struct Gate
+    {
+        uint16_t m_StillThreshold;
+        uint16_t m_MoveThreshold;
+    };
+    Gate m_Gates[16];
 };
 
 #endif
