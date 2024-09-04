@@ -88,6 +88,10 @@ bool LD2420::frame_t::VerifyFooter() const
 
 LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
 {
+    printf("Sending frame of %d bytes\n", frame.TotalSize());
+    for(int i = 0; i < frame.TotalSize(); ++i)
+        printf(" %X", frame.data[i]);
+    printf("\n");
     return Send(frame.data, frame.TotalSize()) 
             | transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::SendFrame", ErrorCode::SendFrame}; })
             | and_then([&](uart::Channel &c)->ExpectedResult{ return std::ref(static_cast<LD2420&>(c)); });
@@ -97,9 +101,9 @@ LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 {
     return Read(frame.data, 4, duration_ms_t(100))
         | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
-                //printf("Read %d bytes\n", l);
-                //printf("4 header bytes: %X %X %X %X\n", frame.data[0], frame.data[1], frame.data[2], frame.data[3]);
-                //fflush(stdout);
+                printf("Read %d bytes\n", l);
+                printf("4 header bytes: %X %X %X %X\n", frame.data[0], frame.data[1], frame.data[2], frame.data[3]);
+                fflush(stdout);
                 if (l != 4 || !frame.VerifyHeader())
                     return std::unexpected(::Err{"LD2420::RecvFrame < 4"});
                 return c.Read(frame.data + 4, 2);
@@ -130,7 +134,7 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
 
     frame_t f;
     f.WriteCmd(cmd, outData);
-    printf("Sending command %X\n", cmd);
+    //printf("Sending command %X; Span: %d\n", cmd, outData.size());
     return Flush() //flushing whatever unread was in the buffer
         | transform_error([](::Err e){ return Err{e, "SendCommand", ErrorCode::SendCommand_Failed}; })
         | and_then([&]{ return SendFrame(f); })

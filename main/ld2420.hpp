@@ -4,7 +4,7 @@
 #include "uart.hpp"
 #include <span>
 
-class LD2420: protected uart::Channel
+class LD2420: public uart::Channel
 {
 public:
     enum class ErrorCode: uint8_t
@@ -44,7 +44,7 @@ public:
     LD2420(uart::Port p, int baud_rate = 115200);
 
     ExpectedResult Init(int txPin, int rxPin);
-private:
+public:
     struct frame_t
     {
         static constexpr size_t kDataOffset = 4 + 2;//header + len
@@ -59,7 +59,6 @@ private:
         bool VerifyHeader() const;
         bool VerifyFooter() const;
     };
-public:
     struct CmdErr
     {
         Err e;
