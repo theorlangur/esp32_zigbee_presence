@@ -77,111 +77,15 @@ extern "C" void app_main(void)
         return;
     }
 
-    LD2420::version_buf_t verBuf;
-    auto e = presence.OpenCommandMode()
-                | and_then([&](LD2420 &d, LD2420::OpenCmdModeResponse prot){
-                        printf("Protocol: %d; Buffer=%d\n", prot.protocol_version, prot.buffer_size);
-                        return d.GetVersion(verBuf);
-                  })
-                | and_then([](LD2420 &d, std::string_view ver){
-                        ((char*)ver.data())[ver.size()] = 0;
-                        printf("Version: %s\n", ver.data());
-                        return d.ReadRawADBSingle(0x0000);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0, val);
-                        return d.ReadRawADBSingle(0x0001);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0001, val);
-                        return d.ReadRawADBSingle(0x0002);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0002, val);
-                        return d.ReadRawADBSingle(0x0003);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0003, val);
-                        return d.ReadRawADBSingle(0x0010);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0010, val);
-                        return d.ReadRawADBSingle(0x0011);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0011, val);
-                        return d.ReadRawADBSingle(0x0012);
-                  })
-                | and_then([](LD2420 &d, uint32_t val){
-                        printf("Param %X: %lX\n", 0x0012, val);
-                        return d.CloseCommandMode();
-                  })
-                ;
-    //auto e = presence.OpenCommandMode()
-    //            | and_then([&]{ return presence.SetSystemMode(0x04); })//energy
-    //            | and_then([&]{ return presence.ReadRawADBMulti(uint16_t(0x0), uint16_t(0x01), uint16_t(0x04)); })
-    //            | and_then([&](LD2420 &d, LD2420::Params<3> &params){ 
-    //                    printf("Min gate distance: %d\nMax gate distance: %d\nTimeout: %d\n"
-    //                            , (uint16_t)params.value[0]
-    //                            , (uint16_t)params.value[1]
-    //                            , (uint16_t)params.value[2]);
-    //                    using p = LD2420::ADBParam;
-    //                    return presence.WriteRawADBMulti(p{0x0, 1}, p{0x01, 12}, p{0x04, 120}); 
-    //            })
-    //            | and_then([&]{ 
-    //                    std::this_thread::sleep_for(duration_ms_t(100));
-    //                    return presence.ReadRawADBMulti(uint16_t(0x0), uint16_t(0x01), uint16_t(0x04)); 
-    //                    })
-    //            | and_then([&](LD2420 &d, LD2420::Params<3> &params){ 
-    //                    printf("After set:\nMin gate distance: %d\nMax gate distance: %d\nTimeout: %d\n"
-    //                            , (uint16_t)params.value[0]
-    //                            , (uint16_t)params.value[1]
-    //                            , (uint16_t)params.value[2]);
-    //                    return d.CloseCommandMode();
-    //              });
-    if (!e)
+    if (auto e = presence.ReloadConfig(); !e)
     {
         print_ld2420_error(e.error());
         return;
     }
 
-    //uint8_t buf[1024];
-    //for(int i = 0; i < 50000; ++i)
-    //{
-    //    size_t l;
-    //    if (auto e = presence.GetReadyToReadDataLen(); !e)
-    //    {
-    //        printf("Reading length failed. Iteration %d", i);
-    //        print_ld2420_error(e.error());
-    //        return;
-    //    }else
-    //        l = e.value().v;
-    //
-    //    if (l)
-    //    {
-    //        printf("Available %d bytes\n", l);
-    //        if (auto e = presence.Read(buf, l); !e)
-    //        {
-    //            printf("Reading failed. Iteration %d", i);
-    //            print_ld2420_error(e.error());
-    //            return;
-    //        }else
-    //            l = e.value().v;
-    //
-    //        print_bytes(std::span<uint8_t>(buf, l));
-    //        fflush(stdout);
-    //    }else
-    //    {
-    //        std::this_thread::sleep_for(duration_ms_t(500));
-    //        //vTaskDelay(10 / portTICK_PERIOD_MS);
-    //    }
-    //}
-
-    //if (!e)
-    //{
-    //    print_ld2420_error(e.error());
-    //    return;
-    //}
+    printf("Version: %s\n", presence.GetVersion().data());
+    printf("Current Mode: %d\n", (int)presence.GetSystemMode());
+    printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", presence.GetMinDistance(), presence.GetMaxDistance(), presence.GetTimeout());
 
     fflush(stdout);
     return;
