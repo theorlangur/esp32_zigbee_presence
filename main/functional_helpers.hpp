@@ -133,8 +133,8 @@ auto invoke_continuation_lval(std::expected<ExpVal, ExpErr> &e, Cont &cont, Args
 template<class Exp, class Cont>
 using ret_type_continuation_t = decltype(invoke_continuation(std::declval<Exp>(), std::declval<Cont>()));
 
-template<class Exp, class Cont>
-using ret_type_continuation_lval_t = decltype(invoke_continuation_lval(std::declval<Exp>(), std::declval<Cont>()));
+template<class Exp, class Cont, class... Args>
+using ret_type_continuation_lval_t = decltype(invoke_continuation_lval(std::declval<Exp&>(), std::declval<Cont&>(), std::declval<Args>()...));
 
 template<class ExpVal, class ExpErr, class AndThenV>
 auto operator|(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)->ret_type_continuation_t<decltype(e), decltype(cont)>
@@ -205,7 +205,7 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, 
 }
 
 template<class ExpVal, class ExpErr, class V>
-auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def), int>
 {
     if (!e)
         return std::move(e);
