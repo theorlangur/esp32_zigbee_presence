@@ -67,6 +67,9 @@ public:
     int GetMaxDistance() const { return m_MaxDistance * 7 / 10; }
     uint32_t GetMaxDistanceRaw() const { return m_MaxDistance; }
 
+    auto GetMoveThreshold(uint8_t gate) const { return m_Gates[gate].m_MoveThreshold; }
+    auto GetStillThreshold(uint8_t gate) const { return m_Gates[gate].m_StillThreshold; }
+
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
 
     ExpectedResult ReloadConfig();
