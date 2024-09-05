@@ -50,6 +50,7 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
                 , [&]{ return UpdateSystemMode(); }
                 , [&]{ std::this_thread::sleep_for(duration_ms_t(100)); return true; } //on error
             ) //apparently cannot be read
+        | or_else(std::ref(*this))
         | and_then([&]{ return UpdateMinMaxTimeout(); })
         | repeat_n(16, [&](uint8_t i){ return UpdateGate(i); })
         | and_then([&]{ return CloseCommandMode(); })
