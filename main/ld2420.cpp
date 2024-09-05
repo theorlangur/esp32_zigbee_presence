@@ -42,6 +42,16 @@ LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
         | and_then([](uart::Channel &c)->ExpectedResult { return std::ref(static_cast<LD2420&>(c)); });
 }
 
+LD2420::ExpectedResult LD2420::ReloadConfig()
+{
+    return OpenCommandMode()
+        | and_then([&]{ return UpdateVersion(); })
+        //| and_then([&]{ return UpdateSystemMode(); }) //apparently cannot be read
+        | and_then([&]{ return UpdateMinMaxTimeout(); })
+        | and_then([&]{ return CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
+}
+
 void LD2420::frame_t::WriteCustom(std::span<uint8_t> const d)
 {
     len = (uint16_t)d.size();
@@ -88,10 +98,13 @@ bool LD2420::frame_t::VerifyFooter() const
 
 LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
 {
-    //printf("Sending frame of %d bytes\n", frame.TotalSize());
-    //for(int i = 0; i < frame.TotalSize(); ++i)
-    //    printf(" %X", frame.data[i]);
-    //printf("\n");
+    if constexpr (kDebugFrame)
+    {
+        printf("Sending frame of %d bytes\n", frame.TotalSize());
+        for(int i = 0; i < frame.TotalSize(); ++i)
+            printf(" %X", frame.data[i]);
+        printf("\n");
+    }
     return Send(frame.data, frame.TotalSize()) 
             | transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::SendFrame", ErrorCode::SendFrame}; })
             | and_then([&](uart::Channel &c)->ExpectedResult{ return std::ref(static_cast<LD2420&>(c)); });
@@ -101,11 +114,12 @@ LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 {
     return Read(frame.data, 4, duration_ms_t(100))
         | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
-                //printf("Read %d bytes\n", l);
-                //printf("4 header bytes: %X %X %X %X\n", frame.data[0], frame.data[1], frame.data[2], frame.data[3]);
-                //fflush(stdout);
                 if (l != 4 || !frame.VerifyHeader())
+                {
+                    if constexpr (kDebugFrame)
+                        printf("RecvFrame Failure: %d bytes\n", l);
                     return std::unexpected(::Err{"LD2420::RecvFrame < 4"});
+                }
                 return c.Read(frame.data + 4, 2);
           })
         | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
@@ -134,7 +148,8 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
 
     frame_t f;
     f.WriteCmd(cmd, outData);
-    //printf("Sending command %X; Span: %d\n", cmd, outData.size());
+    if constexpr (kDebugCommands)
+        printf("Sending command %X; Span: %d\n", cmd, outData.size());
     return Flush() //flushing whatever unread was in the buffer
         | transform_error([](::Err e){ return Err{e, "SendCommand", ErrorCode::SendCommand_Failed}; })
         | and_then([&]{ return SendFrame(f); })
@@ -188,21 +203,6 @@ std::string_view LD2420::GetVersion() const
     return m_Version;
 }
 
-LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion();
-{
-    frame_t f;
-    return SendCommand(0x0, std::span<uint8_t>{}, f)
-        | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedStrResult
-          { 
-              uint16_t *pLen = (uint16_t*)val.data();
-              if (*pLen >= sizeof(m_Version))
-                    return std::unexpected(CmdErr{Err{{}, "LD2420::UpdateVersion", ErrorCode::SendCommand_InsufficientSpace}, *pLen});
-              memcpy(m_Version, val.data(), *pLen);
-              m_Version[*pLen] = 0;
-              return std::ref(*this);
-          });
-}
-
 LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
 {
     frame_t f;
@@ -214,11 +214,13 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
                     return std::unexpected(CmdErr{Err{{}, "LD2420::ReadRawADBSingle", ErrorCode::SendCommand_WrongFormat}, (uint16_t)val.size()});
                 if (val.size() > 4)
                 {
-                    printf("Unexpected bytes: ");
-                    for(uint8_t b : val)
-                        printf(" %X", b);
-                    printf("\n");
-                    fflush(stdout);
+                    if constexpr (kDebugCommands)
+                    {
+                        printf("Unexpected bytes: ");
+                        for(uint8_t b : val) printf(" %X", b);
+                        printf("\n");
+                        fflush(stdout);
+                    }
                 }
                 return SingleRawADBRetVal{std::ref(d), *(uint32_t*)val.data()};
           });
@@ -227,4 +229,53 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
 LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 {
     return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), (uint32_t)mode});
+}
+
+
+LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
+{
+    frame_t f;
+    return SendCommand(0x0, std::span<uint8_t>{}, f)
+        | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedGenericCmdResult
+          { 
+              uint16_t *pLen = (uint16_t*)val.data();
+              if (*pLen >= sizeof(m_Version))
+                    return std::unexpected(CmdErr{Err{{}, "LD2420::UpdateVersion", ErrorCode::SendCommand_InsufficientSpace}, *pLen});
+              memcpy(m_Version, val.data() + sizeof(uint16_t), *pLen);
+              m_Version[*pLen] = 0;
+              return std::ref(*this);
+          });
+}
+
+LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
+{
+    return ReadRawSysMulti(SysRegs::Mode)
+        | and_then([&](LD2420 &d, Params<1> val)->ExpectedGenericCmdResult
+          { 
+              memcpy(&m_Mode, &val.value[0], sizeof(val.value[0]));
+              return std::ref(*this);
+          });
+}
+
+LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
+{
+    return ReadRawADBMulti(ADBRegs::MinDistance, ADBRegs::MaxDistance, ADBRegs::Timeout)
+        | and_then([&](LD2420 &d, Params<3> val)->ExpectedGenericCmdResult
+          { 
+              memcpy(&m_MinDistance, &val.value[0], sizeof(val.value[0]));
+              memcpy(&m_MaxDistance, &val.value[1], sizeof(val.value[1]));
+              memcpy(&m_Timeout, &val.value[2], sizeof(val.value[2]));
+              return std::ref(*this);
+          });
+}
+
+LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
+{
+    return ReadRawADBMulti((uint16_t)ADBRegs::MoveThresholdGateBase + gate, (uint16_t)ADBRegs::StillThresholdGateBase + gate)
+        | and_then([&](LD2420 &d, Params<2> val)->ExpectedGenericCmdResult
+          { 
+              memcpy(&m_Gates[gate].m_MoveThreshold, &val.value[0], sizeof(Gate::m_MoveThreshold));
+              memcpy(&m_Gates[gate].m_StillThreshold, &val.value[1], sizeof(Gate::m_StillThreshold));
+              return std::ref(*this);
+          });
 }

@@ -7,6 +7,8 @@
 class LD2420: protected uart::Channel
 {
 public:
+    static const constexpr bool kDebugFrame = false;
+    static const constexpr bool kDebugCommands = false;
     enum class ErrorCode: uint8_t
     {
         Ok,
@@ -40,6 +42,11 @@ public:
         ErrorCode code;
     };
     using ExpectedResult = std::expected<Ref, Err>;
+    struct CmdErr
+    {
+        Err e;
+        uint16_t returnCode;
+    };
 
     template<typename V>
     using RetVal = RetValT<Ref, V>;
@@ -52,12 +59,37 @@ public:
     ExpectedResult Init(int txPin, int rxPin);
 
     void SetSystemMode(SystemMode mode);
-    SystemMode GetSystemMode() const { return m_SystemMode; }
+    SystemMode GetSystemMode() const { return m_Mode; }
+
+    int GetMinDistance() const { return m_MinDistance * 7 / 10; }
+    uint32_t GetMinDistanceRaw() const { return m_MinDistance; }
+
+    int GetMaxDistance() const { return m_MaxDistance * 7 / 10; }
+    uint32_t GetMaxDistanceRaw() const { return m_MaxDistance; }
+
+    uint32_t GetTimeout() const { return m_Timeout; }//seconds
 
     ExpectedResult ReloadConfig();
 
     std::string_view GetVersion() const;
 private:
+    enum class ADBRegs: uint16_t
+    {
+        MinDistance = 0,
+        MaxDistance = 1,
+        ActiveFrameNum = 2,
+        InactiveFrameNum = 3,
+        Timeout = 4,
+
+        MoveThresholdGateBase = 0x10,
+        StillThresholdGateBase = 0x20,
+    };
+
+    enum class SysRegs: uint16_t
+    {
+        Mode = 0
+    };
+
     struct frame_t
     {
         static constexpr size_t kDataOffset = 4 + 2;//header + len
@@ -71,11 +103,6 @@ private:
         void WriteCmd(uint16_t cmd, std::span<uint8_t> const d);
         bool VerifyHeader() const;
         bool VerifyFooter() const;
-    };
-    struct CmdErr
-    {
-        Err e;
-        uint16_t returnCode;
     };
     template<size_t N>
     struct Params
@@ -150,7 +177,7 @@ private:
     template<typename... T>
     auto ReadRawADBMulti(T... param)->ExpectedMultiRawADBResult<sizeof...(T)>
     {
-        uint16_t buf[sizeof...(T)] = {param...};
+        uint16_t buf[sizeof...(T)] = {(uint16_t)param...};
         return ReadRawADBMulti<sizeof...(T)>(buf);
     }
 
@@ -193,7 +220,7 @@ private:
     template<typename... T>
     auto ReadRawSysMulti(T... param)
     {
-        uint16_t buf[sizeof...(T)] = {param...};
+        uint16_t buf[sizeof...(T)] = {(uint16_t)param...};
         return ReadRawSysMulti<sizeof...(T)>(buf);
     }
 
@@ -223,8 +250,8 @@ private:
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Energy;
     OpenCmdModeResponse m_ProtoInfo{0, 0};
-    uint32_t m_MinDistance;
-    uint32_t m_MaxDistance;
+    uint32_t m_MinDistance;//*70cm to get the distance
+    uint32_t m_MaxDistance;//*70cm to get the distance
     uint32_t m_Timeout;
     struct Gate
     {
