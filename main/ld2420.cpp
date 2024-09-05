@@ -46,7 +46,10 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
 {
     return OpenCommandMode()
         | and_then([&]{ return UpdateVersion(); })
-        //| and_then([&]{ return UpdateSystemMode(); }) //apparently cannot be read
+        | retry_on_fail(3
+                , [&]{ return UpdateSystemMode(); }
+                , [&]{ std::this_thread::sleep_for(duration_ms_t(100)); return true; } //on error
+            ) //apparently cannot be read
         | and_then([&]{ return UpdateMinMaxTimeout(); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });

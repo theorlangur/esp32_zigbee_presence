@@ -40,6 +40,33 @@ auto or_else(V &&f)
     return or_else_t{std::move(f)};
 }
 
+template<class CB>
+struct retry_on_fail_t
+{
+    CB t;
+    int attempts;
+};
+template<class CB>
+auto retry_on_fail(int attempts, CB &&f)
+{
+    return retry_on_fail_t{std::move(f), attempts};
+}
+
+template<class CB, class ErrorHandler>
+struct retry_on_fail_err_handle_t: retry_on_fail_t<CB>
+{
+    retry_on_fail_err_handle_t(CB &&f, int attempts, ErrorHandler &&e):
+        retry_on_fail_t<CB>{std::move(f), attempts},
+        err{std::move(e)}
+    {}
+    ErrorHandler err;
+};
+template<class CB, class ErrorHandler>
+auto retry_on_fail(int attempts, CB &&f, ErrorHandler &&err)
+{
+    return retry_on_fail_err_handle_t{std::move(f), attempts, std::move(err)};
+}
+
 template <typename T> struct get_arity : get_arity<decltype(&T::operator())> {};
 template <typename R, typename... Args> struct get_arity<R(*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
 // Possibly add specialization for variadic functions
@@ -61,6 +88,24 @@ auto invoke_continuation(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV>
         }(std::make_index_sequence<get_arity<AndThenV>::value>{});
     }else if constexpr(get_arity<AndThenV>::value == 1)
         return cont.t(std::move(e).value());
+    else
+        return cont.t();
+}
+
+template<class ExpVal, class ExpErr, class RetryV>
+auto invoke_retry_continuation(std::expected<ExpVal, ExpErr> &e, retry_on_fail_t<RetryV> &cont)
+{
+    if constexpr (get_arity<RetryV>::value > 1)
+    {
+        static_assert(get_arity<RetryV>::value <= std::tuple_size_v<ExpVal>, "Too many arguments");
+        //destruct into separate
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>){
+            using namespace std;
+            decltype(auto) v = e.value();
+            return cont.t(get<idx>(v)...);
+        }(std::make_index_sequence<get_arity<RetryV>::value>{});
+    }else if constexpr(get_arity<RetryV>::value == 1)
+        return cont.t(e.value());
     else
         return cont.t();
 }
@@ -89,7 +134,48 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, or_else_t<V> &&def)->std::expe
     if (!e)
         return std::move(def).t;
     else
-        return e;
+        return std::move(e);
+}
+
+template<class ExpVal, class ExpErr, class V>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_t<V> &&def)->std::expected<ExpVal, ExpErr>
+{
+    if (!e)
+        return std::move(e);
+
+    for(int i = 0; i < (def.attempts - 1); ++i)
+    {
+        if (auto te = invoke_retry_continuation(e, def); te)
+            return te;
+    }
+    return invoke_retry_continuation(e, def);
+}
+
+template<class ExpVal, class ExpErr, class V, class E>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, E> &&def)->std::expected<ExpVal, ExpErr>
+{
+    if (!e)
+        return std::move(e);
+
+    for(int i = 0; i < (def.attempts - 1); ++i)
+    {
+        if (auto te = invoke_retry_continuation(e, def); te)
+            return te;
+        else
+        { 
+            if constexpr (get_arity<E>::value == 1)
+            {
+                if (!def.err(te.error()))
+                    return te;//we stop iterating and return error
+            }else if constexpr (get_arity<E>::value == 0)
+            {
+                if (!def.err())
+                    return te;//we stop iterating and return error
+            }else
+                static_assert(get_arity<E>::value == 1, "Error handler must accept either 1 parameter (error) or nothing");
+        }
+    }
+    return invoke_retry_continuation(e, def);
 }
 
 #endif
