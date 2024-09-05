@@ -86,6 +86,10 @@ extern "C" void app_main(void)
     printf("Version: %s\n", presence.GetVersion().data());
     printf("Current Mode: %d\n", (int)presence.GetSystemMode());
     printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", presence.GetMinDistance(), presence.GetMaxDistance(), presence.GetTimeout());
+    for(uint8_t i = 0; i < 16; ++i)
+    {
+        printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
+    }
 
     fflush(stdout);
     return;
