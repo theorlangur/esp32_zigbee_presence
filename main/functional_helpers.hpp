@@ -83,6 +83,20 @@ auto repeat_n(int n, CB &&f)
     return repeat_n_t{std::move(f), n};
 }
 
+template<class While, class CB, class Default>
+struct repeat_while_t
+{
+    using Callback = CB;
+    While w;
+    CB t;
+    Default d;
+};
+template<class While, class CB, class Default>
+auto repeat_while(While &&w, CB &&f, Default &&d)
+{
+    return repeat_while_t{std::move(w), std::move(f), std::move(d)};
+}
+
 template <typename T> struct get_arity : get_arity<decltype(&T::operator())> {};
 template <typename R, typename... Args> struct get_arity<R(*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
 // Possibly add specialization for variadic functions
@@ -216,6 +230,35 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V> &&def)->ret_type
             return te;
     }
     return invoke_continuation_lval(e, def, def.n - 1);
+}
+
+template<class ExpVal, class ExpErr, class W, class V, class D>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
+{
+    if (!e)
+        return std::move(e);
+
+    using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def)>;
+    alignas(ret_type_t) uint8_t resMem[sizeof(ret_type_t)];
+    ret_type_continuation_lval_t<decltype(e), decltype(def)> *pRes = nullptr;
+    while(true)
+    {
+        if (auto te = def.w(); !te)
+            return std::unexpected(te.error());
+        else if (!te.value())
+            break;
+        if (auto te = invoke_continuation_lval(e, def); !te)
+            return te;
+        else
+        {
+            if (!pRes) pRes = new (resMem) ret_type_t(std::move(te));
+            else *pRes = std::move(te);
+        }
+    }
+    if (!pRes)
+        return def.d();
+    
+    return *pRes;
 }
 
 #endif
