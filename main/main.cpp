@@ -91,6 +91,18 @@ extern "C" void app_main(void)
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
+    while(true)
+    {
+        if (auto te = presence.TryHandleDataSimpleMode(); !te)
+        {
+            print_ld2420_error(te.error());
+            break;
+        }
+        auto p = presence.GetPresence();
+        printf("Presence: %s; Distance: %.2fm\n", p.m_Detected ? "Detected" : "Clear", p.m_Distance);
+        fflush(stdout);
+    }
+
     fflush(stdout);
     return;
 

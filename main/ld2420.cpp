@@ -19,6 +19,10 @@ const char* LD2420::err_to_str(ErrorCode e)
         case ErrorCode::SendCommand_InsufficientSpace: return "SendCommand_InsufficientSpace";
         case ErrorCode::RecvFrame_Malformed: return "RecvFrame_Malformed";
         case ErrorCode::RecvFrame_Incomplete: return "RecvFrame_Incomplete";
+        case ErrorCode::SimpleData_Malformed: return "SimpleData_Malformed";
+        case ErrorCode::EnergyData_Malformed: return "EnergyData_Malformed";
+        case ErrorCode::SimpleData_Failure: return "SimpleData_Failure";
+        case ErrorCode::EnergyData_Failure: return "EnergyData_Failure";
     }
     return "unknown";
 }
@@ -288,31 +292,96 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 LD2420::ExpectedResult LD2420::TryHandleDataSimpleMode()
 {
     char buf[32];
-    return Flush() 
-        | and_then([&]{ return Read(buf, sizeof(buf), duration_ms_t{100}); })
-        | and_then([&](uart::Channel &c, size_t l)->ExpectedResult{  
+    size_t buf_avail = sizeof(32);
+    size_t buf_off = 0;
+    int frame = 0;
+
+    auto try_process_frame = [&]{
+        return [&](uart::Channel &c, size_t l)->ExpectedResult{  
+                l += buf_off;
+                //printf("Trying to process frame %d; Len: %d\n", frame, l);
+                ++frame;
+                //buf[l] = 0;
+                //printf("Buf ascii: %s\n", buf);
+                if (l < 10)
+                {
+                    printf("Error while Trying to process frame %d; Len: %d\n", frame, l);
+                    buf[l] = 0;
+                    printf("Buf ascii: %s\n", buf);
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l < 10", ErrorCode::SimpleData_Malformed});
+                }
+
                 int off = 0;
                 if (std::string_view(buf, 2) == "ON")
                 {
-                    m_PresenceDetected = true;
+                    m_Presence.m_Detected = true;
                     off += 2;
                 }
                 else if (std::string_view(buf, 3) == "OFF")
                 {
-                    m_PresenceDetected = false;
+                    m_Presence.m_Detected = false;
                     off += 3;
                 }else
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode ON|OFF", ErrorCode::SimpleData_Malformed});
 
+                l -= off;
                 if (std::string_view(buf + off, 2) != "\r\n")
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode rn", ErrorCode::SimpleData_Malformed});
 
                 off += 2;
+                l -= 2;
 
-                if (std::string_view(buf + off, sizeof("Range")) != "Range")
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
-                off += sizeof("Range");
+                constexpr const char rng[] = "Range ";
+                constexpr size_t rngLen = sizeof(rng) - 1;
+
+                if (l < rngLen)
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l<Range", ErrorCode::SimpleData_Malformed});
+
+                if (std::string_view(buf + off, rngLen) != "Range ")
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode Range", ErrorCode::SimpleData_Malformed});
+                off += rngLen;
+                l -= rngLen;
 
                 //parse the number
-          });
+                m_Presence.m_Distance = 0;
+                while(l && buf[off] >= '0' && buf[off] <= '9')
+                {
+                    m_Presence.m_Distance = m_Presence.m_Distance * 10 + buf[off] - '0';
+                    ++off;
+                    --l;
+                }
+                m_Presence.m_Distance /= 100;
+                if (l < 2)
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l < 2", ErrorCode::SimpleData_Malformed});
+                if (std::string_view(buf + off, 2) != "\r\n")
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode end rn", ErrorCode::SimpleData_Malformed});
+
+                off += 2;
+                l -= 2;
+
+                memcpy(buf, buf + off, l);
+                buf_off = l;
+                buf_avail = sizeof(buf) - l;
+                return std::ref(*this);
+          };
+    };
+
+    return Flush() 
+        | and_then([&]{ return Read((uint8_t*)buf, sizeof(buf) - 1, duration_ms_t{100}); })
+        | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::Read initial", ErrorCode::SimpleData_Failure};})
+        | and_then(try_process_frame())
+        | repeat_while(
+                /*while condition*/[&]()->std::expected<bool,Err>{ 
+                        return GetReadyToReadDataLen()
+                                | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::GetReadyToReadDataLen", ErrorCode::SimpleData_Failure};})
+                                | and_then([&](uart::Channel &c, size_t l)->std::expected<bool,Err>{ return l > 0; })
+                        ;
+                    },
+                /*while body*/[&]()->ExpectedResult{
+                        return Read((uint8_t*)buf + buf_off, buf_avail, duration_ms_t{0})
+                                | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::Read while", ErrorCode::SimpleData_Failure};})
+                                | and_then(try_process_frame());
+                },
+                /*no iteration case*/[&]()->ExpectedResult{ return std::ref(*this); }
+            );
 }

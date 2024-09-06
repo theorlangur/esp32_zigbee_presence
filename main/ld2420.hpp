@@ -28,6 +28,9 @@ public:
 
         SimpleData_Malformed,
         EnergyData_Malformed,
+
+        SimpleData_Failure,
+        EnergyData_Failure,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -57,6 +60,12 @@ public:
     template<class V>
     using ExpectedValue = std::expected<RetVal<V>, Err>;
 
+    struct PresenceResult
+    {
+        bool m_Detected = false;
+        float m_Distance = 0;
+    };
+
     LD2420(uart::Port p, int baud_rate = 115200);
 
     ExpectedResult Init(int txPin, int rxPin);
@@ -79,6 +88,7 @@ public:
 
     std::string_view GetVersion() const;
 
+    PresenceResult GetPresence() const { return m_Presence; }
 private:
     enum class ADBRegs: uint16_t
     {
@@ -253,7 +263,9 @@ private:
     ExpectedGenericCmdResult UpdateMinMaxTimeout();
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
+public:
     ExpectedResult TryHandleDataSimpleMode();
+private:
 
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Simple;
@@ -268,8 +280,7 @@ private:
     };
     Gate m_Gates[16];
 
-    bool m_PresenceDetected = false;
-    float m_PresenceDistance = 0;
+    PresenceResult m_Presence;
 };
 
 #endif
