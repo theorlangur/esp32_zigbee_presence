@@ -25,6 +25,9 @@ public:
 
         RecvFrame_Malformed,
         RecvFrame_Incomplete,
+
+        SimpleData_Malformed,
+        EnergyData_Malformed,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -75,6 +78,7 @@ public:
     ExpectedResult ReloadConfig();
 
     std::string_view GetVersion() const;
+
 private:
     enum class ADBRegs: uint16_t
     {
@@ -249,9 +253,10 @@ private:
     ExpectedGenericCmdResult UpdateMinMaxTimeout();
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
+    ExpectedResult TryHandleDataSimpleMode();
 
     char m_Version[10];
-    SystemMode m_Mode = SystemMode::Energy;
+    SystemMode m_Mode = SystemMode::Simple;
     OpenCmdModeResponse m_ProtoInfo{0, 0};
     uint32_t m_MinDistance;//*70cm to get the distance
     uint32_t m_MaxDistance;//*70cm to get the distance
@@ -262,6 +267,9 @@ private:
         uint16_t m_MoveThreshold;
     };
     Gate m_Gates[16];
+
+    bool m_PresenceDetected = false;
+    float m_PresenceDistance = 0;
 };
 
 #endif

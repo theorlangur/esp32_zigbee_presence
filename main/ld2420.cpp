@@ -284,3 +284,35 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
               return std::ref(*this);
           });
 }
+
+LD2420::ExpectedResult LD2420::TryHandleDataSimpleMode()
+{
+    char buf[32];
+    return Flush() 
+        | and_then([&]{ return Read(buf, sizeof(buf), duration_ms_t{100}); })
+        | and_then([&](uart::Channel &c, size_t l)->ExpectedResult{  
+                int off = 0;
+                if (std::string_view(buf, 2) == "ON")
+                {
+                    m_PresenceDetected = true;
+                    off += 2;
+                }
+                else if (std::string_view(buf, 3) == "OFF")
+                {
+                    m_PresenceDetected = false;
+                    off += 3;
+                }else
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
+
+                if (std::string_view(buf + off, 2) != "\r\n")
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
+
+                off += 2;
+
+                if (std::string_view(buf + off, sizeof("Range")) != "Range")
+                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode", ErrorCode::SimpleData_Malformed});
+                off += sizeof("Range");
+
+                //parse the number
+          });
+}
