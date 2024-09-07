@@ -104,19 +104,67 @@ template <typename R, typename... Args> struct get_arity<R(*)(Args...)> : std::i
 template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
 template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Args...) const> : std::integral_constant<unsigned, sizeof...(Args)> {};
 
+
+template<class CB, class V, size_t N, size_t...idx>
+concept can_skip_first_n_args_c = requires(CB &cb, V &&v){
+        cb(get<idx + N>(v)...);
+};
+
+template<class CB, class V, size_t N, size_t... idx>
+consteval bool can_skip_first_n_args_impl(std::index_sequence<idx...>)
+{
+    return can_skip_first_n_args_c<CB, V, N, idx...>;
+}
+
+template<class V>
+concept supports_tuple_interface = requires{
+    std::tuple_size_v<V>;
+};
+
+template<class CB, class V, size_t N>
+consteval bool can_skip_first_n_args()
+{
+    constexpr const size_t arity = get_arity<CB>::value;
+    if constexpr (arity == 1)
+        return can_skip_first_n_args_impl<CB, V, N>(std::make_index_sequence<arity>{});
+    else if constexpr (arity > 1 && supports_tuple_interface<V>)
+        if constexpr (std::tuple_size_v<V> > arity)
+            return can_skip_first_n_args_impl<CB, V, N>(std::make_index_sequence<arity>{});
+        else
+            return false;
+    else
+        return false;
+}
+
+template<class ExpVal, class ExpErr, class AndThenV>
+void check_skip(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
+{
+    static_assert(can_skip_first_n_args<AndThenV, ExpVal, 1>());
+}
+
+
 template<class ExpVal, class ExpErr, class AndThenV>
 auto invoke_continuation(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
 {
-    if constexpr (get_arity<AndThenV>::value > 1)
+    constexpr const size_t arity = get_arity<AndThenV>::value;
+    if constexpr (can_skip_first_n_args<AndThenV, ExpVal, 1>())
     {
-        static_assert(get_arity<AndThenV>::value <= std::tuple_size_v<ExpVal>, "Too many arguments");
+        //destruct into separate and skip 1st argument
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>){
+            using namespace std;
+            decltype(auto) v = std::move(e).value();
+            return cont.t(get<idx + 1>(v)...);
+        }(std::make_index_sequence<arity>{});
+    }else if constexpr (arity > 1)
+    {
+        static_assert(arity <= std::tuple_size_v<ExpVal>, "Too many arguments");
         //destruct into separate
         return [&]<std::size_t... idx>(std::index_sequence<idx...>){
             using namespace std;
             decltype(auto) v = std::move(e).value();
             return cont.t(get<idx>(v)...);
-        }(std::make_index_sequence<get_arity<AndThenV>::value>{});
-    }else if constexpr(get_arity<AndThenV>::value == 1)
+        }(std::make_index_sequence<arity>{});
+    }else if constexpr(arity == 1)
         return cont.t(std::move(e).value());
     else
         return cont.t();
