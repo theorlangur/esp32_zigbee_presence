@@ -91,9 +91,16 @@ extern "C" void app_main(void)
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
+    presence.SetTimeout(5);
+    if (auto e = presence.UpdateMinMaxTimeoutConfig(); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }
+
     while(true)
     {
-        if (auto te = presence.TryHandleDataSimpleMode(); !te)
+        if (auto te = presence.TryReadSimpleFrameV2(); !te)
         {
             print_ld2420_error(te.error());
             break;
