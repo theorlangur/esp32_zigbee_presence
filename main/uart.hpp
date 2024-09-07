@@ -101,6 +101,8 @@ namespace uart
         ExpectedValue<size_t> Read(uint8_t *pBuf, size_t len, duration_ms_t wait=duration_ms_t{0});
         ExpectedResult Flush();
         ExpectedResult WaitAllSent();
+        ExpectedValue<uint8_t> ReadByte(duration_ms_t wait=duration_ms_t{0});
+        ExpectedValue<uint8_t> PeekByte(duration_ms_t wait=duration_ms_t{0});
     private:
         uart_port_t m_Port;
         uart_config_t m_Config;
@@ -115,6 +117,8 @@ namespace uart
             }m_State;
             uint8_t m_StateU8 = 0;
         };
+        bool m_HasPeekByte = false;
+        uint8_t m_PeekByte = 0;
     };
 }
 #endif

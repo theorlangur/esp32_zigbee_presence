@@ -1,5 +1,6 @@
 #include "uart.hpp"
 #include <utility>
+#include "functional_helpers.hpp"
 
 namespace uart
 {
@@ -185,11 +186,45 @@ namespace uart
 
     Channel::ExpectedValue<size_t> Channel::Read(uint8_t *pBuf, size_t len, duration_ms_t wait)
     {
+        if (!len) return RetVal<size_t>{*this, size_t(0)};
+        bool addedPeek = m_HasPeekByte;
+        if (m_HasPeekByte)
+        {
+            pBuf[0] = m_PeekByte;
+            m_HasPeekByte = false;
+            --len;
+            ++pBuf;
+            if (!len) return RetVal<size_t>{*this, 1};
+        }
+
         int r = uart_read_bytes(m_Port, pBuf, len, wait.count() / portTICK_PERIOD_MS);
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Read", ESP_ERR_INVALID_ARG});
 
-        return RetVal<size_t>{*this, size_t(r)};
+        return RetVal<size_t>{*this, size_t(r) + size_t(addedPeek)};
+    }
+
+    Channel::ExpectedValue<uint8_t> Channel::ReadByte(duration_ms_t wait)
+    {
+        uint8_t b;
+        return Read(&b, 1, wait)
+            | and_then([&](Channel &c, size_t l)->ExpectedValue<uint8_t>{
+                    if (!l)
+                        return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
+                    return RetVal{std::ref(*this), b};
+                });
+    }
+
+    Channel::ExpectedValue<uint8_t> Channel::PeekByte(duration_ms_t wait)
+    {
+        if (m_HasPeekByte)
+            return RetVal{std::ref(*this), m_PeekByte};
+        return ReadByte(wait)
+            | and_then([&](Channel &c, uint8_t b)->ExpectedValue<uint8_t>{
+                    m_HasPeekByte = true;
+                    m_PeekByte = b;
+                    return RetVal{std::ref(*this), b};
+              });
     }
 
     Channel::ExpectedResult Channel::Flush()
