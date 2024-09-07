@@ -31,6 +31,11 @@ public:
 
         SimpleData_Failure,
         EnergyData_Failure,
+
+        FillBuffer_NoSpace,
+        FillBuffer_ReadFailure,
+
+        MatchError,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -83,6 +88,9 @@ public:
     auto GetStillThreshold(uint8_t gate) const { return m_Gates[gate].m_StillThreshold; }
 
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
+    void SetTimeout(uint32_t t) { m_Timeout = t; }
+
+    ExpectedResult UpdateMinMaxTimeoutConfig();
 
     ExpectedResult ReloadConfig();
 
@@ -264,21 +272,28 @@ private:
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
 public:
-    ExpectedResult TryHandleDataSimpleMode();
+    ExpectedResult ReadSimpleFrameV2();
+    ExpectedResult TryReadSimpleFrameV2(int attempts = 3);
 private:
+    ExpectedResult TryFillBuffer(size_t s);
 
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Simple;
     OpenCmdModeResponse m_ProtoInfo{0, 0};
-    uint32_t m_MinDistance;//*70cm to get the distance
-    uint32_t m_MaxDistance;//*70cm to get the distance
-    uint32_t m_Timeout;
+    uint32_t m_MinDistance = 1;//*70cm to get the distance
+    uint32_t m_MaxDistance = 12;//*70cm to get the distance
+    uint32_t m_Timeout = 30;
     struct Gate
     {
         uint16_t m_StillThreshold;
         uint16_t m_MoveThreshold;
     };
     Gate m_Gates[16];
+
+    char m_Buffer[64];
+    size_t m_BufferReadFrom = 0;
+    size_t m_BufferWriteTo = 0;
+    bool m_BufferEmpty = true;
 
     PresenceResult m_Presence;
 };

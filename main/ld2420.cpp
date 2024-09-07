@@ -23,6 +23,9 @@ const char* LD2420::err_to_str(ErrorCode e)
         case ErrorCode::EnergyData_Malformed: return "EnergyData_Malformed";
         case ErrorCode::SimpleData_Failure: return "SimpleData_Failure";
         case ErrorCode::EnergyData_Failure: return "EnergyData_Failure";
+        case ErrorCode::FillBuffer_NoSpace: return "FillBuffer_NoSpace";
+        case ErrorCode::FillBuffer_ReadFailure: return "FillBuffer_ReadFailure";
+        case ErrorCode::MatchError: return "MatchError";
     }
     return "unknown";
 }
@@ -289,99 +292,152 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
           });
 }
 
-LD2420::ExpectedResult LD2420::TryHandleDataSimpleMode()
+LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
 {
-    char buf[32];
-    size_t buf_avail = sizeof(32);
-    size_t buf_off = 0;
-    int frame = 0;
+    if (!m_BufferEmpty)
+    {
+        size_t avail = m_BufferWriteTo < m_BufferReadFrom ? (m_BufferReadFrom - m_BufferWriteTo) : sizeof(m_Buffer) - m_BufferWriteTo + m_BufferReadFrom;
+        if (avail < s)
+            return std::unexpected(Err{{}, "LD2420::TryFillBuffer", ErrorCode::FillBuffer_NoSpace});
+    }
 
-    auto try_process_frame = [&]{
-        return [&](uart::Channel &c, size_t l)->ExpectedResult{  
-                l += buf_off;
-                //printf("Trying to process frame %d; Len: %d\n", frame, l);
-                ++frame;
-                //buf[l] = 0;
-                //printf("Buf ascii: %s\n", buf);
-                if (l < 10)
-                {
-                    printf("Error while Trying to process frame %d; Len: %d\n", frame, l);
-                    buf[l] = 0;
-                    printf("Buf ascii: %s\n", buf);
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l < 10", ErrorCode::SimpleData_Malformed});
-                }
+    return ExpectedResult{std::ref(*this)} |
+        repeat_while(
+                /*condition*/[&]()->std::expected<bool, Err>{ return s > 0; },
+                /*iteration*/[&]()->ExpectedResult{
+                    size_t availCont = m_BufferWriteTo < m_BufferReadFrom ? (m_BufferReadFrom - m_BufferWriteTo) : sizeof(m_Buffer) - m_BufferWriteTo;
+                    if (availCont > s) availCont = s;
+                    return Read((uint8_t*)m_Buffer + m_BufferWriteTo, availCont, duration_ms_t{100})
+                        | transform_error([&](::Err e){ return Err{e, "LD2420::TryFillBuffer", ErrorCode::FillBuffer_ReadFailure};})
+                        | and_then([&](uart::Channel &c, size_t l)->ExpectedResult{
+                                s -= l;
+                                m_BufferWriteTo = (m_BufferWriteTo + l) % sizeof(m_Buffer);
+                                return std::ref(*this);
+                        });
+                },
+                /*on no iterations*/[&]()->ExpectedResult{return std::ref(*this);}
+        );
+}
 
-                int off = 0;
-                if (std::string_view(buf, 2) == "ON")
-                {
-                    m_Presence.m_Detected = true;
-                    off += 2;
-                }
-                else if (std::string_view(buf, 3) == "OFF")
-                {
-                    m_Presence.m_Detected = false;
-                    off += 3;
-                }else
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode ON|OFF", ErrorCode::SimpleData_Malformed});
+LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
+{
+    constexpr const auto _wait = duration_ms_t(150);
+    char b = 0;
 
-                l -= off;
-                if (std::string_view(buf + off, 2) != "\r\n")
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode rn", ErrorCode::SimpleData_Malformed});
-
-                off += 2;
-                l -= 2;
-
-                constexpr const char rng[] = "Range ";
-                constexpr size_t rngLen = sizeof(rng) - 1;
-
-                if (l < rngLen)
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l<Range", ErrorCode::SimpleData_Malformed});
-
-                if (std::string_view(buf + off, rngLen) != "Range ")
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode Range", ErrorCode::SimpleData_Malformed});
-                off += rngLen;
-                l -= rngLen;
-
-                //parse the number
-                m_Presence.m_Distance = 0;
-                while(l && buf[off] >= '0' && buf[off] <= '9')
-                {
-                    m_Presence.m_Distance = m_Presence.m_Distance * 10 + buf[off] - '0';
-                    ++off;
-                    --l;
-                }
-                m_Presence.m_Distance /= 100;
-                if (l < 2)
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode l < 2", ErrorCode::SimpleData_Malformed});
-                if (std::string_view(buf + off, 2) != "\r\n")
-                    return std::unexpected(Err{{}, "LD2420::TryHandleDataSimpleMode end rn", ErrorCode::SimpleData_Malformed});
-
-                off += 2;
-                l -= 2;
-
-                memcpy(buf, buf + off, l);
-                buf_off = l;
-                buf_avail = sizeof(buf) - l;
-                return std::ref(*this);
-          };
+    auto ReadNextByte = [&]()->ExpectedResult{
+        return ReadByte(_wait)
+                    | transform_error([&](::Err e){ return Err{e, "LD2420:: ReadNextByte", ErrorCode::FillBuffer_ReadFailure};})
+                    | and_then([&](uart::Channel &c, uint8_t _b)->ExpectedResult{ b = (char)_b; return std::ref(*this); }); 
+    };
+    auto PeekNextByte = [&]()->ExpectedResult{
+        return PeekByte(_wait)
+                    | transform_error([&](::Err e){ return Err{e, "LD2420:: PeekNextByte", ErrorCode::FillBuffer_ReadFailure};})
+                    | and_then([&](uart::Channel &c, uint8_t _b)->ExpectedResult{ b = (char)_b; return std::ref(*this); }); 
     };
 
-    return Flush() 
-        | and_then([&]{ return Read((uint8_t*)buf, sizeof(buf) - 1, duration_ms_t{100}); })
-        | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::Read initial", ErrorCode::SimpleData_Failure};})
-        | and_then(try_process_frame())
-        | repeat_while(
-                /*while condition*/[&]()->std::expected<bool,Err>{ 
-                        return GetReadyToReadDataLen()
-                                | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::GetReadyToReadDataLen", ErrorCode::SimpleData_Failure};})
-                                | and_then([&](uart::Channel &c, size_t l)->std::expected<bool,Err>{ return l > 0; })
-                        ;
-                    },
-                /*while body*/[&]()->ExpectedResult{
-                        return Read((uint8_t*)buf + buf_off, buf_avail, duration_ms_t{0})
-                                | transform_error([&](::Err e){ return Err{e, "TryHandleDataSimpleMode::Read while", ErrorCode::SimpleData_Failure};})
-                                | and_then(try_process_frame());
+    const char *pMatchStr = nullptr, *pMatchStr2 = nullptr;
+
+    auto MatchStr = [&](const char *pStr){
+        pMatchStr = pStr;
+        return repeat_while(
+                [&]()->std::expected<bool,Err>{ return *pMatchStr != 0; },
+                [&]()->ExpectedResult{
+                    return ReadNextByte() 
+                    | and_then([&]()->ExpectedResult{
+                            if (*pMatchStr != b)
+                            {
+                                printf("Match failed to %s\n", pMatchStr);
+                                return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchStr", ErrorCode::MatchError});
+                            }
+                            ++pMatchStr;
+                            return std::ref(*this);
+                      });
                 },
-                /*no iteration case*/[&]()->ExpectedResult{ return std::ref(*this); }
+                [&]()->ExpectedResult{ return std::ref(*this); }
+        );
+    };
+
+    using MatchAnyResult = RetVal<int>;
+    using ExpectedAnyResult = std::expected<MatchAnyResult, Err>;
+
+    auto MatchAnyStr = [&](const char *pStr1, const char *pStr2){
+        pMatchStr = pStr1;
+        pMatchStr2 = pStr2;
+        return repeat_while(
+                [&]()->std::expected<bool,Err>{ return (pMatchStr && *pMatchStr != 0) || (pMatchStr2 && *pMatchStr2 != 0); },
+                [&]()->ExpectedAnyResult{
+                    return ReadNextByte() 
+                    | and_then([&]()->ExpectedAnyResult{
+                            if (pMatchStr && *pMatchStr != b)
+                                pMatchStr = nullptr;
+                            if (pMatchStr2 && *pMatchStr2 != b)
+                                pMatchStr2 = nullptr;
+                            if (!pMatchStr && !pMatchStr2)
+                                return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchAnyStr", ErrorCode::MatchError});
+
+                            int match;
+                            if (pMatchStr) ++pMatchStr, match = 0;
+                            if (pMatchStr2) ++pMatchStr2, match = 1;
+                            return MatchAnyResult{std::ref(*this), match};
+                      });
+                },
+                [&]()->ExpectedAnyResult{ return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchAnyStr", ErrorCode::MatchError}); }
+        );
+    };
+
+    auto ScanFor = [&](char c){
+        return repeat_while(
+                [&,c]()->std::expected<bool,Err>{ return PeekNextByte() | and_then([&]()->std::expected<bool,Err>{ return b != c; }); },
+                [&]{ return ReadNextByte(); },
+                [&]()->ExpectedResult{ return std::ref(*this); }
+        );
+    };
+
+    uint16_t val = 0;
+    auto ParseNum = repeat_while(
+            [&]()->std::expected<bool,Err>{ return PeekNextByte() | and_then([&]()->std::expected<bool,Err>{ return b >= '0' && b <= '9'; }); },
+            [&]{ return ReadNextByte() | and_then([&]()->ExpectedResult{ val = val * 10 + b - '0'; return std::ref(*this);}); },
+            [&]()->ExpectedResult{ return std::ref(*this); }
             );
+
+
+    return ExpectedResult{std::ref(*this)}
+                    | ScanFor('O')
+                    | MatchAnyStr("ON", "OFF")//either ON or OFF
+                    | and_then([&](LD2420 &d, int match)->ExpectedResult{
+                            m_Presence.m_Detected = match == 0;
+                            return std::ref(*this);
+                      })
+                    | MatchStr("\r\n")
+                    | and_then([&]()->ExpectedResult{
+                            if (m_Presence.m_Detected)
+                                return ExpectedResult{std::ref(*this)}
+                                    | MatchStr("Range ")
+                                    | std::move(ParseNum)
+                                    | MatchStr("\r\n")
+                                    | and_then([&]()->ExpectedResult{
+                                            m_Presence.m_Distance = float(val) / 100;
+                                            return std::ref(*this);
+                                    });
+                            else
+                                return std::ref(*this);
+                            })
+                    ;
 }
+
+LD2420::ExpectedResult LD2420::TryReadSimpleFrameV2(int attempts)
+{
+    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadSimpleFrameV2(); });
+}
+
+LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
+{
+    return OpenCommandMode()
+        | and_then([&]{ return WriteRawADBMulti(
+                    ADBParam{uint16_t(ADBRegs::MinDistance), m_MinDistance}
+                    , ADBParam{uint16_t(ADBRegs::MaxDistance), m_MaxDistance}
+                    , ADBParam{uint16_t(ADBRegs::Timeout), m_Timeout}); })
+        | and_then([&]{ return CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
+}
+
