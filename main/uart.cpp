@@ -208,7 +208,7 @@ namespace uart
     {
         uint8_t b;
         return Read(&b, 1, wait)
-            | and_then([&](Channel &c, size_t l)->ExpectedValue<uint8_t>{
+            | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
                         return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
                     return RetVal{std::ref(*this), b};
@@ -220,7 +220,7 @@ namespace uart
         if (m_HasPeekByte)
             return RetVal{std::ref(*this), m_PeekByte};
         return ReadByte(wait)
-            | and_then([&](Channel &c, uint8_t b)->ExpectedValue<uint8_t>{
+            | and_then([&](uint8_t b)->ExpectedValue<uint8_t>{
                     m_HasPeekByte = true;
                     m_PeekByte = b;
                     return RetVal{std::ref(*this), b};
