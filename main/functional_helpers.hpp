@@ -222,7 +222,7 @@ template<class ExpVal, class ExpErr, class V>
 auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def), int>
 {
     if (!e)
-        return std::move(e);
+        return std::unexpected(std::move(e).error());
 
     for(int i = 0; i < (def.n - 1); ++i)
     {
@@ -236,7 +236,7 @@ template<class ExpVal, class ExpErr, class W, class V, class D>
 auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
 {
     if (!e)
-        return std::move(e);
+        return std::unexpected(std::move(e).error());
 
     using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def)>;
     alignas(ret_type_t) uint8_t resMem[sizeof(ret_type_t)];
