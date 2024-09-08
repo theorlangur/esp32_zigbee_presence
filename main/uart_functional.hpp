@@ -6,7 +6,7 @@
 
 namespace uart
 {
-    auto match_bytes(Channel &c, duration_ms_t wait, std::span<uint8_t> bytes)
+    auto match_bytes(Channel &c, std::span<uint8_t> bytes)
     {
         struct ctx_t
         {
@@ -18,8 +18,8 @@ namespace uart
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
                 /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.idx < ctx.bytes.size(); },
-                /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{
-                                return ctx.c.ReadByte(wait) 
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{
+                                return ctx.c.ReadByte() 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         if (ctx.bytes[ctx.idx] != b)
                                         {
@@ -36,7 +36,7 @@ namespace uart
     }
 
     template<class... Seqs>
-    auto match_any_bytes(Channel &c, duration_ms_t wait, Seqs&&... bytes)
+    auto match_any_bytes(Channel &c, Seqs&&... bytes)
     {
         struct ctx_t
         {
@@ -51,8 +51,8 @@ namespace uart
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
                 /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.anyValidLeft && ctx.match == -1; },
-                /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{
-                                return ctx.c.ReadByte(wait) 
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{
+                                return ctx.c.ReadByte() 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         ctx.anyValidLeft = false;
                                         int match = 0;
@@ -82,7 +82,7 @@ namespace uart
                 );
     }
 
-    auto match_bytes(Channel &c, duration_ms_t wait, const uint8_t *pBytes, uint8_t terminator)
+    auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator)
     {
         //printf("match_bytes for: %s\n", pBytes);
         struct ctx_t
@@ -95,8 +95,8 @@ namespace uart
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
                 /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return *ctx.pBytes != ctx.terminator; },
-                /*iteration*/[wait, pOrig=pBytes](ctx_t &ctx)->ExpectedResult{
-                                return ctx.c.ReadByte(wait) 
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{
+                                return ctx.c.ReadByte() 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         if (*ctx.pBytes != b)
                                         {
@@ -112,13 +112,13 @@ namespace uart
                 );
     }
 
-    auto match_bytes(Channel &c, duration_ms_t wait, const char *pStr)
+    auto match_bytes(Channel &c, const char *pStr)
     {
-        return match_bytes(c, wait, (const uint8_t*)pStr, 0);
+        return match_bytes(c, (const uint8_t*)pStr, 0);
     }
 
     template<class... BytePtr>
-    auto match_any_bytes_term(Channel &c, duration_ms_t wait, uint8_t term, BytePtr&&... bytes)
+    auto match_any_bytes_term(Channel &c, uint8_t term, BytePtr&&... bytes)
     {
         struct ctx_t
         {
@@ -134,8 +134,8 @@ namespace uart
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
                 /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.anyValidLeft && ctx.match == -1; },
-                /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{
-                                return ctx.c.ReadByte(wait) 
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{
+                                return ctx.c.ReadByte() 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         ctx.anyValidLeft = false;
                                         int match = 0;
@@ -166,7 +166,7 @@ namespace uart
                 );
     }
 
-    auto read_until(Channel &c, uint8_t until, duration_ms_t wait)
+    auto read_until(Channel &c, uint8_t until)
     {
         struct ctx_t
         {
@@ -176,8 +176,8 @@ namespace uart
         using ExpectedResult = std::expected<Channel::Ref, ::Err>;
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
-                /*condition*/[wait](ctx_t &ctx)->ExpectedCondition{ return ctx.c.PeekByte(wait) | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); },
-                /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte(wait) | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
+                /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.c.PeekByte() | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); },
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, until}
                 );
