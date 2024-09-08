@@ -5,7 +5,6 @@
 #include <utility>
 #include <tuple>
 
-
 template<class T>
 struct and_then_t
 {
@@ -110,6 +109,7 @@ auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={})
 
 struct any_t
 {
+    any_t(std::size_t);
     template<class T>
     constexpr operator T&&() const noexcept;
     template<class T>
@@ -132,9 +132,8 @@ consteval const T& get_fake_object() noexcept {
 template<std::size_t N, class C>
 consteval bool has_arity_of(C const& f)
 {
-    any_t args[N];
     return [&]<std::size_t... idx>(std::index_sequence<idx...>){
-        return requires { f(args[idx]...); };
+        return requires { f(any_t(idx)...); };
     }(std::make_index_sequence<N>());
 }
 
@@ -156,6 +155,25 @@ constexpr std::size_t get_arity_of()
 {
     return get_arity_of_impl<C>();
 }
+
+
+template<class C>
+constexpr auto get_return_type()
+{
+   return []<std::size_t... idx>(std::index_sequence<idx...>)
+    {
+        return get_fake_object<C>()(any_t(idx)...);
+    }(std::make_index_sequence<get_arity_of<C>()>());
+}
+
+template<class C>
+struct return_type_of
+{
+    using type = decltype(get_return_type<C>());
+};
+
+template<class C>
+using return_type_of_t = return_type_of<C>::type;
 
 
 template<class CB, class V, size_t N, size_t...idx>
