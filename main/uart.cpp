@@ -187,6 +187,7 @@ namespace uart
     Channel::ExpectedValue<size_t> Channel::Read(uint8_t *pBuf, size_t len, duration_ms_t wait)
     {
         if (!len) return RetVal<size_t>{*this, size_t(0)};
+        if (wait == kDefaultWait) wait = m_DefaultWait;
         bool addedPeek = m_HasPeekByte;
         if (m_HasPeekByte)
         {
@@ -206,6 +207,7 @@ namespace uart
 
     Channel::ExpectedValue<uint8_t> Channel::ReadByte(duration_ms_t wait)
     {
+        if (wait == kDefaultWait) wait = m_DefaultWait;
         uint8_t b;
         return Read(&b, 1, wait)
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
@@ -219,6 +221,7 @@ namespace uart
     {
         if (m_HasPeekByte)
             return RetVal{std::ref(*this), m_PeekByte};
+        if (wait == kDefaultWait) wait = m_DefaultWait;
         return ReadByte(wait)
             | and_then([&](uint8_t b)->ExpectedValue<uint8_t>{
                     m_HasPeekByte = true;

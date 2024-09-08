@@ -58,6 +58,8 @@ namespace uart
         template<typename V>
         using ExpectedValue = std::expected<RetVal<V>, Err>;
 
+        static const constexpr duration_ms_t kDefaultWait = duration_ms_t{-1};
+
         Channel(Port p, int baud_rate = 115200, Parity parity = Parity::Disable);
         ~Channel();
 
@@ -89,6 +91,9 @@ namespace uart
 
         ExpectedResult SetPins(int tx, int rx, int rts = UART_PIN_NO_CHANGE, int cts = UART_PIN_NO_CHANGE);
 
+        void SetDefaultWait(duration_ms_t w) { m_DefaultWait = w; }
+        duration_ms_t GetDefaultWait() const { return m_DefaultWait; }
+
         ExpectedResult Open();
         ExpectedResult Close();
 
@@ -98,11 +103,11 @@ namespace uart
         ExpectedResult Send(const uint8_t *pData, size_t len);
         ExpectedResult SendWithBreak(const uint8_t *pData, size_t len, size_t breakLen);
 
-        ExpectedValue<size_t> Read(uint8_t *pBuf, size_t len, duration_ms_t wait=duration_ms_t{0});
+        ExpectedValue<size_t> Read(uint8_t *pBuf, size_t len, duration_ms_t wait=kDefaultWait);
         ExpectedResult Flush();
         ExpectedResult WaitAllSent();
-        ExpectedValue<uint8_t> ReadByte(duration_ms_t wait=duration_ms_t{0});
-        ExpectedValue<uint8_t> PeekByte(duration_ms_t wait=duration_ms_t{0});
+        ExpectedValue<uint8_t> ReadByte(duration_ms_t wait=kDefaultWait);
+        ExpectedValue<uint8_t> PeekByte(duration_ms_t wait=kDefaultWait);
     private:
         uart_port_t m_Port;
         uart_config_t m_Config;
@@ -110,6 +115,7 @@ namespace uart
         int m_RxBufferSize = 1024;
         int m_TxBufferSize = 1024;
         int m_QueueSize = 10;
+        duration_ms_t m_DefaultWait{0};
         union{
             struct{
                 uint8_t configured: 1;
