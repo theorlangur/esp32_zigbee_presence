@@ -5,6 +5,7 @@
 #include <utility>
 #include <tuple>
 
+
 template<class T>
 struct and_then_t
 {
@@ -107,14 +108,54 @@ auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={})
     return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx)};
 }
 
+struct any_t
+{
+    template<class T>
+    constexpr operator T&&() const noexcept;
+    template<class T>
+    constexpr operator T&() const noexcept;
+    template<class T>
+    constexpr operator const T&() const noexcept;
+};
 
+template <class T>
+struct wrapper {
+  const T value;
+  static const wrapper<T> report_if_you_see_a_link_error_with_this_object;
+};
 
-template <typename T> struct get_arity : get_arity<decltype(&T::operator())> {};
-template <typename R, typename... Args> struct get_arity<R(*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
-// Possibly add specialization for variadic functions
-// Member functions:
-template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
-template <typename R, typename C, typename... Args> struct get_arity<R(C::*)(Args...) const> : std::integral_constant<unsigned, sizeof...(Args)> {};
+template <class T>
+consteval const T& get_fake_object() noexcept {
+  return wrapper<T>::report_if_you_see_a_link_error_with_this_object.value;
+}
+
+template<std::size_t N, class C>
+consteval bool has_arity_of(C const& f)
+{
+    any_t args[N];
+    return [&]<std::size_t... idx>(std::index_sequence<idx...>){
+        return requires { f(args[idx]...); };
+    }(std::make_index_sequence<N>());
+}
+
+template<class C, std::size_t N = 10>
+constexpr std::size_t get_arity_of_impl()
+{
+    if constexpr (N == 0)
+    {
+        static_assert(requires{get_fake_object<C>()();}, "If this fails then either f is not invokable or arity bigger than max supported");
+        return 0;
+    }else if constexpr (has_arity_of<N>(get_fake_object<C>()))
+        return N;
+    else
+        return get_arity_of_impl<C, N-1>();
+}
+
+template<class C>
+constexpr std::size_t get_arity_of()
+{
+    return get_arity_of_impl<C>();
+}
 
 
 template<class CB, class V, size_t N, size_t...idx>
@@ -136,7 +177,7 @@ concept supports_tuple_interface = requires{
 template<class CB, class V, size_t N>
 consteval bool can_skip_first_n_args()
 {
-    constexpr const size_t arity = get_arity<CB>::value;
+    constexpr const size_t arity = get_arity_of<CB>();
     if constexpr (arity == 1)
         return can_skip_first_n_args_impl<CB, V, N>(std::make_index_sequence<arity>{});
     else if constexpr (arity > 1 && supports_tuple_interface<V>)
@@ -158,7 +199,7 @@ void check_skip(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
 template<class ExpVal, class ExpErr, class AndThenV>
 auto invoke_continuation(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
 {
-    constexpr const size_t arity = get_arity<AndThenV>::value;
+    constexpr const size_t arity = get_arity_of<AndThenV>();
     if constexpr (can_skip_first_n_args<AndThenV, ExpVal, 1>())
     {
         //destruct into separate and skip 1st argument
@@ -186,7 +227,7 @@ template<class ExpVal, class ExpErr, class Cont, class... Args>
 auto invoke_continuation_lval(std::expected<ExpVal, ExpErr> &e, Cont &cont, Args&&... args)
 {
     using CB = typename Cont::Callback;
-    constexpr const size_t arity = get_arity<CB>::value;
+    constexpr const size_t arity = get_arity_of<CB>();
     constexpr const size_t add_args_count = sizeof...(Args);
     //static_assert(arity >= add_args_count, "Callback must accept at least the amount of additional arguments");
     if constexpr ((arity > add_args_count) && (arity - add_args_count) > 1)
@@ -264,22 +305,24 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, 
     if (!e)
         return std::move(e);
 
+    constexpr auto arity = get_arity_of<E>();
+
     for(int i = 0; i < (def.attempts - 1); ++i)
     {
         if (auto te = invoke_continuation_lval(e, def); te)
             return te;
         else
         { 
-            if constexpr (get_arity<E>::value == 1)
+            if constexpr (arity == 1)
             {
                 if (!def.err(te.error()))
                     return te;//we stop iterating and return error
-            }else if constexpr (get_arity<E>::value == 0)
+            }else if constexpr (arity == 0)
             {
                 if (!def.err())
                     return te;//we stop iterating and return error
             }else
-                static_assert(get_arity<E>::value == 1, "Error handler must accept either 1 parameter (error) or nothing");
+                static_assert(arity == 1, "Error handler must accept either 1 parameter (error) or nothing");
         }
     }
     return invoke_continuation_lval(e, def);
