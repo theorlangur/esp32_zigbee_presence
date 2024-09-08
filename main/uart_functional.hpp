@@ -84,6 +84,7 @@ namespace uart
 
     auto match_bytes(Channel &c, duration_ms_t wait, const uint8_t *pBytes, uint8_t terminator)
     {
+        //printf("match_bytes for: %s\n", pBytes);
         struct ctx_t
         {
             Channel &c;
@@ -94,12 +95,12 @@ namespace uart
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
                 /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return *ctx.pBytes != ctx.terminator; },
-                /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{
+                /*iteration*/[wait, pOrig=pBytes](ctx_t &ctx)->ExpectedResult{
                                 return ctx.c.ReadByte(wait) 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         if (*ctx.pBytes != b)
                                         {
-                                            //printf("Match failed to %s\n", pMatchStr);
+                                            //printf("Match failed to %s\nByte num failed: %d\n", (const char*)pOrig, int(ctx.pBytes - pOrig));
                                             return std::unexpected(::Err{"match_bytes", ESP_OK});
                                         }
                                         ++ctx.pBytes;
@@ -138,16 +139,16 @@ namespace uart
                                             if (!s)
                                                 continue;
 
-                                            if (s[ctx.idx] != b)
+                                            if (s[ctx.idx] == b)
                                             {
-                                                if (s[ctx.idx] == ctx.term)
+                                                if (s[ctx.idx + 1] == ctx.term)
                                                 {
                                                     ctx.match = match;
                                                     break;
-                                                }
-                                                s = nullptr;
+                                                }else
+                                                    ctx.anyValidLeft = true;
                                             }else
-                                                ctx.anyValidLeft = true;
+                                                s = nullptr;
                                             ++match;
                                         }
 
@@ -172,7 +173,7 @@ namespace uart
         return repeat_while(
                 /*condition*/[wait](ctx_t &ctx)->ExpectedCondition{ return ctx.c.PeekByte(wait) | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); },
                 /*iteration*/[wait](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte(wait) | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
-                /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"read_until", ESP_OK}); },
+                /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, until}
                 );
     }
