@@ -8,6 +8,7 @@
 template<class T>
 struct and_then_t
 {
+    using functional_block_t = void;
     using Callback = T;
     T t;
 };
@@ -21,6 +22,7 @@ auto and_then(T &&f)
 template<class T>
 struct transform_error_t
 {
+    using functional_block_t = void;
     using Callback = T;
     T t;
 };
@@ -34,6 +36,7 @@ auto transform_error(T &&f)
 template<class V>
 struct or_else_t
 {
+    using functional_block_t = void;
     V t;
 };
 
@@ -46,6 +49,7 @@ auto or_else(V &&f)
 template<class CB>
 struct retry_on_fail_t
 {
+    using functional_block_t = void;
     using Callback = CB;
     CB t;
     int attempts;
@@ -75,6 +79,7 @@ struct dummy_loop_ctx_t {};
 template<class CB, class Ctx>
 struct repeat_n_t
 {
+    using functional_block_t = void;
     using Callback = CB;
     CB t;
     int n;
@@ -89,6 +94,7 @@ auto repeat_n(int n, CB &&f, LoopCtx ctx={})
 template<class While, class CB, class Default, class Ctx>
 struct repeat_while_t
 {
+    using functional_block_t = void;
     using Callback = CB;
     While w;
     CB t;
@@ -210,10 +216,12 @@ template<class Exp, class Cont, class... Args>
 using ret_type_continuation_lval_t = decltype(invoke_continuation_lval(std::declval<Exp&>(), std::declval<Cont&>(), std::declval<Args>()...));
 
 template<class ExpVal, class ExpErr, class AndThenV>
-auto operator|(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)->ret_type_continuation_t<decltype(e), decltype(cont)>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
 {
+    using ret_type_t = ret_type_continuation_t<decltype(e), decltype(cont)>;
+    using ret_err_type_t = typename ret_type_t::error_type;
     if (!e)
-        return std::unexpected(std::move(e).error());
+        return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
 
     return invoke_continuation(std::move(e), std::move(cont));
 }
@@ -278,10 +286,12 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, 
 }
 
 template<class ExpVal, class ExpErr, class V, class Ctx>
-auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def), int>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> &&def)
 {
+    using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def), int>;
+    using ret_err_type_t = typename ret_type_t::error_type;
     if (!e)
-        return std::unexpected(std::move(e).error());
+        return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
 
     for(int i = 0; i < (def.n - 1); ++i)
     {
@@ -298,8 +308,9 @@ template<class ExpVal, class ExpErr, class W, class V, class D, class Ctx>
 auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&def)
 {
     using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def), decltype(def.ctx)>;
+    using ret_err_type_t = typename ret_type_t::error_type;
     if (!e)
-        return ret_type_t(std::unexpected(std::move(e).error()));
+        return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
 
     alignas(ret_type_t) uint8_t resMem[sizeof(ret_type_t)];
     ret_type_t *pRes = nullptr;
