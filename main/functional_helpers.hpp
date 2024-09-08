@@ -107,17 +107,6 @@ auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={})
     return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx)};
 }
 
-struct any_t
-{
-    any_t(std::size_t);
-    template<class T>
-    constexpr operator T&&() const noexcept;
-    template<class T>
-    constexpr operator T&() const noexcept;
-    template<class T>
-    constexpr operator const T&() const noexcept;
-};
-
 template <class T>
 struct wrapper {
   const T value;
@@ -128,6 +117,17 @@ template <class T>
 consteval const T& get_fake_object() noexcept {
   return wrapper<T>::report_if_you_see_a_link_error_with_this_object.value;
 }
+
+struct any_t
+{
+    any_t(std::size_t);
+    template<class T>
+    constexpr operator T&&() const noexcept;
+    template<class T>
+    constexpr operator T&() const noexcept;
+    template<class T>
+    constexpr operator const T&() const noexcept;
+};
 
 template<std::size_t N, class C>
 consteval bool has_arity_of(C const& f)
@@ -153,12 +153,20 @@ constexpr std::size_t get_arity_of_impl()
 template<class C>
 constexpr std::size_t get_arity_of()
 {
-    return get_arity_of_impl<C>();
+    if constexpr (requires{ typename C::Callback; })
+    {
+        if constexpr (requires{ C::my_arity; })
+            return C::my_arity;
+        else
+            return get_arity_of_impl<typename C::Callback>();
+    }
+    else
+        return get_arity_of_impl<C>();
 }
 
 
 template<class C>
-constexpr auto get_return_type()
+consteval auto get_return_type()
 {
    return []<std::size_t... idx>(std::index_sequence<idx...>)
     {
@@ -244,8 +252,8 @@ auto invoke_continuation(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV>
 template<class ExpVal, class ExpErr, class Cont, class... Args>
 auto invoke_continuation_lval(std::expected<ExpVal, ExpErr> &e, Cont &cont, Args&&... args)
 {
-    using CB = typename Cont::Callback;
-    constexpr const size_t arity = get_arity_of<CB>();
+    //using CB = typename Cont::Callback;
+    constexpr const size_t arity = get_arity_of<Cont>();
     constexpr const size_t add_args_count = sizeof...(Args);
     //static_assert(arity >= add_args_count, "Callback must accept at least the amount of additional arguments");
     if constexpr ((arity > add_args_count) && (arity - add_args_count) > 1)
@@ -405,6 +413,36 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&de
         return invoke_default(def);
     
     return *pRes;
+}
+
+template<class C>
+concept is_functional_block = requires{ typename std::remove_cvref_t<C>::functional_block_t; };
+
+template<class T>
+struct combo_t
+{
+    using functional_block_t = void;
+    using Callback = T;
+    static const constexpr size_t my_arity = 1;
+    T t;
+};
+
+template<class Block1, class Block2> requires is_functional_block<Block1> && is_functional_block<Block2>
+auto operator|(Block1 &&b1, Block2 &&b2)
+{
+    return combo_t{[b1=std::move(b1), b2=std::move(b2)]<class E>(E &&e) mutable {
+        return std::move(e) | std::move(b1) | std::move(b2);
+    }};
+}
+
+template<class ExpVal, class ExpErr, class CB>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, combo_t<CB> &def)
+{
+    using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def), decltype(e)>;
+    using ret_err_type_t = typename ret_type_t::error_type;
+    if (!e)
+        return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
+    return def.t(std::move(e));
 }
 
 #endif

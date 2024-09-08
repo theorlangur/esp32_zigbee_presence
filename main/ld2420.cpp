@@ -330,9 +330,15 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
+    //auto block1 = uart::read_until(*this, 'O');
+    //auto block2 = uart::match_bytes(*this, "\r\n");
+    auto test_block = uart::read_until(*this, 'O')
+                    | uart::match_any_bytes_term(*this, 0, "ON", "OFF");
+    //Channel::ExpectedResult{std::ref((uart::Channel&)*this)} | test_block;
     return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
-                    | uart::read_until(*this, 'O')
-                    | uart::match_any_bytes_term(*this, 0, "ON", "OFF")
+                    //| uart::read_until(*this, 'O')
+                    //| uart::match_any_bytes_term(*this, 0, "ON", "OFF")
+                    | test_block
                     | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
                             m_Presence.m_Detected = match == 0;
                             printf("Presence detected: %d\n", m_Presence.m_Detected);
