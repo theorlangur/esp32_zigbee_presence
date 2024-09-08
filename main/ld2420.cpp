@@ -2,6 +2,7 @@
 #include "ld2420.hpp"
 #include "generic_helpers.hpp"
 #include "functional_helpers.hpp"
+#include "uart_functional.hpp"
 
 const char* LD2420::err_to_str(ErrorCode e)
 {
@@ -395,33 +396,59 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
 
     uint16_t val = 0;
     auto ParseNum = repeat_while(
-            [&]()->std::expected<bool,Err>{ return PeekNextByte() | and_then([&]()->std::expected<bool,Err>{ return b >= '0' && b <= '9'; }); },
-            [&]{ return ReadNextByte() | and_then([&]()->ExpectedResult{ val = val * 10 + b - '0'; return std::ref(*this);}); },
-            [&]()->ExpectedResult{ return std::ref(*this); }
+            [&]()->std::expected<bool,::Err>{ return PeekByte(_wait) | and_then([&](uint8_t b)->std::expected<bool,::Err>{ return b >= '0' && b <= '9'; }); },
+            [&]{ return ReadByte(_wait) | and_then([&](uint8_t b)->Channel::ExpectedResult{ val = val * 10 + b - '0'; return std::ref((Channel&)*this);}); },
+            [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
+    //Flush() | uart::match_any_bytes(*this, b1, b2);
+    //Flush() | uart::match_any_bytes_term(*this, 0, "abs", "ed");
 
-    return ExpectedResult{std::ref(*this)}
-                    | ScanFor('O')
-                    | MatchAnyStr("ON", "OFF")//either ON or OFF
-                    | and_then([&](LD2420 &d, int match)->ExpectedResult{
+    //return ExpectedResult{std::ref(*this)}
+    //                | ScanFor('O')
+    //                | MatchAnyStr("ON", "OFF")//either ON or OFF
+    //                | and_then([&](LD2420 &d, int match)->ExpectedResult{
+    //                        m_Presence.m_Detected = match == 0;
+    //                        return std::ref(*this);
+    //                  })
+    //                | MatchStr("\r\n")
+    //                | and_then([&]()->ExpectedResult{
+    //                        if (m_Presence.m_Detected)
+    //                            return ExpectedResult{std::ref(*this)}
+    //                                | MatchStr("Range ")
+    //                                | std::move(ParseNum)
+    //                                | MatchStr("\r\n")
+    //                                | and_then([&]()->ExpectedResult{
+    //                                        m_Presence.m_Distance = float(val) / 100;
+    //                                        return std::ref(*this);
+    //                                });
+    //                        else
+    //                            return std::ref(*this);
+    //                        })
+    //                ;
+    return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
+                    | uart::read_until(*this, 'O', _wait)
+                    | uart::match_any_bytes_term(*this, _wait, 0, "ON", "OFF")
+                    | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
                             m_Presence.m_Detected = match == 0;
-                            return std::ref(*this);
+                            return std::ref((uart::Channel&)*this);
                       })
-                    | MatchStr("\r\n")
-                    | and_then([&]()->ExpectedResult{
+                    | uart::match_bytes(*this, _wait, (const uint8_t*)"\r\n", 0)
+                    | and_then([&]()->Channel::ExpectedResult{
                             if (m_Presence.m_Detected)
-                                return ExpectedResult{std::ref(*this)}
-                                    | MatchStr("Range ")
+                                return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
+                                    | uart::match_bytes(*this, _wait, (const uint8_t*)"Range ", 0)
                                     | std::move(ParseNum)
-                                    | MatchStr("\r\n")
-                                    | and_then([&]()->ExpectedResult{
+                                    | uart::match_bytes(*this, _wait, (const uint8_t*)"\r\n", 0)
+                                    | and_then([&]()->Channel::ExpectedResult{
                                             m_Presence.m_Distance = float(val) / 100;
-                                            return std::ref(*this);
+                                            return std::ref((uart::Channel&)*this);
                                     });
                             else
-                                return std::ref(*this);
+                                return std::ref((uart::Channel&)*this);
                             })
+                    | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::FillBuffer_ReadFailure};})
+                    | and_then([&]()->ExpectedResult{ return std::ref(*this); });
                     ;
 }
 
