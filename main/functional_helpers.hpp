@@ -3,6 +3,7 @@
 
 #include <expected>
 #include <utility>
+#include <tuple>
 
 template<class T>
 struct and_then_t
@@ -70,32 +71,37 @@ auto retry_on_fail(int attempts, CB &&f, ErrorHandler &&err)
     return retry_on_fail_err_handle_t{std::move(f), attempts, std::move(err)};
 }
 
-template<class CB>
+struct dummy_loop_ctx_t {};
+template<class CB, class Ctx>
 struct repeat_n_t
 {
     using Callback = CB;
     CB t;
     int n;
+    Ctx ctx;
 };
-template<class CB>
-auto repeat_n(int n, CB &&f)
+template<class CB, class LoopCtx = dummy_loop_ctx_t>
+auto repeat_n(int n, CB &&f, LoopCtx ctx={})
 {
-    return repeat_n_t{std::move(f), n};
+    return repeat_n_t{std::move(f), n, std::move(ctx)};
 }
 
-template<class While, class CB, class Default>
+template<class While, class CB, class Default, class Ctx>
 struct repeat_while_t
 {
     using Callback = CB;
     While w;
     CB t;
     Default d;
+    Ctx ctx;
 };
-template<class While, class CB, class Default>
-auto repeat_while(While &&w, CB &&f, Default &&d)
+template<class While, class CB, class Default, class LoopCtx = dummy_loop_ctx_t>
+auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={})
 {
-    return repeat_while_t{std::move(w), std::move(f), std::move(d)};
+    return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx)};
 }
+
+
 
 template <typename T> struct get_arity : get_arity<decltype(&T::operator())> {};
 template <typename R, typename... Args> struct get_arity<R(*)(Args...)> : std::integral_constant<unsigned, sizeof...(Args)> {};
@@ -176,8 +182,8 @@ auto invoke_continuation_lval(std::expected<ExpVal, ExpErr> &e, Cont &cont, Args
     using CB = typename Cont::Callback;
     constexpr const size_t arity = get_arity<CB>::value;
     constexpr const size_t add_args_count = sizeof...(Args);
-    static_assert(arity >= add_args_count, "Callback must accept at least the amount of additional arguments");
-    if constexpr ((arity - add_args_count) > 1)
+    //static_assert(arity >= add_args_count, "Callback must accept at least the amount of additional arguments");
+    if constexpr ((arity > add_args_count) && (arity - add_args_count) > 1)
     {
         static_assert(arity <= std::tuple_size_v<ExpVal>, "Too many arguments");
         //destruct into separate
@@ -186,10 +192,15 @@ auto invoke_continuation_lval(std::expected<ExpVal, ExpErr> &e, Cont &cont, Args
             decltype(auto) v = e.value();
             return cont.t(std::forward<Args>(args)..., get<idx>(v)...);
         }(std::make_index_sequence<arity>{});
-    }else if constexpr((arity - add_args_count) == 1)
+    }else if constexpr((arity > add_args_count) && (arity - add_args_count) == 1)
         return cont.t(std::forward<Args>(args)..., e.value());
     else
-        return cont.t(std::forward<Args>(args)...);
+    {
+        return [&]<std::size_t... idx>(std::index_sequence<idx...>, std::tuple<Args&&...> &&targs){
+            using namespace std;
+            return cont.t(get<idx>(targs)...);
+        }(std::make_index_sequence<arity>{}, std::forward_as_tuple(std::forward<Args>(args)...));
+    }
 }
 
 template<class Exp, class Cont>
@@ -266,22 +277,22 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, 
     return invoke_continuation_lval(e, def);
 }
 
-template<class ExpVal, class ExpErr, class V>
-auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def), int>
+template<class ExpVal, class ExpErr, class V, class Ctx>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def), int>
 {
     if (!e)
         return std::unexpected(std::move(e).error());
 
     for(int i = 0; i < (def.n - 1); ++i)
     {
-        if (auto te = invoke_continuation_lval(e, def, i); !te)
+        if (auto te = invoke_continuation_lval(e, def, i, def.ctx); !te)
             return te;
     }
-    return invoke_continuation_lval(e, def, def.n - 1);
+    return invoke_continuation_lval(e, def, def.n - 1, def.ctx);
 }
 
-template<class ExpVal, class ExpErr, class W, class V, class D>
-auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
+template<class ExpVal, class ExpErr, class W, class V, class D, class Ctx>
+auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
 {
     if (!e)
         return std::unexpected(std::move(e).error());
@@ -295,7 +306,7 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D> &&def)->
             return std::unexpected(te.error());
         else if (!te.value())
             break;
-        if (auto te = invoke_continuation_lval(e, def); !te)
+        if (auto te = invoke_continuation_lval(e, def, def.ctx); !te)
             return te;
         else
         {
