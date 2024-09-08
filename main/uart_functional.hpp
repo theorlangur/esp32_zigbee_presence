@@ -112,6 +112,11 @@ namespace uart
                 );
     }
 
+    auto match_bytes(Channel &c, duration_ms_t wait, const char *pStr)
+    {
+        return match_bytes(c, wait, (const uint8_t*)pStr, 0);
+    }
+
     template<class... BytePtr>
     auto match_any_bytes_term(Channel &c, duration_ms_t wait, uint8_t term, BytePtr&&... bytes)
     {

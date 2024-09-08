@@ -338,13 +338,13 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
                             printf("Presence detected: %d\n", m_Presence.m_Detected);
                             return std::ref((uart::Channel&)*this);
                       })
-                    | uart::match_bytes(*this, _wait, (const uint8_t*)"\r\n", 0)
+                    | uart::match_bytes(*this, _wait, "\r\n")
                     | and_then([&]()->Channel::ExpectedResult{
                             if (m_Presence.m_Detected)
                                 return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
-                                    | uart::match_bytes(*this, _wait, (const uint8_t*)"Range ", 0)
+                                    | uart::match_bytes(*this, _wait, "Range ")
                                     | std::move(ParseNum)
-                                    | uart::match_bytes(*this, _wait, (const uint8_t*)"\r\n", 0)
+                                    | uart::match_bytes(*this, _wait, "\r\n")
                                     | and_then([&]()->Channel::ExpectedResult{
                                             m_Presence.m_Distance = float(val) / 100;
                                             return std::ref((uart::Channel&)*this);
