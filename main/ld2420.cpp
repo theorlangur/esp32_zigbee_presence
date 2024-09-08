@@ -323,77 +323,6 @@ LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
 LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
 {
     constexpr const auto _wait = duration_ms_t(150);
-    char b = 0;
-
-    auto ReadNextByte = [&]()->ExpectedResult{
-        return ReadByte(_wait)
-                    | transform_error([&](::Err e){ return Err{e, "LD2420:: ReadNextByte", ErrorCode::FillBuffer_ReadFailure};})
-                    | and_then([&](uart::Channel &c, uint8_t _b)->ExpectedResult{ b = (char)_b; return std::ref(*this); }); 
-    };
-    auto PeekNextByte = [&]()->ExpectedResult{
-        return PeekByte(_wait)
-                    | transform_error([&](::Err e){ return Err{e, "LD2420:: PeekNextByte", ErrorCode::FillBuffer_ReadFailure};})
-                    | and_then([&](uart::Channel &c, uint8_t _b)->ExpectedResult{ b = (char)_b; return std::ref(*this); }); 
-    };
-
-    const char *pMatchStr = nullptr, *pMatchStr2 = nullptr;
-
-    auto MatchStr = [&](const char *pStr){
-        pMatchStr = pStr;
-        return repeat_while(
-                [&]()->std::expected<bool,Err>{ return *pMatchStr != 0; },
-                [&]()->ExpectedResult{
-                    return ReadNextByte() 
-                    | and_then([&]()->ExpectedResult{
-                            if (*pMatchStr != b)
-                            {
-                                printf("Match failed to %s\n", pMatchStr);
-                                return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchStr", ErrorCode::MatchError});
-                            }
-                            ++pMatchStr;
-                            return std::ref(*this);
-                      });
-                },
-                [&]()->ExpectedResult{ return std::ref(*this); }
-        );
-    };
-
-    using MatchAnyResult = RetVal<int>;
-    using ExpectedAnyResult = std::expected<MatchAnyResult, Err>;
-
-    auto MatchAnyStr = [&](const char *pStr1, const char *pStr2){
-        pMatchStr = pStr1;
-        pMatchStr2 = pStr2;
-        return repeat_while(
-                [&]()->std::expected<bool,Err>{ return (pMatchStr && *pMatchStr != 0) || (pMatchStr2 && *pMatchStr2 != 0); },
-                [&]()->ExpectedAnyResult{
-                    return ReadNextByte() 
-                    | and_then([&]()->ExpectedAnyResult{
-                            if (pMatchStr && *pMatchStr != b)
-                                pMatchStr = nullptr;
-                            if (pMatchStr2 && *pMatchStr2 != b)
-                                pMatchStr2 = nullptr;
-                            if (!pMatchStr && !pMatchStr2)
-                                return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchAnyStr", ErrorCode::MatchError});
-
-                            int match;
-                            if (pMatchStr) ++pMatchStr, match = 0;
-                            if (pMatchStr2) ++pMatchStr2, match = 1;
-                            return MatchAnyResult{std::ref(*this), match};
-                      });
-                },
-                [&]()->ExpectedAnyResult{ return std::unexpected(Err{{}, "LD2420::TryReadSimpleFrameV2 MatchAnyStr", ErrorCode::MatchError}); }
-        );
-    };
-
-    auto ScanFor = [&](char c){
-        return repeat_while(
-                [&,c]()->std::expected<bool,Err>{ return PeekNextByte() | and_then([&]()->std::expected<bool,Err>{ return b != c; }); },
-                [&]{ return ReadNextByte(); },
-                [&]()->ExpectedResult{ return std::ref(*this); }
-        );
-    };
-
     uint16_t val = 0;
     auto ParseNum = repeat_while(
             [&]()->std::expected<bool,::Err>{ return PeekByte(_wait) | and_then([&](uint8_t b)->std::expected<bool,::Err>{ return b >= '0' && b <= '9'; }); },
@@ -401,36 +330,12 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
-    //Flush() | uart::match_any_bytes(*this, b1, b2);
-    //Flush() | uart::match_any_bytes_term(*this, 0, "abs", "ed");
-
-    //return ExpectedResult{std::ref(*this)}
-    //                | ScanFor('O')
-    //                | MatchAnyStr("ON", "OFF")//either ON or OFF
-    //                | and_then([&](LD2420 &d, int match)->ExpectedResult{
-    //                        m_Presence.m_Detected = match == 0;
-    //                        return std::ref(*this);
-    //                  })
-    //                | MatchStr("\r\n")
-    //                | and_then([&]()->ExpectedResult{
-    //                        if (m_Presence.m_Detected)
-    //                            return ExpectedResult{std::ref(*this)}
-    //                                | MatchStr("Range ")
-    //                                | std::move(ParseNum)
-    //                                | MatchStr("\r\n")
-    //                                | and_then([&]()->ExpectedResult{
-    //                                        m_Presence.m_Distance = float(val) / 100;
-    //                                        return std::ref(*this);
-    //                                });
-    //                        else
-    //                            return std::ref(*this);
-    //                        })
-    //                ;
     return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
                     | uart::read_until(*this, 'O', _wait)
                     | uart::match_any_bytes_term(*this, _wait, 0, "ON", "OFF")
                     | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
                             m_Presence.m_Detected = match == 0;
+                            printf("Presence detected: %d\n", m_Presence.m_Detected);
                             return std::ref((uart::Channel&)*this);
                       })
                     | uart::match_bytes(*this, _wait, (const uint8_t*)"\r\n", 0)
