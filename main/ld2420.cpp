@@ -322,29 +322,29 @@ LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
 
 LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
 {
-    constexpr const auto _wait = duration_ms_t(150);
+    SetDefaultWait(duration_ms_t(150));
     uint16_t val = 0;
     auto ParseNum = repeat_while(
-            [&]()->std::expected<bool,::Err>{ return PeekByte(_wait) | and_then([&](uint8_t b)->std::expected<bool,::Err>{ return b >= '0' && b <= '9'; }); },
-            [&]{ return ReadByte(_wait) | and_then([&](uint8_t b)->Channel::ExpectedResult{ val = val * 10 + b - '0'; return std::ref((Channel&)*this);}); },
+            [&]()->std::expected<bool,::Err>{ return PeekByte() | and_then([&](uint8_t b)->std::expected<bool,::Err>{ return b >= '0' && b <= '9'; }); },
+            [&]{ return ReadByte() | and_then([&](uint8_t b)->Channel::ExpectedResult{ val = val * 10 + b - '0'; return std::ref((Channel&)*this);}); },
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
     return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
-                    | uart::read_until(*this, 'O', _wait)
-                    | uart::match_any_bytes_term(*this, _wait, 0, "ON", "OFF")
+                    | uart::read_until(*this, 'O')
+                    | uart::match_any_bytes_term(*this, 0, "ON", "OFF")
                     | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
                             m_Presence.m_Detected = match == 0;
                             printf("Presence detected: %d\n", m_Presence.m_Detected);
                             return std::ref((uart::Channel&)*this);
                       })
-                    | uart::match_bytes(*this, _wait, "\r\n")
+                    | uart::match_bytes(*this, "\r\n")
                     | and_then([&]()->Channel::ExpectedResult{
                             if (m_Presence.m_Detected)
                                 return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
-                                    | uart::match_bytes(*this, _wait, "Range ")
+                                    | uart::match_bytes(*this, "Range ")
                                     | std::move(ParseNum)
-                                    | uart::match_bytes(*this, _wait, "\r\n")
+                                    | uart::match_bytes(*this, "\r\n")
                                     | and_then([&]()->Channel::ExpectedResult{
                                             m_Presence.m_Distance = float(val) / 100;
                                             return std::ref((uart::Channel&)*this);
