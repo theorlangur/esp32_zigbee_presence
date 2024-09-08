@@ -291,6 +291,9 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> &&def)->ret
     return invoke_continuation_lval(e, def, def.n - 1, def.ctx);
 }
 
+template<class F, class Ctx>
+concept can_call_with_ctx = requires(F &&f, Ctx &ctx) { f(ctx); };
+
 template<class ExpVal, class ExpErr, class W, class V, class D, class Ctx>
 auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&def)->ret_type_continuation_lval_t<decltype(e), decltype(def)>
 {
@@ -300,9 +303,21 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&de
     using ret_type_t = ret_type_continuation_lval_t<decltype(e), decltype(def)>;
     alignas(ret_type_t) uint8_t resMem[sizeof(ret_type_t)];
     ret_type_continuation_lval_t<decltype(e), decltype(def)> *pRes = nullptr;
+    auto while_condition = [](auto &d){
+        if constexpr (can_call_with_ctx<W,Ctx>)
+            return d.w(d.ctx);
+        else
+            return d.w();
+    };
+    auto invoke_default = [](auto &d){
+        if constexpr (can_call_with_ctx<D,Ctx>)
+            return d.d(d.ctx);
+        else
+            return d.d();
+    };
     while(true)
     {
-        if (auto te = def.w(); !te)
+        if (auto te = while_condition(def); !te)
             return std::unexpected(te.error());
         else if (!te.value())
             break;
@@ -315,7 +330,7 @@ auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&de
         }
     }
     if (!pRes)
-        return def.d();
+        return invoke_default(def);
     
     return *pRes;
 }
