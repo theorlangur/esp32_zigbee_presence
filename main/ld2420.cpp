@@ -344,7 +344,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
-    return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
+    return start_sequence(*this)
                     | uart::read_until(*this, 'O')
                     | uart::match_any_str(*this, "ON", "OFF")
                     | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
@@ -354,7 +354,8 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                     | uart::match_bytes(*this, "\r\n")
                     | and_then([&]()->Channel::ExpectedResult{
                             if (m_Presence.m_Detected)
-                                return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
+                                return 
+                                    start_sequence(*this)
                                     | uart::match_bytes(*this, "Range ")
                                     | std::move(ParseNum)
                                     | uart::match_bytes(*this, "\r\n")
