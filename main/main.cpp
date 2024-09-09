@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include "functional_helpers.hpp"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -100,7 +99,7 @@ extern "C" void app_main(void)
 
     while(true)
     {
-        if (auto te = presence.TryReadSimpleFrameV2(); !te)
+        if (auto te = presence.TryReadSimpleFrame(); !te)
         {
             print_ld2420_error(te.error());
             break;

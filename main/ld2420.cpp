@@ -1,7 +1,7 @@
 #include <cstring>
 #include "ld2420.hpp"
 #include "generic_helpers.hpp"
-#include "functional_helpers.hpp"
+#include "functional/functional.hpp"
 #include "uart_functional.hpp"
 
 const char* LD2420::err_to_str(ErrorCode e)
@@ -43,6 +43,7 @@ LD2420::LD2420(uart::Port p, int baud_rate):
 
 LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
 {
+    using namespace functional;
     return Configure() 
         | and_then([&]{ return SetPins(txPin, rxPin); })
         | and_then([&]{ return Open(); })
@@ -52,6 +53,7 @@ LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
 
 LD2420::ExpectedResult LD2420::ReloadConfig()
 {
+    using namespace functional;
     return OpenCommandMode()
         | and_then([&]{ return UpdateVersion(); })
         //| retry_on_fail(3
@@ -111,6 +113,7 @@ bool LD2420::frame_t::VerifyFooter() const
 
 LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
 {
+    using namespace functional;
     if constexpr (kDebugFrame)
     {
         printf("Sending frame of %d bytes\n", frame.TotalSize());
@@ -125,6 +128,7 @@ LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
 
 LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 {
+    using namespace functional;
     return Read(frame.data, 4, duration_ms_t(100))
         | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
                 if (l != 4 || !frame.VerifyHeader())
@@ -156,6 +160,7 @@ LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 
 LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uint8_t> outData, std::span<uint8_t> inData)
 {
+    using namespace functional;
     if (!inData.empty()  && (inData.size() < sizeof(frame_t)))
         return std::unexpected(CmdErr{Err{{}, "SendCommand", ErrorCode::SendCommand_InsufficientSpace}, 0});
 
@@ -184,6 +189,7 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
 
 LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
 {
+    using namespace functional;
     frame_t f;
     uint16_t protocol_version = 2;
     f.WriteCmd(0xff, std::span<uint8_t>((uint8_t*)&protocol_version, 2));
@@ -206,6 +212,7 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
 
 LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
 {
+    using namespace functional;
     frame_t f;
     return SendCommand(0xfe, std::span<uint8_t>{}, f)
         | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
@@ -218,6 +225,7 @@ std::string_view LD2420::GetVersion() const
 
 LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
 {
+    using namespace functional;
     frame_t f;
     std::span<uint8_t> data((uint8_t*)&param, sizeof(param));
     //printf("Param to obtain: %X\n", param);
@@ -247,6 +255,7 @@ LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
 {
+    using namespace functional;
     frame_t f;
     return SendCommand(0x0, std::span<uint8_t>{}, f)
         | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedGenericCmdResult
@@ -262,6 +271,7 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
 {
+    using namespace functional;
     return ReadRawSysMulti(SysRegs::Mode)
         | and_then([&](LD2420 &d, Params<1> val)->ExpectedGenericCmdResult
           { 
@@ -272,6 +282,7 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 {
+    using namespace functional;
     return ReadRawADBMulti(ADBRegs::MinDistance, ADBRegs::MaxDistance, ADBRegs::Timeout)
         | and_then([&](LD2420 &d, Params<3> val)->ExpectedGenericCmdResult
           { 
@@ -284,6 +295,7 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 {
+    using namespace functional;
     return ReadRawADBMulti((uint16_t)ADBRegs::MoveThresholdGateBase + gate, (uint16_t)ADBRegs::StillThresholdGateBase + gate)
         | and_then([&](LD2420 &d, Params<2> val)->ExpectedGenericCmdResult
           { 
@@ -295,6 +307,7 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 
 LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
 {
+    using namespace functional;
     if (!m_BufferEmpty)
     {
         size_t avail = m_BufferWriteTo < m_BufferReadFrom ? (m_BufferReadFrom - m_BufferWriteTo) : sizeof(m_Buffer) - m_BufferWriteTo + m_BufferReadFrom;
@@ -320,8 +333,9 @@ LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
         );
 }
 
-LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
+LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 {
+    using namespace functional;
     SetDefaultWait(duration_ms_t(150));
     uint16_t val = 0;
     auto ParseNum = repeat_while(
@@ -330,18 +344,11 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
-    //auto block1 = uart::read_until(*this, 'O');
-    //auto block2 = uart::match_bytes(*this, "\r\n");
-    auto test_block = uart::read_until(*this, 'O')
-                    | uart::match_any_bytes_term(*this, 0, "ON", "OFF");
-    //Channel::ExpectedResult{std::ref((uart::Channel&)*this)} | test_block;
     return Channel::ExpectedResult{std::ref((uart::Channel&)*this)}
-                    //| uart::read_until(*this, 'O')
-                    //| uart::match_any_bytes_term(*this, 0, "ON", "OFF")
-                    | test_block
+                    | uart::read_until(*this, 'O')
+                    | uart::match_any_str(*this, "ON", "OFF")
                     | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
                             m_Presence.m_Detected = match == 0;
-                            printf("Presence detected: %d\n", m_Presence.m_Detected);
                             return std::ref((uart::Channel&)*this);
                       })
                     | uart::match_bytes(*this, "\r\n")
@@ -363,13 +370,15 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrameV2()
                     ;
 }
 
-LD2420::ExpectedResult LD2420::TryReadSimpleFrameV2(int attempts)
+LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts)
 {
-    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadSimpleFrameV2(); });
+    using namespace functional;
+    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadSimpleFrame(); });
 }
 
 LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
 {
+    using namespace functional;
     return OpenCommandMode()
         | and_then([&]{ return WriteRawADBMulti(
                     ADBParam{uint16_t(ADBRegs::MinDistance), m_MinDistance}

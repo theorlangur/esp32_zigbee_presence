@@ -1,5 +1,5 @@
 #include "aht21.hpp"
-#include "functional_helpers.hpp"
+#include "functional/functional.hpp"
 #include <thread>
 #include <cmath>
 
@@ -36,6 +36,7 @@ void AHT21::ResetReg(uint8_t reg)
 
 AHT21::ExpectedResult AHT21::Init()
 {
+    using namespace functional;
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     auto *pThis = this;
     return m_Device.ReadReg8(0x71)
@@ -68,6 +69,7 @@ AHT21::ExpectedResult AHT21::Init()
 
 AHT21::ExpectedValue<AHT21::Measurements> AHT21::UpdateMeasurements()
 {
+    using namespace functional;
     return m_Device.WriteReg16(0xAC, 0x3300)
         .transform_error([](auto &&e){ return Err{e, "AHT21::UpdateMeasurements", ErrorCode::Measure_IssueComand}; })
         .and_then([this](i2c::I2CDevice &d)->ExpectedValue<Measurements>{

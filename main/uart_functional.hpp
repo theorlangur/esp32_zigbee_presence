@@ -2,12 +2,13 @@
 #define UART_FUNCTIONAL_H_
 
 #include "uart.hpp"
-#include "functional_helpers.hpp"
+#include "functional/functional.hpp"
 
 namespace uart
 {
     auto match_bytes(Channel &c, std::span<uint8_t> bytes)
     {
+        using namespace functional;
         struct ctx_t
         {
             Channel &c;
@@ -38,6 +39,7 @@ namespace uart
     template<class... Seqs>
     auto match_any_bytes(Channel &c, Seqs&&... bytes)
     {
+        using namespace functional;
         struct ctx_t
         {
             Channel &c;
@@ -84,6 +86,7 @@ namespace uart
 
     auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator)
     {
+        using namespace functional;
         //printf("match_bytes for: %s\n", pBytes);
         struct ctx_t
         {
@@ -120,6 +123,7 @@ namespace uart
     template<class... BytePtr>
     auto match_any_bytes_term(Channel &c, uint8_t term, BytePtr&&... bytes)
     {
+        using namespace functional;
         struct ctx_t
         {
             Channel &c;
@@ -166,8 +170,18 @@ namespace uart
                 );
     }
 
+    template<class C>
+    concept convertible_to_const_char_ptr = requires(C &c) { {c}->std::convertible_to<const char*>; };
+
+    template<class... BytePtr> requires (convertible_to_const_char_ptr<BytePtr> &&...)
+    auto match_any_str(Channel &c, BytePtr&&... bytes)
+    {
+        return match_any_bytes_term(c, 0, std::forward<BytePtr>(bytes)...);
+    }
+
     auto read_until(Channel &c, uint8_t until)
     {
+        using namespace functional;
         struct ctx_t
         {
             Channel &c;
@@ -181,6 +195,13 @@ namespace uart
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, until}
                 );
+    }
+
+    template<class T>
+    auto read_into(Channel &c, T &dst)
+    {
+        using namespace functional;
+        return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); });
     }
 }
 

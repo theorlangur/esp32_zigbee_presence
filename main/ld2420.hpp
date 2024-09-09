@@ -3,6 +3,7 @@
 
 #include "uart.hpp"
 #include <span>
+#include "functional/functional.hpp"
 
 class LD2420: protected uart::Channel
 {
@@ -186,6 +187,7 @@ private:
     template<size_t N>
     ExpectedMultiRawADBResult<N> ReadRawADBMulti(uint16_t (&regs)[N])
     {
+        using namespace functional;
         frame_t f;
         std::span<uint8_t> data((uint8_t*)&(regs[0]), sizeof(uint16_t) * N);
         return SendCommand(0x0008, data, f) 
@@ -209,6 +211,7 @@ private:
     template<size_t N>
     ExpectedGenericCmdResult WriteRawADBMulti(ADBParam (&pairs)[N])
     {
+        using namespace functional;
         frame_t f;
         std::span<uint8_t> data((uint8_t*)&(pairs[0]), sizeof(ADBParam) * N);
         return SendCommand(0x0007, data, f) 
@@ -229,6 +232,7 @@ private:
     template<size_t N>
     ExpectedMultiRawSysResult<N> ReadRawSysMulti(uint16_t (&regs)[N])
     {
+        using namespace functional;
         frame_t f;
         std::span<uint8_t> data((uint8_t*)&(regs[0]), sizeof(uint16_t) * N);
         return SendCommand(0x0013, data, f) 
@@ -252,6 +256,7 @@ private:
     template<size_t N>
     ExpectedGenericCmdResult WriteRawSysMulti(SetParam (&pairs)[N])
     {
+        using namespace functional;
         frame_t f;
         std::span<uint8_t> data((uint8_t*)&pairs[0], sizeof(SetParam) * N);
         return SendCommand(0x0012, data, f) 
@@ -272,8 +277,8 @@ private:
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
 public:
-    ExpectedResult ReadSimpleFrameV2();
-    ExpectedResult TryReadSimpleFrameV2(int attempts = 3);
+    ExpectedResult ReadSimpleFrame();
+    ExpectedResult TryReadSimpleFrame(int attempts = 3);
 private:
     ExpectedResult TryFillBuffer(size_t s);
 
