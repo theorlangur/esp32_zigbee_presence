@@ -8,6 +8,12 @@ namespace functional
         {
             using functional_block_t = void;
             V t;
+
+            template<class Dummy>
+            auto operator()(Dummy &&)
+            {
+                return t;
+            }
         };
 
     template<class V>
@@ -21,7 +27,7 @@ namespace functional
         auto operator|(std::expected<ExpVal, ExpErr> &&e, or_else_t<V> &&def)->std::expected<ExpVal, ExpErr>
         {
             if (!e)
-                return std::move(def).t;
+                return def(e);
             else
                 return std::move(e);
         }

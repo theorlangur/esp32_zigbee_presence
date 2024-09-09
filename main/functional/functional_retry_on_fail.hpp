@@ -10,6 +10,18 @@ namespace functional
             using Callback = CB;
             CB t;
             int attempts;
+
+            template<class ExpVal>
+            auto operator()(ExpVal &&v)
+            {
+                using namespace internals;
+                for(int i = 0; i < attempts - 1; ++i)
+                {
+                    if (auto te = invoke_continuation_lval(std::forward<ExpVal>(v), *this); te)
+                        return te;
+                }
+                return invoke_continuation_lval(std::forward<ExpVal>(v), *this);
+            }
         };
     template<class CB>
         auto retry_on_fail(int attempts, CB &&f)
@@ -25,7 +37,36 @@ namespace functional
             err{std::move(e)}
         {}
         ErrorHandler err;
+
+
+        template<class ExpVal>
+        auto operator()(ExpVal &&v)
+        {
+            using namespace internals;
+            constexpr auto arity = get_arity_of<ErrorHandler>();
+
+            for(int i = 0; i < (this->attempts - 1); ++i)
+            {
+                if (auto te = invoke_continuation_lval(std::forward<ExpVal>(v), *this); te)
+                    return te;
+                else
+                { 
+                    if constexpr (arity == 1)
+                    {
+                        if (!this->err(te.error()))
+                            return te;//we stop iterating and return error
+                    }else if constexpr (arity == 0)
+                    {
+                        if (!this->err())
+                            return te;//we stop iterating and return error
+                    }else
+                        static_assert(arity == 1, "Error handler must accept either 1 parameter (error) or nothing");
+                }
+            }
+            return invoke_continuation_lval(std::forward<ExpVal>(v), *this);
+        }
     };
+
     template<class CB, class ErrorHandler>
         auto retry_on_fail(int attempts, CB &&f, ErrorHandler &&err)
         {
@@ -40,12 +81,7 @@ namespace functional
             if (!e)
                 return std::move(e);
 
-            for(int i = 0; i < (def.attempts - 1); ++i)
-            {
-                if (auto te = invoke_continuation_lval(e, def); te)
-                    return te;
-            }
-            return invoke_continuation_lval(e, def);
+            return def(e.value());
         }
 
     template<class ExpVal, class ExpErr, class V, class E>
@@ -55,27 +91,7 @@ namespace functional
             if (!e)
                 return std::move(e);
 
-            constexpr auto arity = get_arity_of<E>();
-
-            for(int i = 0; i < (def.attempts - 1); ++i)
-            {
-                if (auto te = invoke_continuation_lval(e, def); te)
-                    return te;
-                else
-                { 
-                    if constexpr (arity == 1)
-                    {
-                        if (!def.err(te.error()))
-                            return te;//we stop iterating and return error
-                    }else if constexpr (arity == 0)
-                    {
-                        if (!def.err())
-                            return te;//we stop iterating and return error
-                    }else
-                        static_assert(arity == 1, "Error handler must accept either 1 parameter (error) or nothing");
-                }
-            }
-            return invoke_continuation_lval(e, def);
+            return def(e.value());
         }
 }
 #endif

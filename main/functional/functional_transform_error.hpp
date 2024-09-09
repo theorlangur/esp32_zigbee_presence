@@ -9,6 +9,12 @@ namespace functional
             using functional_block_t = void;
             using Callback = T;
             T t;
+
+            template<class ExpVal>
+            auto operator()(ExpVal &&v)
+            {
+                static_assert(false, "Makes no sense to call it directly. It converts an error");
+            }
         };
 
     template<class T>
