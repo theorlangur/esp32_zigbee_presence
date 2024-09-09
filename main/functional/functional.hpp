@@ -9,5 +9,6 @@
 #include "functional_retry_on_fail.hpp"
 #include "functional_repeat_while.hpp"
 #include "functional_combo.hpp"
+#include "functional_start_sequence.hpp"
 
 #endif

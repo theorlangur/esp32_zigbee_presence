@@ -20,8 +20,8 @@ namespace functional
         auto operator|(start_t<Args...> &&s, Block &&def)
         {
             //actually call the thing
-            return [&]<size_t...idx>(std::index_sequence<idx...>){ 
-                return def(std::get<idx>(s.args)...); 
+            return [&]<std::size_t...idx>(std::index_sequence<idx...>){ 
+                return def(std::move(s.args)); 
             }(std::make_index_sequence<sizeof...(Args)>());
         }
 }
