@@ -374,7 +374,7 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
     uint16_t reportLen = 0;
     uint16_t distance = 0;
     return start_sequence()
-        | uart::read_until(*this, 0xf4)
+        | uart::read_until(*this, header[0])
         | uart::match_bytes(*this, header)
         | uart::read_into(*this, reportLen)
         | uart::read_into(*this, m_Presence.m_Detected)
