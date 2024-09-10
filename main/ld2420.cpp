@@ -125,25 +125,25 @@ LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
 {
     using namespace functional;
     return Read(frame.data, 4, duration_ms_t(100))
-        | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
+        | and_then([&](size_t l)->uart::Channel::ExpectedValue<size_t>{
                 if (l != 4 || !frame.VerifyHeader())
                 {
                     if constexpr (kDebugFrame)
                         printf("RecvFrame Failure: %d bytes\n", l);
                     return std::unexpected(::Err{"LD2420::RecvFrame < 4"});
                 }
-                return c.Read(frame.data + 4, 2);
+                return Read(frame.data + 4, 2);
           })
-        | and_then([&](uart::Channel &c, size_t l)->uart::Channel::ExpectedValue<size_t>{
+        | and_then([&](size_t l)->uart::Channel::ExpectedValue<size_t>{
             //printf("Read %d bytes\n", l);
             //printf("2 len bytes: %X %X\n", frame.data[4], frame.data[5]);
             if (l != 2)
                 return std::unexpected(::Err{"LD2420::RecvFrame < 2"});
             frame.len = frame.data[4] + (frame.data[5] << 8);
-            return c.Read(frame.data + frame_t::kDataOffset, frame.len + frame_t::kFooterSize);
+            return Read(frame.data + frame_t::kDataOffset, frame.len + frame_t::kFooterSize);
           })
         | transform_error([](::Err uartErr){ return CmdErr{{uartErr, "LD2420::RecvFrame", ErrorCode::RecvFrame_Malformed}, 0}; })
-        | and_then([&](uart::Channel &c, size_t l)->ExpectedDataResult{
+        | and_then([&](size_t l)->ExpectedDataResult{
             if (l != (frame.len + frame_t::kFooterSize))
                 return std::unexpected(CmdErr{{::Err{}, "LD2420::RecvFrame < len", ErrorCode::RecvFrame_Incomplete}, 0});
             if (!frame.VerifyFooter())
@@ -341,10 +341,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
     return start_sequence(*this)
                     | uart::read_until(*this, 'O')
                     | uart::match_any_str(*this, "ON", "OFF")
-                    | and_then([&](uart::Channel &d, int match)->Channel::ExpectedResult{
-                            m_Presence.m_Detected = match == 0;
-                            return std::ref((uart::Channel&)*this);
-                      })
+                    | and_then([&](int match){ m_Presence.m_Detected = match == 0; })
                     | uart::match_bytes(*this, "\r\n")
                     | and_then([&]()->Channel::ExpectedResult{
                             if (m_Presence.m_Detected)
@@ -353,10 +350,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                                     | uart::match_bytes(*this, "Range ")
                                     | std::move(ParseNum)
                                     | uart::match_bytes(*this, "\r\n")
-                                    | and_then([&]()->Channel::ExpectedResult{
-                                            m_Presence.m_Distance = float(val) / 100;
-                                            return std::ref((uart::Channel&)*this);
-                                    });
+                                    | and_then([&]{ m_Presence.m_Distance = float(val) / 100; });
                             else
                                 return std::ref((uart::Channel&)*this);
                             })
