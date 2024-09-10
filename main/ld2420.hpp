@@ -87,6 +87,7 @@ public:
 
     auto GetMoveThreshold(uint8_t gate) const { return m_Gates[gate].m_MoveThreshold; }
     auto GetStillThreshold(uint8_t gate) const { return m_Gates[gate].m_StillThreshold; }
+    auto GetMeasuredEnergy(uint8_t gate) const { return m_Gates[gate].m_Energy; }
 
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
     void SetTimeout(uint32_t t) { m_Timeout = t; }
@@ -281,6 +282,7 @@ public:
     ExpectedResult TryReadSimpleFrame(int attempts = 3);
 
     ExpectedResult ReadEnergyFrame();
+    ExpectedResult TryReadEnergyFrame(int attempts = 3);
 private:
     ExpectedResult TryFillBuffer(size_t s);
 

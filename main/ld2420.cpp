@@ -386,6 +386,12 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
         | and_then([&]()->ExpectedResult{ return std::ref(*this); });
 }
 
+LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts)
+{
+    using namespace functional;
+    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
+}
+
 LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
 {
     using namespace functional;
