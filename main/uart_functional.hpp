@@ -6,6 +6,28 @@
 
 namespace uart
 {
+    auto skip_bytes(Channel &c, size_t bytes)
+    {
+        using namespace functional;
+        struct ctx_t
+        {
+            Channel &c;
+            size_t bytes;
+            uint8_t buf[16];
+        };
+        using ExpectedResult = std::expected<Channel::Ref, ::Err>;
+        using ExpectedCondition = std::expected<bool, ::Err>;
+        return repeat_while(
+                /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.bytes > 0; },
+                /*iteration*/[](ctx_t &ctx)->ExpectedResult{
+                                return ctx.c.Read(ctx.buf, std::min(sizeof(ctx.buf), ctx.bytes)) 
+                                | and_then([&](size_t l)->ExpectedResult{ ctx.bytes -= l; return std::ref(ctx.c); });
+                            },
+                /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
+                /*context  */ctx_t{c, bytes, {}}
+                );
+    }
+
     auto match_bytes(Channel &c, std::span<const uint8_t> bytes)
     {
         using namespace functional;
