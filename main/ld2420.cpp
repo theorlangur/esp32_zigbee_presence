@@ -376,6 +376,7 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
     using namespace functional;
     SetDefaultWait(duration_ms_t(150));
     constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
+    constexpr uint8_t footer[] = {0xf8, 0xf7, 0xf6, 0xf5};
     uint16_t reportLen = 0;
     uint16_t distance = 0;
     return start_sequence()
@@ -384,6 +385,9 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
         | uart::read_into(*this, reportLen)
         | uart::read_into(*this, m_Presence.m_Detected)
         | uart::read_into(*this, distance)
+        | and_then([&]{ m_Presence.m_Distance = float(distance) / 100; })
+        | repeat_n(16, [&](int i){ return start_sequence() | uart::read_into(*this, m_Gates[i].m_Energy); })
+        | uart::match_bytes(*this, footer)
         | transform_error([&](::Err e){ return Err{e, "LD2420::ReadEnergyFrame", ErrorCode::EnergyData_Failure};})
         | and_then([&]()->ExpectedResult{ return std::ref(*this); });
 }

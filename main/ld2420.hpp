@@ -292,8 +292,9 @@ private:
     uint32_t m_Timeout = 30;
     struct Gate
     {
-        uint16_t m_StillThreshold;
-        uint16_t m_MoveThreshold;
+        uint16_t m_StillThreshold; //config
+        uint16_t m_MoveThreshold; //config
+        uint16_t m_Energy; //output
     };
     Gate m_Gates[16];
 
