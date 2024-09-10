@@ -279,6 +279,8 @@ private:
 public:
     ExpectedResult ReadSimpleFrame();
     ExpectedResult TryReadSimpleFrame(int attempts = 3);
+
+    ExpectedResult ReadEnergyFrame();
 private:
     ExpectedResult TryFillBuffer(size_t s);
 

@@ -48,7 +48,7 @@ LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
         | and_then([&]{ return SetPins(txPin, rxPin); })
         | and_then([&]{ return Open(); })
         | transform_error([](::Err &c){ return Err{c, "LD2420::Init", ErrorCode::Init}; })
-        | and_then([](uart::Channel &c)->ExpectedResult { return std::ref(static_cast<LD2420&>(c)); });
+        | and_then([&]()->ExpectedResult { return std::ref(*this); });
 }
 
 LD2420::ExpectedResult LD2420::ReloadConfig()
@@ -56,11 +56,6 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
     using namespace functional;
     return OpenCommandMode()
         | and_then([&]{ return UpdateVersion(); })
-        //| retry_on_fail(3
-        //        , [&]{ return UpdateSystemMode(); }
-        //        , [&]{ std::this_thread::sleep_for(duration_ms_t(100)); return true; } //on error
-        //    ) //apparently cannot be read
-        //| or_else(std::ref(*this))
         | and_then([&]{ return UpdateMinMaxTimeout(); })
         | repeat_n(16, [&](uint8_t i){ return UpdateGate(i); })
         | and_then([&]{ return CloseCommandMode(); })
@@ -123,7 +118,7 @@ LD2420::ExpectedResult LD2420::SendFrame(const frame_t &frame)
     }
     return Send(frame.data, frame.TotalSize()) 
             | transform_error([](::Err uartErr){ return Err{uartErr, "LD2420::SendFrame", ErrorCode::SendFrame}; })
-            | and_then([&](uart::Channel &c)->ExpectedResult{ return std::ref(static_cast<LD2420&>(c)); });
+            | and_then([&]()->ExpectedResult{ return std::ref(*this); });
 }
 
 LD2420::ExpectedDataResult LD2420::RecvFrame(frame_t &frame)
@@ -171,7 +166,6 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
     return Flush() //flushing whatever unread was in the buffer
         | transform_error([](::Err e){ return Err{e, "SendCommand", ErrorCode::SendCommand_Failed}; })
         | and_then([&]{ return SendFrame(f); })
-    //return SendFrame(f)
         | transform_error([](Err e){ return CmdErr{e, 0}; })
         | and_then([&]{ return WaitAllSent() | transform_error([](::Err e){ return CmdErr{Err{e, "SendCommandOnly", ErrorCode::SendCommand_FailedWrite}, 0};}); })
         | and_then([&]{ frame_t *pF = reinterpret_cast<frame_t *>(inData.data()); return RecvFrame(*pF); })
@@ -323,7 +317,7 @@ LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
                     if (availCont > s) availCont = s;
                     return Read((uint8_t*)m_Buffer + m_BufferWriteTo, availCont, duration_ms_t{100})
                         | transform_error([&](::Err e){ return Err{e, "LD2420::TryFillBuffer", ErrorCode::FillBuffer_ReadFailure};})
-                        | and_then([&](uart::Channel &c, size_t l)->ExpectedResult{
+                        | and_then([&](size_t l)->ExpectedResult{
                                 s -= l;
                                 m_BufferWriteTo = (m_BufferWriteTo + l) % sizeof(m_Buffer);
                                 return std::ref(*this);
@@ -375,6 +369,23 @@ LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts)
 {
     using namespace functional;
     return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadSimpleFrame(); });
+}
+
+LD2420::ExpectedResult LD2420::ReadEnergyFrame()
+{
+    using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
+    constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
+    uint16_t reportLen = 0;
+    uint16_t distance = 0;
+    return start_sequence()
+        | uart::read_until(*this, 0xf4)
+        | uart::match_bytes(*this, header)
+        | uart::read_into(*this, reportLen)
+        | uart::read_into(*this, m_Presence.m_Detected)
+        | uart::read_into(*this, distance)
+        | transform_error([&](::Err e){ return Err{e, "LD2420::ReadEnergyFrame", ErrorCode::EnergyData_Failure};})
+        | and_then([&]()->ExpectedResult{ return std::ref(*this); });
 }
 
 LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
