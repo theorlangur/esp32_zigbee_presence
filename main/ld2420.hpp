@@ -284,8 +284,6 @@ public:
     ExpectedResult ReadEnergyFrame();
     ExpectedResult TryReadEnergyFrame(int attempts = 3);
 private:
-    ExpectedResult TryFillBuffer(size_t s);
-
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Simple;
     OpenCmdModeResponse m_ProtoInfo{0, 0};

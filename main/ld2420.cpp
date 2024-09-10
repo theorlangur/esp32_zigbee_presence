@@ -299,34 +299,6 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
           });
 }
 
-LD2420::ExpectedResult LD2420::TryFillBuffer(size_t s)
-{
-    using namespace functional;
-    if (!m_BufferEmpty)
-    {
-        size_t avail = m_BufferWriteTo < m_BufferReadFrom ? (m_BufferReadFrom - m_BufferWriteTo) : sizeof(m_Buffer) - m_BufferWriteTo + m_BufferReadFrom;
-        if (avail < s)
-            return std::unexpected(Err{{}, "LD2420::TryFillBuffer", ErrorCode::FillBuffer_NoSpace});
-    }
-
-    return ExpectedResult{std::ref(*this)} |
-        repeat_while(
-                /*condition*/[&]()->std::expected<bool, Err>{ return s > 0; },
-                /*iteration*/[&]()->ExpectedResult{
-                    size_t availCont = m_BufferWriteTo < m_BufferReadFrom ? (m_BufferReadFrom - m_BufferWriteTo) : sizeof(m_Buffer) - m_BufferWriteTo;
-                    if (availCont > s) availCont = s;
-                    return Read((uint8_t*)m_Buffer + m_BufferWriteTo, availCont, duration_ms_t{100})
-                        | transform_error([&](::Err e){ return Err{e, "LD2420::TryFillBuffer", ErrorCode::FillBuffer_ReadFailure};})
-                        | and_then([&](size_t l)->ExpectedResult{
-                                s -= l;
-                                m_BufferWriteTo = (m_BufferWriteTo + l) % sizeof(m_Buffer);
-                                return std::ref(*this);
-                        });
-                },
-                /*on no iterations*/[&]()->ExpectedResult{return std::ref(*this);}
-        );
-}
-
 LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 {
     using namespace functional;
@@ -354,7 +326,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                             else
                                 return std::ref((uart::Channel&)*this);
                             })
-                    | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::FillBuffer_ReadFailure};})
+                    | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure};})
                     | and_then([&]()->ExpectedResult{ return std::ref(*this); });
                     ;
 }
