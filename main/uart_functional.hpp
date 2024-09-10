@@ -6,13 +6,13 @@
 
 namespace uart
 {
-    auto match_bytes(Channel &c, std::span<uint8_t> bytes)
+    auto match_bytes(Channel &c, std::span<const uint8_t> bytes)
     {
         using namespace functional;
         struct ctx_t
         {
             Channel &c;
-            std::span<uint8_t> bytes;
+            std::span<const uint8_t> bytes;
             size_t idx = 0;
         };
         using ExpectedResult = std::expected<Channel::Ref, ::Err>;
@@ -118,6 +118,18 @@ namespace uart
     auto match_bytes(Channel &c, const char *pStr)
     {
         return match_bytes(c, (const uint8_t*)pStr, 0);
+    }
+
+    template<size_t N>
+    auto match_bytes(Channel &c, const char (&arr)[N])
+    {
+        return match_bytes(c, (const uint8_t*)arr, 0);
+    }
+
+    template<size_t N>
+    auto match_bytes(Channel &c, const uint8_t (&arr)[N])
+    {
+        return match_bytes(c, std::span<const uint8_t>(arr, N));
     }
 
     template<class... BytePtr>
