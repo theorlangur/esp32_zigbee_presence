@@ -51,11 +51,19 @@ namespace functional
         {
             using namespace internals;
             using ret_type_t = std::remove_cvref_t<decltype(cont(e.value()))>;
-            using ret_err_type_t = typename ret_type_t::error_type;
-            if (!e)
-                return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
+            if constexpr (!std::is_same_v<ret_type_t, void>)
+            {
+                using ret_err_type_t = typename ret_type_t::error_type;
+                if (!e)
+                    return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
 
-            return cont(e.value());
+                return cont(e.value());
+            }else
+            {
+                if (e)
+                    cont(e.value());
+                return e;
+            }
         }
 };
 #endif
