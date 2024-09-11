@@ -86,6 +86,14 @@ namespace functional
         template<class C>
             using return_type_of_t = return_type_of<C>::type;
 
+        template<class C>
+        concept has_expected_interface = requires(C e)
+        {
+            e.error();
+            e.value();
+            {!e}->std::convertible_to<bool>;
+        };
+
 
         template<class CB, class V, size_t N, size_t...idx>
             concept can_skip_first_n_args_c = requires(CB &cb, V &&v){
@@ -100,7 +108,7 @@ namespace functional
 
         template<class V>
             concept supports_tuple_interface = requires{
-                std::tuple_size_v<V>;
+                std::tuple_size<V>::value;
             };
 
         template<class CB, class V, size_t N>

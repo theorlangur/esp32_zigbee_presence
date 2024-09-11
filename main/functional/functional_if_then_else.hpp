@@ -7,14 +7,6 @@ namespace functional
 {
     namespace internals
     {
-        template<class C>
-        concept has_expected_interface = requires(C e)
-        {
-            e.error();
-            e.value();
-            {e}->std::convertible_to<bool>;
-        };
-
         struct dummy_else_t
         {
             using i_am_dummy = void;
@@ -49,8 +41,8 @@ namespace functional
         auto operator()(ExpVal &&v)
         {
             using namespace internals;
-            using ret_type_if_t = ret_type_continuation_lval_t<ExpVal, WrapIf<If>>;
-            using ret_type_then_t = ret_type_continuation_lval_t<ExpVal, if_then_else_t<If,Then,Else>>;
+            using ret_type_if_t = std::remove_cvref_t<ret_type_continuation_lval_t<ExpVal, WrapIf<If>>>;
+            using ret_type_then_t = std::remove_cvref_t<ret_type_continuation_lval_t<ExpVal, if_then_else_t<If,Then,Else>>>;
 
             WrapIf _wif{_if};
             bool condition;
@@ -68,10 +60,21 @@ namespace functional
                 return invoke_continuation_lval(std::forward<ExpVal>(v), *this);
 
             if constexpr (requires{ typename Else::i_am_dummy; })
-                return ret_type_then_t(std::forward<ExpVal>(v));
+            {
+                if constexpr (has_expected_interface<ret_type_then_t> && supports_tuple_interface<std::remove_cvref_t<ExpVal>>)
+                {
+                    if constexpr (!supports_tuple_interface<typename ret_type_then_t::value_type>)
+                        return ret_type_then_t(std::get<0>(std::forward<ExpVal>(v)));
+                    else if constexpr (std::tuple_size_v<typename ret_type_then_t::value_type> == 1)
+                        return ret_type_then_t(std::get<0>(std::forward<ExpVal>(v)));
+                    else
+                        return ret_type_then_t(std::forward<ExpVal>(v));
+                }else
+                    return ret_type_then_t(std::forward<ExpVal>(v));
+            }
             else
             {
-                using ret_type_else_t = ret_type_continuation_lval_t<ExpVal, WrapElse<Else>>;
+                using ret_type_else_t = std::remove_cvref_t<ret_type_continuation_lval_t<ExpVal, WrapElse<Else>>>;
                 WrapElse _welse{_else};
                 static_assert(std::is_convertible_v<ret_type_else_t, ret_type_then_t>, "If and Then return types must be compatible");
                 return invoke_continuation_lval(std::forward<ExpVal>(v), _welse);
