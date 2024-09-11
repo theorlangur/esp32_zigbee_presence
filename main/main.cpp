@@ -96,16 +96,39 @@ extern "C" void app_main(void)
         print_ld2420_error(e.error());
         return;
     }
+    presence.SetSystemMode(LD2420::SystemMode::Energy);
+    if (auto e = presence.UpdateSystemMode(); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }
 
     while(true)
     {
-        if (auto te = presence.TryReadSimpleFrame(); !te)
+        if (presence.GetSystemMode() == LD2420::SystemMode::Simple)
         {
-            print_ld2420_error(te.error());
-            break;
+            if (auto te = presence.TryReadSimpleFrame(); !te)
+            {
+                print_ld2420_error(te.error());
+                break;
+            }
+        }else
+        {
+            if (auto te = presence.TryReadEnergyFrame(); !te)
+            {
+                print_ld2420_error(te.error());
+                break;
+            }
         }
         auto p = presence.GetPresence();
         printf("Presence: %s; Distance: %.2fm\n", p.m_Detected ? "Detected" : "Clear", p.m_Distance);
+        if (presence.GetSystemMode() == LD2420::SystemMode::Energy)
+        {
+            printf("Energy:");
+            for(uint8_t i = 0; i < 16; ++i)
+                printf("%d=%d ", (int)i, (int)presence.GetMeasuredEnergy(i));
+            printf("\n");
+        }
         fflush(stdout);
     }
 
