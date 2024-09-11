@@ -310,11 +310,6 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
-    auto ParseDistance =  uart::match_bytes(*this, "Range ")
-                        | std::move(ParseNum)
-                        | uart::match_bytes(*this, "\r\n")
-                        | and_then([&]{ m_Presence.m_Distance = float(val) / 100; });
-
     return start_sequence(*this)
                     | uart::read_until(*this, 'O')
                     | uart::match_any_str(*this, "ON", "OFF")
@@ -322,7 +317,10 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                     | uart::match_bytes(*this, "\r\n")
                     | if_then(
                             /*if  */ m_Presence.m_Detected
-                            /*then*/, ParseDistance
+                            /*then*/,   uart::match_bytes(*this, "Range ")
+                                        | ParseNum
+                                        | uart::match_bytes(*this, "\r\n")
+                                        | and_then([&]{ m_Presence.m_Distance = float(val) / 100; })
                             )
                     | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure};})
                     | and_then([&]()->ExpectedResult{ return std::ref(*this); });
