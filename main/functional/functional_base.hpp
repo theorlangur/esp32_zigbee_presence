@@ -55,15 +55,16 @@ namespace functional
         template<class C>
             constexpr std::size_t get_arity_of()
             {
-                if constexpr (requires{ typename C::Callback; })
+                using CR = std::remove_cvref_t<C>;
+                if constexpr (requires{ typename CR::Callback; })
                 {
-                    if constexpr (requires{ C::my_arity; })
-                        return C::my_arity;
+                    if constexpr (requires{ CR::my_arity; })
+                        return CR::my_arity;
                     else
-                        return get_arity_of_impl<typename C::Callback>();
+                        return get_arity_of<typename CR::Callback>();
                 }
                 else
-                    return get_arity_of_impl<C>();
+                    return get_arity_of_impl<CR>();
             }
 
 
