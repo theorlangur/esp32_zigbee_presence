@@ -3,6 +3,7 @@
 
 #include "functional_base.hpp"
 #include "functional_and_then.hpp"
+#include "functional_if_then_else.hpp"
 #include "functional_or_else.hpp"
 #include "functional_transform_error.hpp"
 #include "functional_repeat_n.hpp"
