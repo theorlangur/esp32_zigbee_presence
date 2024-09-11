@@ -305,7 +305,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
     SetDefaultWait(duration_ms_t(150));
     uint16_t val = 0;
     auto ParseNum = repeat_while(
-            [&]()->std::expected<bool,::Err>{ return PeekByte() | and_then([&](uint8_t b)->std::expected<bool,::Err>{ return b >= '0' && b <= '9'; }); },
+            [&]()->WhileResult<::Err>{ return PeekByte() | and_then([&](uint8_t b)->WhileResult<::Err>{ return b >= '0' && b <= '9'; }); },
             [&]{ return ReadByte() | and_then([&](uint8_t b)->Channel::ExpectedResult{ val = val * 10 + b - '0'; return std::ref((Channel&)*this);}); },
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );

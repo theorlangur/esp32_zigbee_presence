@@ -12,6 +12,9 @@ namespace functional
             concept can_call_with_ctx = requires(F &&f, Ctx &ctx) { f(ctx); };
     }
 
+    template<class Err>
+    using WhileResult = std::expected<bool, Err>;
+
     template<class While, class CB, class Default, class Ctx>
         struct repeat_while_t
         {
