@@ -241,6 +241,11 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
           });
 }
 
+void LD2420::SetSystemMode(SystemMode mode)
+{
+    m_Mode = mode;
+}
+
 LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 {
     return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), (uint32_t)mode});
@@ -263,16 +268,16 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
           });
 }
 
-LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
-{
-    using namespace functional;
-    return ReadRawSysMulti(SysRegs::Mode)
-        | and_then([&](LD2420 &d, Params<1> val)->ExpectedGenericCmdResult
-          { 
-              memcpy(&m_Mode, &val.value[0], sizeof(val.value[0]));
-              return std::ref(*this);
-          });
-}
+//LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
+//{
+//    using namespace functional;
+//    return ReadRawSysMulti(SysRegs::Mode)
+//        | and_then([&](LD2420 &d, Params<1> val)->ExpectedGenericCmdResult
+//          { 
+//              memcpy(&m_Mode, &val.value[0], sizeof(val.value[0]));
+//              return std::ref(*this);
+//          });
+//}
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 {
@@ -369,6 +374,15 @@ LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
                     ADBParam{uint16_t(ADBRegs::MinDistance), m_MinDistance}
                     , ADBParam{uint16_t(ADBRegs::MaxDistance), m_MaxDistance}
                     , ADBParam{uint16_t(ADBRegs::Timeout), m_Timeout}); })
+        | and_then([&]{ return CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
+}
+
+LD2420::ExpectedResult LD2420::UpdateSystemMode()
+{
+    using namespace functional;
+    return OpenCommandMode()
+        | and_then([&]{ return SetSystemModeInternal(m_Mode); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }

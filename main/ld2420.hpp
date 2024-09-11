@@ -93,6 +93,7 @@ public:
     void SetTimeout(uint32_t t) { m_Timeout = t; }
 
     ExpectedResult UpdateMinMaxTimeoutConfig();
+    ExpectedResult UpdateSystemMode();
 
     ExpectedResult ReloadConfig();
 
@@ -273,7 +274,7 @@ private:
 
     ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
     ExpectedGenericCmdResult UpdateVersion();
-    ExpectedGenericCmdResult UpdateSystemMode();
+    //ExpectedGenericCmdResult UpdateSystemMode();
     ExpectedGenericCmdResult UpdateMinMaxTimeout();
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
