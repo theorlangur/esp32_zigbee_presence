@@ -319,7 +319,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                     | uart::read_until(*this, 'O')
                     | uart::match_any_str(*this, "ON", "OFF")
                     | and_then([&](int match)->Channel::ExpectedResult{ m_Presence.m_Detected = match == 0; return std::ref((Channel&)*this); })
-                    | if_then_else(
+                    | if_then(
                             /*if  */ m_Presence.m_Detected
                             /*then*/, ParseDistance
                             )

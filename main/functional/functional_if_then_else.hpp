@@ -89,7 +89,7 @@ namespace functional
     }
 
     template<class If, class Then>
-    auto if_then_else(If &&_if, Then &&_then)
+    auto if_then(If &&_if, Then &&_then)
     {
         if constexpr (std::is_convertible_v<If,bool>)
             return if_then_else_t{[&]()->bool{ return _if; }, std::forward<Then>(_then), internals::dummy_else_t{}};
