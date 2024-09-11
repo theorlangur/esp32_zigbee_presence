@@ -310,7 +310,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
             [&]()->Channel::ExpectedResult{ return std::ref((Channel&)*this); }
             );
 
-    auto ParseDistance =  uart::match_bytes(*this, "\r\nRange ")
+    auto ParseDistance =  uart::match_bytes(*this, "Range ")
                         | std::move(ParseNum)
                         | uart::match_bytes(*this, "\r\n")
                         | and_then([&]{ m_Presence.m_Distance = float(val) / 100; });
@@ -318,25 +318,12 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
     return start_sequence(*this)
                     | uart::read_until(*this, 'O')
                     | uart::match_any_str(*this, "ON", "OFF")
-                    | and_then([&](int match)->Channel::ExpectedResult{ m_Presence.m_Detected = match == 0; return std::ref((Channel&)*this); })
+                    | and_then([&](int match){ m_Presence.m_Detected = match == 0; })
+                    | uart::match_bytes(*this, "\r\n")
                     | if_then(
                             /*if  */ m_Presence.m_Detected
                             /*then*/, ParseDistance
                             )
-                    //| and_then([&]()->Channel::ExpectedResult{
-                    //        if (m_Presence.m_Detected)
-                    //            return 
-                    //                start_sequence(*this)
-                    //                | uart::match_bytes(*this, "\r\nRange ")
-                    //                | std::move(ParseNum)
-                    //                | uart::match_bytes(*this, "\r\n")
-                    //                | and_then([&]{ m_Presence.m_Distance = float(val) / 100; });
-                    //        else
-                    //        {
-                    //            printf("No presence detected\n");
-                    //            return std::ref((uart::Channel&)*this);
-                    //            }
-                    //        })
                     | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure};})
                     | and_then([&]()->ExpectedResult{ return std::ref(*this); });
                     ;
