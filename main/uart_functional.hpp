@@ -176,9 +176,10 @@ namespace uart
                                 return ctx.c.ReadByte() 
                                 | and_then([&](uint8_t b)->ExpectedResult{
                                         ctx.anyValidLeft = false;
-                                        int match = 0;
+                                        int match = -1;
                                         for(auto &s : ctx.sequences)
                                         {
+                                            ++match;
                                             if (!s)
                                                 continue;
 
@@ -192,7 +193,6 @@ namespace uart
                                                     ctx.anyValidLeft = true;
                                             }else
                                                 s = nullptr;
-                                            ++match;
                                         }
 
                                         ++ctx.idx;
