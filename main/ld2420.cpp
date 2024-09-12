@@ -414,7 +414,7 @@ LD2420::ExpectedResult LD2420::ConfigBlock::EndChange()
     using namespace functional;
     if (!m_GateChanges && !m_MiscChanges)
         return std::ref(d);
-
+    ScopeExit clearChanges = [&]{ m_GateChanges = m_MiscChanges = 0; };
     return d.OpenCommandMode()
         | if_then([&]()->bool{ return m_Changed.Mode; }, [&]{ return d.SetSystemModeInternal(d.m_Mode); })
         | if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout; }, 

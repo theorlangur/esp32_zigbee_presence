@@ -140,8 +140,11 @@ public:
                 uint32_t Timeout             : 1 = 0;
                 uint32_t Unused              : 28= 0;
             }m_Changed;
-            uint32_t m_GateChanges;
-            uint32_t m_MiscChanges;
+            
+            struct{
+                uint32_t m_GateChanges;
+                uint32_t m_MiscChanges;
+            };
         };
     };
 
