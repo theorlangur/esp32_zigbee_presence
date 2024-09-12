@@ -191,6 +191,11 @@ private:
         MoveThresholdGateBase = 0x10,
         StillThresholdGateBase = 0x20,
     };
+    friend uint16_t operator+(ADBRegs r, uint16_t off)
+    {
+        return uint16_t(r) + off;
+    }
+
 
     enum class SysRegs: uint16_t
     {
