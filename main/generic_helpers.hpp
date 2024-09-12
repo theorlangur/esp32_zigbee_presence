@@ -7,6 +7,15 @@
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
 
+template<class CB>
+struct ScopeExit
+{
+    ScopeExit(CB &&cb):m_CB(std::move(cb)){}
+    ~ScopeExit(){ m_CB(); }
+private:
+    CB m_CB;
+};
+
 class ILockable
 {
 public:
