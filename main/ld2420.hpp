@@ -72,11 +72,83 @@ public:
         float m_Distance = 0;
     };
 
+    struct ConfigBlock
+    {
+        LD2420 &d;
+
+        ConfigBlock(LD2420 &d): d(d) {}
+        ConfigBlock(ConfigBlock const&) = delete;
+        ConfigBlock(ConfigBlock &&) = delete;
+        ConfigBlock& operator=(ConfigBlock const &) = delete;
+        ConfigBlock& operator=(ConfigBlock &&) = delete;
+
+
+        ConfigBlock& SetSystemMode(SystemMode mode);
+
+        ConfigBlock& SetMinDistance(int dist);
+        ConfigBlock& SetMinDistanceRaw(uint32_t dist);
+
+        ConfigBlock& SetMaxDistance(int dist);
+        ConfigBlock& SetMaxDistanceRaw(uint32_t dist);
+
+        ConfigBlock& SetTimeout(uint32_t t);
+
+        ConfigBlock& SetMoveThreshold(uint8_t gate, uint16_t energy);
+        ConfigBlock& SetStillThreshold(uint8_t gate, uint16_t energy);
+
+        ExpectedResult EndChange();
+    private:
+        union{
+            struct
+            {
+                uint32_t Gate0MoveThreshold  : 1 = 0;
+                uint32_t Gate0StillThreshold : 1 = 0;
+                uint32_t Gate1MoveThreshold  : 1 = 0;
+                uint32_t Gate1StillThreshold : 1 = 0;
+                uint32_t Gate2MoveThreshold  : 1 = 0;
+                uint32_t Gate2StillThreshold : 1 = 0;
+                uint32_t Gate3MoveThreshold  : 1 = 0;
+                uint32_t Gate3StillThreshold : 1 = 0;
+                uint32_t Gate4MoveThreshold  : 1 = 0;
+                uint32_t Gate4StillThreshold : 1 = 0;
+                uint32_t Gate5MoveThreshold  : 1 = 0;
+                uint32_t Gate5StillThreshold : 1 = 0;
+                uint32_t Gate6MoveThreshold  : 1 = 0;
+                uint32_t Gate6StillThreshold : 1 = 0;
+                uint32_t Gate7MoveThreshold  : 1 = 0;
+                uint32_t Gate7StillThreshold : 1 = 0;
+                uint32_t Gate8MoveThreshold  : 1 = 0;
+                uint32_t Gate8StillThreshold : 1 = 0;
+                uint32_t Gate9MoveThreshold  : 1 = 0;
+                uint32_t Gate9StillThreshold : 1 = 0;
+                uint32_t Gate10MoveThreshold : 1 = 0;
+                uint32_t Gate10StillThreshold: 1 = 0;
+                uint32_t Gate11MoveThreshold : 1 = 0;
+                uint32_t Gate11StillThreshold: 1 = 0;
+                uint32_t Gate12MoveThreshold : 1 = 0;
+                uint32_t Gate12StillThreshold: 1 = 0;
+                uint32_t Gate13MoveThreshold : 1 = 0;
+                uint32_t Gate13StillThreshold: 1 = 0;
+                uint32_t Gate14MoveThreshold : 1 = 0;
+                uint32_t Gate14StillThreshold: 1 = 0;
+                uint32_t Gate15MoveThreshold : 1 = 0;
+                uint32_t Gate15StillThreshold: 1 = 0;
+
+                uint32_t Mode                : 1 = 0;
+                uint32_t MinDistance         : 1 = 0;
+                uint32_t MaxDistance         : 1 = 0;
+                uint32_t Timeout             : 1 = 0;
+                uint32_t Unused              : 28= 0;
+            }m_Changed;
+            uint32_t m_GateChanges;
+            uint32_t m_MiscChanges;
+        };
+    };
+
     LD2420(uart::Port p, int baud_rate = 115200);
 
     ExpectedResult Init(int txPin, int rxPin);
 
-    void SetSystemMode(SystemMode mode);
     SystemMode GetSystemMode() const { return m_Mode; }
 
     int GetMinDistance() const { return m_MinDistance * 7 / 10; }
@@ -90,7 +162,8 @@ public:
     auto GetMeasuredEnergy(uint8_t gate) const { return m_Gates[gate].m_Energy; }
 
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
-    void SetTimeout(uint32_t t) { m_Timeout = t; }
+
+    ConfigBlock ChangeConfiguration() { return {*this}; }
 
     ExpectedResult UpdateMinMaxTimeoutConfig();
     ExpectedResult UpdateSystemMode();
@@ -100,6 +173,12 @@ public:
     std::string_view GetVersion() const;
 
     PresenceResult GetPresence() const { return m_Presence; }
+
+    ExpectedResult ReadSimpleFrame();
+    ExpectedResult TryReadSimpleFrame(int attempts = 3);
+
+    ExpectedResult ReadEnergyFrame();
+    ExpectedResult TryReadEnergyFrame(int attempts = 3);
 private:
     enum class ADBRegs: uint16_t
     {
@@ -277,13 +356,6 @@ private:
     //ExpectedGenericCmdResult UpdateSystemMode();
     ExpectedGenericCmdResult UpdateMinMaxTimeout();
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
-
-public:
-    ExpectedResult ReadSimpleFrame();
-    ExpectedResult TryReadSimpleFrame(int attempts = 3);
-
-    ExpectedResult ReadEnergyFrame();
-    ExpectedResult TryReadEnergyFrame(int attempts = 3);
 private:
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Simple;

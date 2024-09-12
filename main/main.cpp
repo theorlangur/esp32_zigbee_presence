@@ -90,16 +90,14 @@ extern "C" void app_main(void)
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
-    presence.SetTimeout(5);
-    if (auto e = presence.UpdateMinMaxTimeoutConfig(); !e)
+    auto changeConfig = presence.ChangeConfiguration()
+                                    .SetTimeout(5)
+                                    .SetSystemMode(LD2420::SystemMode::Energy)
+                                .EndChange();
+
+    if (!changeConfig)
     {
-        print_ld2420_error(e.error());
-        return;
-    }
-    presence.SetSystemMode(LD2420::SystemMode::Energy);
-    if (auto e = presence.UpdateSystemMode(); !e)
-    {
-        print_ld2420_error(e.error());
+        print_ld2420_error(changeConfig.error());
         return;
     }
 

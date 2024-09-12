@@ -241,11 +241,6 @@ LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
           });
 }
 
-void LD2420::SetSystemMode(SystemMode mode)
-{
-    m_Mode = mode;
-}
-
 LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 {
     return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), (uint32_t)mode});
@@ -267,17 +262,6 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
               return std::ref(*this);
           });
 }
-
-//LD2420::ExpectedGenericCmdResult LD2420::UpdateSystemMode()
-//{
-//    using namespace functional;
-//    return ReadRawSysMulti(SysRegs::Mode)
-//        | and_then([&](LD2420 &d, Params<1> val)->ExpectedGenericCmdResult
-//          { 
-//              memcpy(&m_Mode, &val.value[0], sizeof(val.value[0]));
-//              return std::ref(*this);
-//          });
-//}
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 {
@@ -366,24 +350,79 @@ LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts)
     return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
 }
 
-LD2420::ExpectedResult LD2420::UpdateMinMaxTimeoutConfig()
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetSystemMode(SystemMode mode)
 {
-    using namespace functional;
-    return OpenCommandMode()
-        | and_then([&]{ return WriteRawADBMulti(
-                    ADBParam{uint16_t(ADBRegs::MinDistance), m_MinDistance}
-                    , ADBParam{uint16_t(ADBRegs::MaxDistance), m_MaxDistance}
-                    , ADBParam{uint16_t(ADBRegs::Timeout), m_Timeout}); })
-        | and_then([&]{ return CloseCommandMode(); })
-        | transform_error([&](CmdErr e){ return e.e; });
+    m_Changed.Mode = true;
+    d.m_Mode = mode;
+    return *this;
+}
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetMinDistance(int dist)
+{
+    m_Changed.MinDistance = true;
+    d.m_MinDistance = std::clamp(dist * 10 / 7, 1, 12);
+    return *this;
+}
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetMinDistanceRaw(uint32_t dist)
+{
+    m_Changed.MinDistance = true;
+    d.m_MinDistance = std::clamp(dist, uint32_t(1), uint32_t(12));
+    return *this;
+}
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetMaxDistance(int dist)
+{
+    m_Changed.MaxDistance = true;
+    d.m_MaxDistance = std::clamp(dist * 10 / 7, 1, 12);
+    return *this;
 }
 
-LD2420::ExpectedResult LD2420::UpdateSystemMode()
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetMaxDistanceRaw(uint32_t dist)
 {
-    using namespace functional;
-    return OpenCommandMode()
-        | and_then([&]{ return SetSystemModeInternal(m_Mode); })
-        | and_then([&]{ return CloseCommandMode(); })
-        | transform_error([&](CmdErr e){ return e.e; });
+    m_Changed.MaxDistance = true;
+    d.m_MaxDistance = std::clamp(dist, uint32_t(1), uint32_t(12));
+    return *this;
 }
 
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetTimeout(uint32_t t)
+{
+    m_Changed.Timeout = true;
+    d.m_Timeout = t;
+    return *this;
+}
+
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetMoveThreshold(uint8_t gate, uint16_t energy)
+{
+    if (gate > 15)
+        return *this;
+
+    m_GateChanges |= 1 << (gate * 2);
+    d.m_Gates[gate].m_MoveThreshold = energy;
+    return *this;
+}
+
+LD2420::ConfigBlock& LD2420::ConfigBlock::SetStillThreshold(uint8_t gate, uint16_t energy)
+{
+    if (gate > 15)
+        return *this;
+
+    m_GateChanges |= 1 << (gate * 2 + 1);
+    d.m_Gates[gate].m_StillThreshold = energy;
+    return *this;
+}
+
+LD2420::ExpectedResult LD2420::ConfigBlock::EndChange()
+{
+    using namespace functional;
+    if (!m_GateChanges && !m_MiscChanges)
+        return std::ref(d);
+
+    return d.OpenCommandMode()
+        | if_then([&]()->bool{ return m_Changed.Mode; }, [&]{ return d.SetSystemModeInternal(d.m_Mode); })
+        | if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout; }, 
+                    [&]{ return d.WriteRawADBMulti(
+                                      ADBParam{uint16_t(ADBRegs::MinDistance), d.m_MinDistance}
+                                    , ADBParam{uint16_t(ADBRegs::MaxDistance), d.m_MaxDistance}
+                                    , ADBParam{uint16_t(ADBRegs::Timeout), d.m_Timeout}); 
+                       })
+        | and_then([&]{ return d.CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
+}
