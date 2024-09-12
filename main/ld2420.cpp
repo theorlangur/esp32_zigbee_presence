@@ -423,18 +423,20 @@ LD2420::ExpectedResult LD2420::ConfigBlock::EndChange()
                                     , ADBParam{uint16_t(ADBRegs::MaxDistance), d.m_MaxDistance}
                                     , ADBParam{uint16_t(ADBRegs::Timeout), d.m_Timeout}); 
                        })
-        | repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
-                if (m_GateChanges & (3 << (g * 2))) //check if both
-                    return d.WriteRawADBMulti(
-                                      ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
-                                    , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}); 
-                else if (m_GateChanges & (1 << (g * 2)))
-                    return d.WriteRawADBMulti(ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}); 
-                else if (m_GateChanges & (1 << (g * 2 + 1)))
-                    return d.WriteRawADBMulti(ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}); 
-                else
-                    return std::ref(d);
-          })
+        | if_then(m_GateChanges, 
+              repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
+                    if (m_GateChanges & (3 << (g * 2))) //check if both
+                        return d.WriteRawADBMulti(
+                                          ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
+                                        , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}); 
+                    else if (m_GateChanges & (1 << (g * 2)))
+                        return d.WriteRawADBMulti(ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}); 
+                    else if (m_GateChanges & (1 << (g * 2 + 1)))
+                        return d.WriteRawADBMulti(ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}); 
+                    else
+                        return std::ref(d);
+              })
+          )
         | and_then([&]{ return d.CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }
