@@ -191,10 +191,7 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
         | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(100)); })
         | transform_error([](Err e){ return CmdErr{e, 0}; })
         | and_then([&]{ return SendCommandV2(0xff, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); })
-        | and_then([&]()->ExpectedOpenCmdModeResult{ 
-                printf("Open command proto: %d, buf size: %d\n", int(r.protocol_version), int(r.buffer_size));
-                return OpenCmdModeRetVal{std::ref(*this), r}; 
-                });
+        | and_then([&]()->ExpectedOpenCmdModeResult{ return OpenCmdModeRetVal{std::ref(*this), r}; });
 
     //frame_t f;
     //uint16_t protocol_version = 2;
@@ -219,9 +216,11 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
 LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
 {
     using namespace functional;
-    frame_t f;
-    return SendCommand(0xfe, std::span<uint8_t>{}, f)
-        | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
+    //frame_t f;
+    //return SendCommand(0xfe, std::span<uint8_t>{}, f)
+    //    | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
+    return SendCommandV2(0xfe, to_send(), to_recv())
+            | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
 }
 
 std::string_view LD2420::GetVersion() const

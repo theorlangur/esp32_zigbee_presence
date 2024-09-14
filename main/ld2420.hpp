@@ -316,7 +316,6 @@ private:
                 | uart::match_bytes(*this, kFrameHeader)
                 | uart::read_into(*this, len)
                 | and_then([&]()->Channel::ExpectedResult{
-                        printf("RecvFrameV2 len: %d; arg_size: %d\n", int(len), int(arg_size));
                         if (arg_size > len)
                             return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
                         return std::ref((Channel&)*this);
