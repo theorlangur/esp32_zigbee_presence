@@ -242,7 +242,7 @@ namespace uart
     inline auto write_any(Channel &c, Args&&... args)
     {
         using namespace functional;
-        return (and_then([&]{return c.Send((uint8_t const*)&args, sizeof(args)); }) |...);
+        return (and_then([&]{ return c.Send((uint8_t const*)&args, sizeof(args)); }) |...);
     }
 
     template<class T>
@@ -251,7 +251,7 @@ namespace uart
         using functional_read_helper = void;
         const T v;
 
-        static constexpr size_t size() { return sizeof(T); }
+        static constexpr size_t size() { return sizeof(std::remove_cvref_t<T>); }
         auto run(Channel &c) { return match_bytes(c, std::span<const uint8_t>((uint8_t const*)&v, sizeof(T))); }
     };
 
@@ -270,7 +270,10 @@ namespace uart
         static constexpr size_t size() { return 0; }
 
         CB v;
-        auto run(Channel &c) { return and_then([&]{ return v(); }); }
+        auto run(Channel &c) { 
+            using namespace functional;
+            return and_then([&]{ return v(); }); 
+        }
     };
 
     template<class C>
@@ -288,7 +291,8 @@ namespace uart
     template<class T>
     inline auto recv_for(Channel &c, T &&a)
     {
-        if constexpr (is_functional_read_helper<T>)
+        using PureT = std::remove_cvref_t<T>;
+        if constexpr (is_functional_read_helper<PureT>)
             return a.run(c);
         else
             return read_into(c, a);
@@ -297,15 +301,16 @@ namespace uart
     template<class Sz, class T>
     inline auto recv_for_checked(Channel &c, Sz &limit, T &&a)
     {
+        using PureT = std::remove_cvref_t<T>;
         using namespace functional;
         auto check_limit = and_then([&]()->Channel::ExpectedResult{ 
-                if (limit < uart_sizeof<T>())
+                if (limit < uart_sizeof<PureT>())
                     return std::unexpected(::Err{"Insufficient length", ESP_OK}); 
-                limit -= uart_sizeof<T>();
+                limit -= uart_sizeof<PureT>();
                 return std::ref(c);
             });
 
-        if constexpr (is_functional_read_helper<T>)
+        if constexpr (is_functional_read_helper<PureT>)
             return  std::move(check_limit) | a.run(c);
         else
             return std::move(check_limit) | read_into(c, a);

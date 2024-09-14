@@ -310,12 +310,13 @@ private:
     {
         using namespace functional;
         uint16_t len;
-        constexpr const size_t arg_size = (uart::uart_sizeof<T>() + ...);
+        constexpr const size_t arg_size = (uart::uart_sizeof<std::remove_cvref_t<T>>() + ...);
         return 
                 start_sequence()
                 | uart::match_bytes(*this, kFrameHeader)
                 | uart::read_into(*this, len)
                 | and_then([&]()->Channel::ExpectedResult{
+                        printf("RecvFrameV2 len: %d; arg_size: %d\n", int(len), int(arg_size));
                         if (arg_size > len)
                             return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
                         return std::ref((Channel&)*this);
@@ -351,7 +352,7 @@ private:
         };
         auto RecvFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){ 
             return RecvFrameV2(
-                uart::match_t{cmd | uint16_t(0x100)}, 
+                uart::match_t{uint16_t(cmd | 0x100)}, 
                 status, 
                 uart::callback_t{[&]()->Channel::ExpectedResult{
                     if (status != 0)
@@ -360,7 +361,8 @@ private:
                 }},
                 std::get<idx>(recvArgs)...);
         };
-        return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>())
+        return Flush() 
+                | and_then([&]{ return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
                 | and_then([&]{ return WaitAllSent() | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed};}); })
                 | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
                 | transform_error([&](Err e){ return CmdErr{e, 0}; })
