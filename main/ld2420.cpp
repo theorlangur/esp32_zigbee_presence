@@ -184,24 +184,32 @@ LD2420::ExpectedDataResult LD2420::SendCommand(uint16_t cmd, const std::span<uin
 LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
 {
     using namespace functional;
-    frame_t f;
     uint16_t protocol_version = 2;
-    f.WriteCmd(0xff, std::span<uint8_t>((uint8_t*)&protocol_version, 2));
-    return SendFrame(f) 
+    OpenCmdModeResponse r;
+    return SendFrameV2(0xff, protocol_version)
+        | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(100)); })
         | transform_error([](Err e){ return CmdErr{e, 0}; })
-        | and_then([&]{ 
-                //printf("Sleeping before sending actual command");
-                std::this_thread::sleep_for(duration_ms_t(100)); 
-                return SendCommand(0xff, protocol_version, f); 
-          })
-        | and_then([&](LD2420 &d, std::span<uint8_t> res)->ExpectedOpenCmdModeResult{
-                if (res.size() != 4)
-                    return std::unexpected(CmdErr{Err{{}, "OpenCommandMode", ErrorCode::SendCommand_WrongFormat}, 0});
-                OpenCmdModeResponse r;
-                r.protocol_version = *(uint16_t*)res.data();
-                r.buffer_size = *(uint16_t*)(res.data() + 2);
-                return OpenCmdModeRetVal{std::ref(d), r};
-          });
+        | and_then([&]{ return SendCommandV2(0xff, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); })
+        | and_then([&]()->ExpectedOpenCmdModeResult{ return OpenCmdModeRetVal{std::ref(*this), r}; });
+
+    //frame_t f;
+    //uint16_t protocol_version = 2;
+    //f.WriteCmd(0xff, std::span<uint8_t>((uint8_t*)&protocol_version, 2));
+    //return SendFrame(f) 
+    //    | transform_error([](Err e){ return CmdErr{e, 0}; })
+    //    | and_then([&]{ 
+    //            //printf("Sleeping before sending actual command");
+    //            std::this_thread::sleep_for(duration_ms_t(100)); 
+    //            return SendCommand(0xff, protocol_version, f); 
+    //      })
+    //    | and_then([&](LD2420 &d, std::span<uint8_t> res)->ExpectedOpenCmdModeResult{
+    //            if (res.size() != 4)
+    //                return std::unexpected(CmdErr{Err{{}, "OpenCommandMode", ErrorCode::SendCommand_WrongFormat}, 0});
+    //            OpenCmdModeResponse r;
+    //            r.protocol_version = *(uint16_t*)res.data();
+    //            r.buffer_size = *(uint16_t*)(res.data() + 2);
+    //            return OpenCmdModeRetVal{std::ref(d), r};
+    //      });
 }
 
 LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()

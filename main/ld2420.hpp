@@ -4,6 +4,7 @@
 #include "uart.hpp"
 #include <span>
 #include "functional/functional.hpp"
+#include "uart_functional.hpp"
 
 class LD2420: protected uart::Channel
 {
@@ -224,6 +225,8 @@ private:
         Mode = 0
     };
 
+    constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
+    constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
     struct frame_t
     {
         static constexpr size_t kDataOffset = 4 + 2;//header + len
@@ -286,6 +289,83 @@ private:
     }
     ExpectedResult SendFrame(const frame_t &frame);
     ExpectedDataResult RecvFrame(frame_t &frame);
+
+    template<class...T>
+    ExpectedResult SendFrameV2(T&&... args)
+    {
+        using namespace functional;
+        return Send(kFrameHeader, sizeof(kFrameHeader))
+            | and_then([&]{ 
+                    uint16_t len = (sizeof(args) + ...);
+                    return Send((uint8_t const*)&len, sizeof(len)); 
+            })
+            | uart::write_any(*this, std::forward<T>(args)...)
+            | and_then([&]{ return Send(kFrameFooter, sizeof(kFrameFooter)); })
+            | transform_error([&](::Err e){ return Err{e, "SendFrameV2", ErrorCode::SendFrame}; })
+            | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+    }
+
+    template<class...T>
+    ExpectedResult RecvFrameV2(T&&... args)
+    {
+        using namespace functional;
+        uint16_t len;
+        constexpr const size_t arg_size = (uart::uart_sizeof<T>() + ...);
+        return 
+                start_sequence()
+                | uart::match_bytes(*this, kFrameHeader)
+                | uart::read_into(*this, len)
+                | and_then([&]()->Channel::ExpectedResult{
+                        if (arg_size > len)
+                            return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
+                        return std::ref((Channel&)*this);
+                  })
+                | uart::read_any_limited(*this, len, std::forward<T>(args)...)
+                | if_then(
+                  /*if*/   [&]{ return arg_size < len; }
+                  /*then*/,[&]{ return start_sequence() | uart::skip_bytes(*this, len - arg_size); })
+                | uart::match_bytes(*this, kFrameFooter)
+                | transform_error([&](::Err e){ return Err{e, "RecvFrameV2", ErrorCode::RecvFrame_Malformed}; })
+                | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+    }
+
+    template<class... ToSend>
+    auto to_send(ToSend&&...args)
+    {
+        return std::forward_as_tuple(std::forward<ToSend>(args)...);
+    }
+
+    template<class... ToRecv>
+    auto to_recv(ToRecv&&...args)
+    {
+        return std::forward_as_tuple(std::forward<ToRecv>(args)...);
+    }
+
+    template<class... ToSend, class... ToRecv>
+    ExpectedGenericCmdResult SendCommandV2(uint16_t cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
+    {
+        using namespace functional;
+        uint16_t status;
+        auto SendFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){
+            return SendFrameV2(cmd, std::get<idx>(sendArgs)...);
+        };
+        auto RecvFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){ 
+            return RecvFrameV2(
+                uart::match_t{cmd | uint16_t(0x100)}, 
+                status, 
+                uart::callback_t{[&]()->Channel::ExpectedResult{
+                    if (status != 0)
+                        return std::unexpected(::Err{"SendCommandV2 status", status});
+                    return std::ref((Channel&)*this);
+                }},
+                std::get<idx>(recvArgs)...);
+        };
+        return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>())
+                | and_then([&]{ return WaitAllSent() | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed};}); })
+                | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
+                | transform_error([&](Err e){ return CmdErr{e, 0}; })
+                | and_then([&]()->ExpectedGenericCmdResult{ return std::ref(*this); });
+    }
 
     ExpectedOpenCmdModeResult OpenCommandMode();
     ExpectedCloseCmdModeResult CloseCommandMode();
