@@ -6,7 +6,7 @@
 
 namespace uart
 {
-    auto skip_bytes(Channel &c, size_t bytes)
+    inline auto skip_bytes(Channel &c, size_t bytes)
     {
         using namespace functional;
         struct ctx_t
@@ -28,7 +28,7 @@ namespace uart
                 );
     }
 
-    auto match_bytes(Channel &c, std::span<const uint8_t> bytes)
+    inline auto match_bytes(Channel &c, std::span<const uint8_t> bytes)
     {
         using namespace functional;
         struct ctx_t
@@ -59,7 +59,7 @@ namespace uart
     }
 
     template<class... Seqs>
-    auto match_any_bytes(Channel &c, Seqs&&... bytes)
+    inline auto match_any_bytes(Channel &c, Seqs&&... bytes)
     {
         using namespace functional;
         struct ctx_t
@@ -106,7 +106,7 @@ namespace uart
                 );
     }
 
-    auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator)
+    inline auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator)
     {
         using namespace functional;
         //printf("match_bytes for: %s\n", pBytes);
@@ -137,25 +137,25 @@ namespace uart
                 );
     }
 
-    auto match_bytes(Channel &c, const char *pStr)
+    inline auto match_bytes(Channel &c, const char *pStr)
     {
         return match_bytes(c, (const uint8_t*)pStr, 0);
     }
 
     template<size_t N>
-    auto match_bytes(Channel &c, const char (&arr)[N])
+    inline auto match_bytes(Channel &c, const char (&arr)[N])
     {
         return match_bytes(c, (const uint8_t*)arr, 0);
     }
 
     template<size_t N>
-    auto match_bytes(Channel &c, const uint8_t (&arr)[N])
+    inline auto match_bytes(Channel &c, const uint8_t (&arr)[N])
     {
         return match_bytes(c, std::span<const uint8_t>(arr, N));
     }
 
     template<class... BytePtr>
-    auto match_any_bytes_term(Channel &c, uint8_t term, BytePtr&&... bytes)
+    inline auto match_any_bytes_term(Channel &c, uint8_t term, BytePtr&&... bytes)
     {
         using namespace functional;
         struct ctx_t
@@ -208,12 +208,12 @@ namespace uart
     concept convertible_to_const_char_ptr = requires(C &c) { {c}->std::convertible_to<const char*>; };
 
     template<class... BytePtr> requires (convertible_to_const_char_ptr<BytePtr> &&...)
-    auto match_any_str(Channel &c, BytePtr&&... bytes)
+    inline auto match_any_str(Channel &c, BytePtr&&... bytes)
     {
         return match_any_bytes_term(c, 0, std::forward<BytePtr>(bytes)...);
     }
 
-    auto read_until(Channel &c, uint8_t until)
+    inline auto read_until(Channel &c, uint8_t until)
     {
         using namespace functional;
         struct ctx_t
@@ -232,10 +232,95 @@ namespace uart
     }
 
     template<class T>
-    auto read_into(Channel &c, T &dst)
+    inline auto read_into(Channel &c, T &dst)
     {
         using namespace functional;
         return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); });
+    }
+
+    template<class... Args>
+    inline auto write_any(Channel &c, Args&&... args)
+    {
+        using namespace functional;
+        return (and_then([&]{return c.Send((uint8_t const*)&args, sizeof(args)); }) |...);
+    }
+
+    template<class T>
+    struct match_t
+    {
+        using functional_read_helper = void;
+        const T v;
+
+        static constexpr size_t size() { return sizeof(T); }
+        auto run(Channel &c) { return match_bytes(c, std::span<const uint8_t>((uint8_t const*)&v, sizeof(T))); }
+    };
+
+    template<size_t N>
+    struct skip_t
+    {
+        using functional_read_helper = void;
+        static constexpr size_t size() { return N; }
+        auto run(Channel &c) { return skip_bytes(c, N); }
+    };
+
+    template<class CB>
+    struct callback_t
+    {
+        using functional_read_helper = void;
+        static constexpr size_t size() { return 0; }
+
+        CB v;
+        auto run(Channel &c) { return and_then([&]{ return v(); }); }
+    };
+
+    template<class C>
+    concept is_functional_read_helper = requires{ typename C::functional_read_helper; };
+
+    template<class T>
+    constexpr size_t uart_sizeof()
+    {
+        if constexpr (is_functional_read_helper<T>)
+            return T::size();
+        else
+            return sizeof(T);
+    }
+
+    template<class T>
+    inline auto recv_for(Channel &c, T &&a)
+    {
+        if constexpr (is_functional_read_helper<T>)
+            return a.run(c);
+        else
+            return read_into(c, a);
+    }
+
+    template<class Sz, class T>
+    inline auto recv_for_checked(Channel &c, Sz &limit, T &&a)
+    {
+        using namespace functional;
+        auto check_limit = and_then([&]()->Channel::ExpectedResult{ 
+                if (limit < uart_sizeof<T>())
+                    return std::unexpected(::Err{"Insufficient length", ESP_OK}); 
+                limit -= uart_sizeof<T>();
+                return std::ref(c);
+            });
+
+        if constexpr (is_functional_read_helper<T>)
+            return  std::move(check_limit) | a.run(c);
+        else
+            return std::move(check_limit) | read_into(c, a);
+    }
+
+    template<class... Args>
+    inline auto read_any(Channel &c, Args&&... args)
+    {
+        return (uart::recv_for(c, args) | ...);
+    }
+
+    template<class Sz, class... Args>
+    inline auto read_any_limited(Channel &c, Sz &limit, Args&&... args)
+    {
+        return (uart::recv_for_checked(c, limit, args) | ...);
     }
 }
 
