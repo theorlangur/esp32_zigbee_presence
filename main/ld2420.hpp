@@ -66,12 +66,20 @@ public:
     template<class V>
     using ExpectedValue = std::expected<RetVal<V>, Err>;
 
+
+    /**********************************************************************/
+    /* PresenceResult                                                     */
+    /**********************************************************************/
     struct PresenceResult
     {
         bool m_Detected = false;
         float m_Distance = 0;
     };
 
+
+    /**********************************************************************/
+    /* ConfigBlock                                                        */
+    /**********************************************************************/
     struct ConfigBlock
     {
         LD2420 &d;
@@ -98,6 +106,17 @@ public:
 
         ExpectedResult EndChange();
     private:
+        SystemMode m_NewMode;
+        uint32_t m_NewMinDistance;
+        uint32_t m_NewMaxDistance;
+        uint32_t m_NewTimeout;
+        struct Gate
+        {
+            uint16_t still;
+            uint16_t move;
+        };
+        Gate m_NewGates[16];
+
         union{
             struct
             {
