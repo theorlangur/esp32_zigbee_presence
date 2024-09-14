@@ -53,7 +53,7 @@ namespace functional
         }
 
     template<class ExpVal, class ExpErr, class CB>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, combo_t<CB> &def)
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, combo_t<CB> &&def)
         {
             using namespace internals;
             using ret_type_t = ret_type_continuation_lval_t<decltype(e.value()), decltype(def), decltype(e)>;
