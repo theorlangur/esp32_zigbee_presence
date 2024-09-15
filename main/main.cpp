@@ -12,6 +12,7 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_system.h"
+#include "driver/gpio.h"
 
 #include "i2c.hpp"
 #include "aht21.hpp"
@@ -48,6 +49,57 @@ void print_bytes(std::span<uint8_t> d)
     ((char*)d.data())[d.size()] = 0;
     printf("ASCII:%s\n", (const char*)d.data());
     fflush(stdout);
+}
+
+struct QueueMsg
+{
+    enum class Type: size_t 
+    {
+        Stop,
+        GPIO
+    };
+
+    Type m_Type;
+    union
+    {
+        struct{
+            gpio_num_t num;
+        }m_GPIO;
+    };
+};
+
+struct ld2420_isr
+{
+    QueueHandle_t q;
+    gpio_num_t num;
+};
+
+void ld2420_pin_isr(void *_pCtx)
+{
+    ld2420_isr *pCtx = (ld2420_isr *)_pCtx;
+    QueueMsg msg{.m_Type=QueueMsg::Type::GPIO, .m_GPIO={pCtx->num}};
+    xQueueSendFromISR(pCtx->q, &msg, nullptr);
+}
+
+void ld2420_loop(LD2420 &d, QueueHandle_t q)
+{
+    QueueMsg msg;
+    while(true)
+    {
+        if (xQueueReceive(q, &msg, 10000 / portTICK_PERIOD_MS))
+        {
+            switch(msg.m_Type)
+            {
+                case QueueMsg::Type::Stop: return;
+                case QueueMsg::Type::GPIO: 
+                {
+                    int l = gpio_get_level(msg.m_GPIO.num);
+                    printf("Level changed to %d", l);
+                }
+                break;
+            }
+        }
+    }
 }
 
 extern "C" void app_main(void)
@@ -147,35 +199,51 @@ auto changeConfig = cfg.EndChange();
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
+    QueueHandle_t ld2420_q = xQueueCreate(10, sizeof(QueueMsg));
+    ld2420_isr isrCtx{ld2420_q, gpio_num_t(12)};
+    gpio_config_t ld2420_presence_pin_cfg = {
+        .pin_bit_mask = 1ULL << isrCtx.num,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_ANYEDGE,
+    };
+    gpio_config(&ld2420_presence_pin_cfg);
+
+    std::jthread ld2420_task(ld2420_loop, presence, ld2420_q);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
+    gpio_isr_handler_add(isrCtx.num, ld2420_pin_isr, (void*) &isrCtx);
+
     //vTaskDelay(600 * 1000 / portTICK_PERIOD_MS);
-    while(true)
-    {
-        if (presence.GetSystemMode() == LD2420::SystemMode::Simple)
-        {
-            if (auto te = presence.TryReadSimpleFrame(); !te)
-            {
-                print_ld2420_error(te.error());
-                break;
-            }
-        }else
-        {
-            if (auto te = presence.TryReadEnergyFrame(); !te)
-            {
-                print_ld2420_error(te.error());
-                break;
-            }
-        }
-        auto p = presence.GetPresence();
-        printf("Presence: %s; Distance: %.2fm\n", p.m_Detected ? "Detected" : "Clear", p.m_Distance);
-        if (presence.GetSystemMode() == LD2420::SystemMode::Energy)
-        {
-            printf("Energy:");
-            for(uint8_t i = 0; i < 16; ++i)
-                printf("%d=%d ", (int)i, (int)presence.GetMeasuredEnergy(i));
-            printf("\n");
-        }
-        fflush(stdout);
-    }
+    //while(true)
+    //{
+    //    if (presence.GetSystemMode() == LD2420::SystemMode::Simple)
+    //    {
+    //        if (auto te = presence.TryReadSimpleFrame(); !te)
+    //        {
+    //            print_ld2420_error(te.error());
+    //            break;
+    //        }
+    //    }else
+    //    {
+    //        if (auto te = presence.TryReadEnergyFrame(); !te)
+    //        {
+    //            print_ld2420_error(te.error());
+    //            break;
+    //        }
+    //    }
+    //    auto p = presence.GetPresence();
+    //    printf("Presence: %s; Distance: %.2fm\n", p.m_Detected ? "Detected" : "Clear", p.m_Distance);
+    //    if (presence.GetSystemMode() == LD2420::SystemMode::Energy)
+    //    {
+    //        printf("Energy:");
+    //        for(uint8_t i = 0; i < 16; ++i)
+    //            printf("%d=%d ", (int)i, (int)presence.GetMeasuredEnergy(i));
+    //        printf("\n");
+    //    }
+    //    fflush(stdout);
+    //}
 
     fflush(stdout);
     return;
