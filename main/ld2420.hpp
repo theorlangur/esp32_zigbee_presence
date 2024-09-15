@@ -180,8 +180,8 @@ public:
     int GetMaxDistance() const { return m_MaxDistance * 7 / 10; }
     uint32_t GetMaxDistanceRaw() const { return m_MaxDistance; }
 
-    auto GetMoveThreshold(uint8_t gate) const { return m_Gates[gate].m_MoveThreshold; }
-    auto GetStillThreshold(uint8_t gate) const { return m_Gates[gate].m_StillThreshold; }
+    auto GetMoveThreshold(uint8_t gate) const { return uint16_t(m_Gates[gate].m_MoveThreshold); }
+    auto GetStillThreshold(uint8_t gate) const { return uint16_t(m_Gates[gate].m_StillThreshold); }
     auto GetMeasuredEnergy(uint8_t gate) const { return m_Gates[gate].m_Energy; }
 
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
@@ -323,7 +323,7 @@ private:
     {
         using namespace functional;
         static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
-        SetDefaultWait(duration_ms_t(100));
+        SetDefaultWait(duration_ms_t(150));
         uint16_t status;
         auto SendFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){
             return SendFrameV2(cmd, std::get<idx>(sendArgs)...);
@@ -365,16 +365,11 @@ private:
     uint32_t m_Timeout = 30;
     struct Gate
     {
-        uint16_t m_StillThreshold; //config
-        uint16_t m_MoveThreshold; //config
+        uint32_t m_StillThreshold; //config
+        uint32_t m_MoveThreshold; //config
         uint16_t m_Energy; //output
     };
     Gate m_Gates[16];
-
-    char m_Buffer[64];
-    size_t m_BufferReadFrom = 0;
-    size_t m_BufferWriteTo = 0;
-    bool m_BufferEmpty = true;
 
     PresenceResult m_Presence;
 };

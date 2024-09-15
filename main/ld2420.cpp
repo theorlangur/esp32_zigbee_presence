@@ -109,14 +109,9 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 {
     using namespace functional;
-    uint32_t move, still;
     return SendCommandV2(Cmd::ReadADB
             , to_send(ADBRegs::MoveThresholdGateBase + gate, ADBRegs::StillThresholdGateBase + gate)
-            , to_recv(move, still)) 
-        | and_then([&]{
-                m_Gates[gate].m_MoveThreshold = (uint16_t)move;
-                m_Gates[gate].m_StillThreshold = (uint16_t)still;
-        });
+            , to_recv(m_Gates[gate].m_MoveThreshold, m_Gates[gate].m_StillThreshold)); 
 }
 
 LD2420::ExpectedResult LD2420::ReadSimpleFrame()
