@@ -6,6 +6,14 @@
 
 namespace uart
 {
+    template<class Adaptor = functional::dummy_t>
+    inline auto flush_and_wait(Channel &c, duration_ms_t maxWait = kForever, Adaptor adapt = {})
+    {
+        using namespace functional;
+        return and_then([&,adapt]{ return c.Flush() | adapt; })
+             | and_then([&,maxWait,adapt]{ return c.PeekByte(maxWait) | adapt; });
+    }
+
     inline auto skip_bytes(Channel &c, size_t bytes)
     {
         using namespace functional;
