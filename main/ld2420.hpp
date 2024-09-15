@@ -195,6 +195,8 @@ public:
 
     std::string_view GetVersion() const;
 
+    ExpectedResult Restart();
+
     PresenceResult GetPresence() const { return m_Presence; }
 
     ExpectedResult ReadSimpleFrame();
@@ -232,6 +234,8 @@ private:
         WriteSys = 0x0012,
         ReadSys = 0x0013,
 
+        Restart = 0x0068,
+
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,
     };
@@ -267,6 +271,8 @@ private:
     constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
     constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
 
+    bool m_dbg = false;
+
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
@@ -274,6 +280,7 @@ private:
         return Send(kFrameHeader, sizeof(kFrameHeader))
             | and_then([&]{ 
                     uint16_t len = (sizeof(args) + ...);
+                    if (m_dbg){ printf("SendFv2 to write %d\n", int(len)); fflush(stdout);}
                     return Send((uint8_t const*)&len, sizeof(len)); 
             })
             | uart::write_any(*this, std::forward<T>(args)...)
@@ -293,6 +300,7 @@ private:
                 | uart::match_bytes(*this, kFrameHeader)
                 | uart::read_into(*this, len)
                 | and_then([&]()->Channel::ExpectedResult{
+                        if (m_dbg){ printf("RecvFv2 len %d\n", int(len)); fflush(stdout);}
                         if (arg_size > len)
                             return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
                         return std::ref((Channel&)*this);

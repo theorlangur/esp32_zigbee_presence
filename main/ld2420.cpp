@@ -62,6 +62,17 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
         | transform_error([&](CmdErr e){ return e.e; });
 }
 
+LD2420::ExpectedResult LD2420::Restart()
+{
+    using namespace functional;
+    //m_dbg = true;
+    return OpenCommandMode()
+        | transform_error([&](CmdErr e){ return e.e; })
+        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(2000)); });
+        //| and_then([&]()->ExpectedResult{ return std::ref(*this); });
+}
+
 LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
 {
     using namespace functional;
