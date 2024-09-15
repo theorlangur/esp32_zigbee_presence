@@ -121,49 +121,49 @@ public:
         union{
             struct
             {
-                uint32_t Gate0MoveThreshold  : 1 = 0;
-                uint32_t Gate0StillThreshold : 1 = 0;
-                uint32_t Gate1MoveThreshold  : 1 = 0;
-                uint32_t Gate1StillThreshold : 1 = 0;
-                uint32_t Gate2MoveThreshold  : 1 = 0;
-                uint32_t Gate2StillThreshold : 1 = 0;
-                uint32_t Gate3MoveThreshold  : 1 = 0;
-                uint32_t Gate3StillThreshold : 1 = 0;
-                uint32_t Gate4MoveThreshold  : 1 = 0;
-                uint32_t Gate4StillThreshold : 1 = 0;
-                uint32_t Gate5MoveThreshold  : 1 = 0;
-                uint32_t Gate5StillThreshold : 1 = 0;
-                uint32_t Gate6MoveThreshold  : 1 = 0;
-                uint32_t Gate6StillThreshold : 1 = 0;
-                uint32_t Gate7MoveThreshold  : 1 = 0;
-                uint32_t Gate7StillThreshold : 1 = 0;
-                uint32_t Gate8MoveThreshold  : 1 = 0;
-                uint32_t Gate8StillThreshold : 1 = 0;
-                uint32_t Gate9MoveThreshold  : 1 = 0;
-                uint32_t Gate9StillThreshold : 1 = 0;
-                uint32_t Gate10MoveThreshold : 1 = 0;
-                uint32_t Gate10StillThreshold: 1 = 0;
-                uint32_t Gate11MoveThreshold : 1 = 0;
-                uint32_t Gate11StillThreshold: 1 = 0;
-                uint32_t Gate12MoveThreshold : 1 = 0;
-                uint32_t Gate12StillThreshold: 1 = 0;
-                uint32_t Gate13MoveThreshold : 1 = 0;
-                uint32_t Gate13StillThreshold: 1 = 0;
-                uint32_t Gate14MoveThreshold : 1 = 0;
-                uint32_t Gate14StillThreshold: 1 = 0;
-                uint32_t Gate15MoveThreshold : 1 = 0;
-                uint32_t Gate15StillThreshold: 1 = 0;
+                uint32_t Gate0MoveThreshold  : 1;
+                uint32_t Gate0StillThreshold : 1;
+                uint32_t Gate1MoveThreshold  : 1;
+                uint32_t Gate1StillThreshold : 1;
+                uint32_t Gate2MoveThreshold  : 1;
+                uint32_t Gate2StillThreshold : 1;
+                uint32_t Gate3MoveThreshold  : 1;
+                uint32_t Gate3StillThreshold : 1;
+                uint32_t Gate4MoveThreshold  : 1;
+                uint32_t Gate4StillThreshold : 1;
+                uint32_t Gate5MoveThreshold  : 1;
+                uint32_t Gate5StillThreshold : 1;
+                uint32_t Gate6MoveThreshold  : 1;
+                uint32_t Gate6StillThreshold : 1;
+                uint32_t Gate7MoveThreshold  : 1;
+                uint32_t Gate7StillThreshold : 1;
+                uint32_t Gate8MoveThreshold  : 1;
+                uint32_t Gate8StillThreshold : 1;
+                uint32_t Gate9MoveThreshold  : 1;
+                uint32_t Gate9StillThreshold : 1;
+                uint32_t Gate10MoveThreshold : 1;
+                uint32_t Gate10StillThreshold: 1;
+                uint32_t Gate11MoveThreshold : 1;
+                uint32_t Gate11StillThreshold: 1;
+                uint32_t Gate12MoveThreshold : 1;
+                uint32_t Gate12StillThreshold: 1;
+                uint32_t Gate13MoveThreshold : 1;
+                uint32_t Gate13StillThreshold: 1;
+                uint32_t Gate14MoveThreshold : 1;
+                uint32_t Gate14StillThreshold: 1;
+                uint32_t Gate15MoveThreshold : 1;
+                uint32_t Gate15StillThreshold: 1;
 
-                uint32_t Mode                : 1 = 0;
-                uint32_t MinDistance         : 1 = 0;
-                uint32_t MaxDistance         : 1 = 0;
-                uint32_t Timeout             : 1 = 0;
-                uint32_t Unused              : 28= 0;
+                uint32_t Mode                : 1;
+                uint32_t MinDistance         : 1;
+                uint32_t MaxDistance         : 1;
+                uint32_t Timeout             : 1;
+                uint32_t Unused              : 28;
             }m_Changed;
             
             struct{
-                uint32_t m_GateChanges;
-                uint32_t m_MiscChanges;
+                uint32_t m_GateChanges = 0;
+                uint32_t m_MiscChanges = 0;
             };
         };
     };
@@ -219,11 +219,26 @@ private:
         return uint16_t(r) + off;
     }
 
-
     enum class SysRegs: uint16_t
     {
         Mode = 0
     };
+
+    enum class Cmd: uint16_t
+    {
+        ReadVer = 0x0000,
+        WriteADB = 0x0007,
+        ReadADB = 0x0008,
+        WriteSys = 0x0012,
+        ReadSys = 0x0013,
+
+        OpenCmd = 0x00ff,
+        CloseCmd = 0x00fe,
+    };
+    friend uint16_t operator|(Cmd r, uint16_t v)
+    {
+        return uint16_t(r) | v;
+    }
 
     constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
     constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
@@ -322,29 +337,31 @@ private:
                   })
                 | uart::read_any_limited(*this, len, std::forward<T>(args)...)
                 | if_then(
-                  /*if*/   [&]{ return arg_size < len; }
-                  /*then*/,[&]{ return start_sequence() | uart::skip_bytes(*this, len - arg_size); })
+                  /*if*/   [&]{ return len; }
+                  /*then*/,[&]{ return start_sequence() | uart::skip_bytes(*this, len); })
                 | uart::match_bytes(*this, kFrameFooter)
                 | transform_error([&](::Err e){ return Err{e, "RecvFrameV2", ErrorCode::RecvFrame_Malformed}; })
                 | and_then([&]()->ExpectedResult{ return std::ref(*this); });
     }
 
     template<class... ToSend>
-    auto to_send(ToSend&&...args)
+    static auto to_send(ToSend&&...args)
     {
         return std::forward_as_tuple(std::forward<ToSend>(args)...);
     }
 
     template<class... ToRecv>
-    auto to_recv(ToRecv&&...args)
+    static auto to_recv(ToRecv&&...args)
     {
         return std::forward_as_tuple(std::forward<ToRecv>(args)...);
     }
 
-    template<class... ToSend, class... ToRecv>
-    ExpectedGenericCmdResult SendCommandV2(uint16_t cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
+    template<class CmdT, class... ToSend, class... ToRecv>
+    ExpectedGenericCmdResult SendCommandV2(CmdT cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
     {
         using namespace functional;
+        static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
+        SetDefaultWait(duration_ms_t(100));
         uint16_t status;
         auto SendFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){
             return SendFrameV2(cmd, std::get<idx>(sendArgs)...);
@@ -361,6 +378,7 @@ private:
                 std::get<idx>(recvArgs)...);
         };
         return Flush() 
+                | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed}; })
                 | and_then([&]{ return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
                 | and_then([&]{ return WaitAllSent() | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed};}); })
                 | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
@@ -371,7 +389,14 @@ private:
     ExpectedOpenCmdModeResult OpenCommandMode();
     ExpectedCloseCmdModeResult CloseCommandMode();
 
-    ExpectedSingleRawADBResult ReadRawADBSingle(uint16_t param);
+    template<size_t N>
+    ExpectedMultiRawADBResult<N> ReadRawADBMultiV2(uint16_t (&regs)[N])
+    {
+        using namespace functional;
+        MultiRawADBRetVal<N> ret;
+        return SendCommandV2(0x0008, to_send(regs), to_recv(ret.v.value)) 
+            | and_then([&]()->ExpectedMultiRawADBResult<N>{ return ret; });
+    }
 
     template<size_t N>
     ExpectedMultiRawADBResult<N> ReadRawADBMulti(uint16_t (&regs)[N])

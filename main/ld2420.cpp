@@ -186,40 +186,17 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
     using namespace functional;
     uint16_t protocol_version = 2;
     OpenCmdModeResponse r;
-    SetDefaultWait(duration_ms_t(100));
-    return SendFrameV2(uint16_t(0xff), protocol_version)
+    return SendFrameV2(Cmd::OpenCmd, protocol_version)
         | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(100)); })
         | transform_error([](Err e){ return CmdErr{e, 0}; })
-        | and_then([&]{ return SendCommandV2(0xff, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); })
+        | and_then([&]{ return SendCommandV2(Cmd::OpenCmd, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); })
         | and_then([&]()->ExpectedOpenCmdModeResult{ return OpenCmdModeRetVal{std::ref(*this), r}; });
-
-    //frame_t f;
-    //uint16_t protocol_version = 2;
-    //f.WriteCmd(0xff, std::span<uint8_t>((uint8_t*)&protocol_version, 2));
-    //return SendFrame(f) 
-    //    | transform_error([](Err e){ return CmdErr{e, 0}; })
-    //    | and_then([&]{ 
-    //            //printf("Sleeping before sending actual command");
-    //            std::this_thread::sleep_for(duration_ms_t(100)); 
-    //            return SendCommand(0xff, protocol_version, f); 
-    //      })
-    //    | and_then([&](LD2420 &d, std::span<uint8_t> res)->ExpectedOpenCmdModeResult{
-    //            if (res.size() != 4)
-    //                return std::unexpected(CmdErr{Err{{}, "OpenCommandMode", ErrorCode::SendCommand_WrongFormat}, 0});
-    //            OpenCmdModeResponse r;
-    //            r.protocol_version = *(uint16_t*)res.data();
-    //            r.buffer_size = *(uint16_t*)(res.data() + 2);
-    //            return OpenCmdModeRetVal{std::ref(d), r};
-    //      });
 }
 
 LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
 {
     using namespace functional;
-    //frame_t f;
-    //return SendCommand(0xfe, std::span<uint8_t>{}, f)
-    //    | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
-    return SendCommandV2(0xfe, to_send(), to_recv())
+    return SendCommandV2(Cmd::CloseCmd, to_send(), to_recv())
             | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
 }
 
@@ -228,75 +205,37 @@ std::string_view LD2420::GetVersion() const
     return m_Version;
 }
 
-LD2420::ExpectedSingleRawADBResult LD2420::ReadRawADBSingle(uint16_t param)
-{
-    using namespace functional;
-    frame_t f;
-    std::span<uint8_t> data((uint8_t*)&param, sizeof(param));
-    //printf("Param to obtain: %X\n", param);
-    return SendCommand(0x0008, data, f) 
-        | and_then([](LD2420 &d, std::span<uint8_t> val)->ExpectedSingleRawADBResult{
-                if (val.size() < 4)
-                    return std::unexpected(CmdErr{Err{{}, "LD2420::ReadRawADBSingle", ErrorCode::SendCommand_WrongFormat}, (uint16_t)val.size()});
-                if (val.size() > 4)
-                {
-                    if constexpr (kDebugCommands)
-                    {
-                        printf("Unexpected bytes: ");
-                        for(uint8_t b : val) printf(" %X", b);
-                        printf("\n");
-                        fflush(stdout);
-                    }
-                }
-                return SingleRawADBRetVal{std::ref(d), *(uint32_t*)val.data()};
-          });
-}
-
 LD2420::ExpectedGenericCmdResult LD2420::SetSystemModeInternal(SystemMode mode)
 {
-    return WriteRawSysMulti(LD2420::SetParam{uint16_t(0x0), (uint32_t)mode});
+    return SendCommandV2(Cmd::WriteSys, to_send(SysRegs::Mode, mode), to_recv());
 }
 
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateVersion()
 {
     using namespace functional;
-    frame_t f;
-    return SendCommand(0x0, std::span<uint8_t>{}, f)
-        | and_then([&](LD2420 &d, std::span<uint8_t> val)->ExpectedGenericCmdResult
-          { 
-              uint16_t *pLen = (uint16_t*)val.data();
-              if (*pLen >= sizeof(m_Version))
-                    return std::unexpected(CmdErr{Err{{}, "LD2420::UpdateVersion", ErrorCode::SendCommand_InsufficientSpace}, *pLen});
-              memcpy(m_Version, val.data() + sizeof(uint16_t), *pLen);
-              m_Version[*pLen] = 0;
-              return std::ref(*this);
-          });
+    uint16_t verLen;
+    return SendCommandV2(Cmd::ReadVer, to_send(), to_recv(verLen, uart::read_var_t{verLen, m_Version})) 
+            | and_then([&]{ m_Version[verLen] = 0; });
 }
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateMinMaxTimeout()
 {
     using namespace functional;
-    return ReadRawADBMulti(ADBRegs::MinDistance, ADBRegs::MaxDistance, ADBRegs::Timeout)
-        | and_then([&](LD2420 &d, Params<3> val)->ExpectedGenericCmdResult
-          { 
-              memcpy(&m_MinDistance, &val.value[0], sizeof(val.value[0]));
-              memcpy(&m_MaxDistance, &val.value[1], sizeof(val.value[1]));
-              memcpy(&m_Timeout, &val.value[2], sizeof(val.value[2]));
-              return std::ref(*this);
-          });
+    return SendCommandV2(Cmd::ReadADB, to_send(ADBRegs::MinDistance, ADBRegs::MaxDistance, ADBRegs::Timeout), to_recv(m_MinDistance, m_MaxDistance, m_Timeout)); 
 }
 
 LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 {
     using namespace functional;
-    return ReadRawADBMulti((uint16_t)ADBRegs::MoveThresholdGateBase + gate, (uint16_t)ADBRegs::StillThresholdGateBase + gate)
-        | and_then([&](LD2420 &d, Params<2> val)->ExpectedGenericCmdResult
-          { 
-              memcpy(&m_Gates[gate].m_MoveThreshold, &val.value[0], sizeof(Gate::m_MoveThreshold));
-              memcpy(&m_Gates[gate].m_StillThreshold, &val.value[1], sizeof(Gate::m_StillThreshold));
-              return std::ref(*this);
-          });
+    uint32_t move, still;
+    return SendCommandV2(Cmd::ReadADB
+            , to_send(ADBRegs::MoveThresholdGateBase + gate, ADBRegs::StillThresholdGateBase + gate)
+            , to_recv(move, still)) 
+        | and_then([&]{
+                m_Gates[gate].m_MoveThreshold = (uint16_t)move;
+                m_Gates[gate].m_StillThreshold = (uint16_t)still;
+        });
 }
 
 LD2420::ExpectedResult LD2420::ReadSimpleFrame()
@@ -409,7 +348,7 @@ LD2420::ConfigBlock& LD2420::ConfigBlock::SetMoveThreshold(uint8_t gate, uint16_
     if (gate > 15)
         return *this;
 
-    m_GateChanges |= 1 << (gate * 2);
+    m_GateChanges |= uint32_t(1) << (gate * 2);
     m_NewGates[gate].move = energy;
     return *this;
 }
@@ -419,7 +358,7 @@ LD2420::ConfigBlock& LD2420::ConfigBlock::SetStillThreshold(uint8_t gate, uint16
     if (gate > 15)
         return *this;
 
-    m_GateChanges |= 1 << (gate * 2 + 1);
+    m_GateChanges |= uint32_t(1) << (gate * 2 + 1);
     m_NewGates[gate].still = energy;
     return *this;
 }
@@ -438,30 +377,40 @@ LD2420::ExpectedResult LD2420::ConfigBlock::EndChange()
                             if (m_Changed.MinDistance) d.m_MinDistance = m_NewMinDistance;
                             if (m_Changed.MaxDistance) d.m_MaxDistance = m_NewMaxDistance;
                             if (m_Changed.Timeout) d.m_Timeout = m_NewTimeout;
-                            return d.WriteRawADBMulti(
-                                      ADBParam{uint16_t(ADBRegs::MinDistance), d.m_MinDistance}
-                                    , ADBParam{uint16_t(ADBRegs::MaxDistance), d.m_MaxDistance}
-                                    , ADBParam{uint16_t(ADBRegs::Timeout), d.m_Timeout}); 
+                            return d.SendCommandV2(Cmd::WriteADB
+                                    ,to_send(
+                                        ADBParam{uint16_t(ADBRegs::MinDistance), d.m_MinDistance}
+                                        , ADBParam{uint16_t(ADBRegs::MaxDistance), d.m_MaxDistance}
+                                        , ADBParam{uint16_t(ADBRegs::Timeout), d.m_Timeout} 
+                                        )
+                                    ,to_recv());
                        })
         | if_then(m_GateChanges, 
               repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
-                    if (m_GateChanges & (3 << (g * 2))) //check if both
+                    if (m_GateChanges & (uint32_t(3) << (g * 2))) //check if both
                     {
                         d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
                         d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-                        return d.WriteRawADBMulti(
-                                          ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
-                                        , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}); 
+                        return d.SendCommandV2(Cmd::WriteADB
+                                ,to_send(
+                                      ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
+                                    , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}
+                                    )
+                                ,to_recv());
                     }
                     else if (m_GateChanges & (1 << (g * 2)))
                     {
                         d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
-                        return d.WriteRawADBMulti(ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}); 
+                        return d.SendCommandV2(Cmd::WriteADB
+                                ,to_send( ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold})
+                                ,to_recv());
                     }
                     else if (m_GateChanges & (1 << (g * 2 + 1)))
                     {
                         d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-                        return d.WriteRawADBMulti(ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}); 
+                        return d.SendCommandV2(Cmd::WriteADB
+                                ,to_send( ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold})
+                                ,to_recv());
                     }
                     else
                         return std::ref(d);
