@@ -3,6 +3,7 @@
 
 #include "i2c.hpp"
 #include <atomic>
+#include "functional/functional.hpp"
 
 class AHT21
 {
@@ -58,6 +59,13 @@ public:
 
     std::optional<Measurements> GetLastMeasurements() const;
 private:
+    auto AdaptError(const char *pL, ErrorCode ec) { return functional::transform_error([pL,ec](auto &e){ return Err{e, pL, ec}; }); }
+    auto AdaptI2C(const char *pL, ErrorCode ec) 
+    { 
+        return functional::adapt_to<ExpectedResult>(
+                [&](auto &&v){ return std::ref(*this); }
+                , [pL,ec](auto &e){ return Err{e, pL, ec}; }); 
+    }
     void ResetReg(uint8_t reg);
     void ConvertTemperature(uint8_t *pData);
     void ConvertHumidity(uint8_t *pData);

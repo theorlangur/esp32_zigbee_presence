@@ -38,61 +38,59 @@ AHT21::ExpectedResult AHT21::Init()
 {
     using namespace functional;
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    auto *pThis = this;
     return m_Device.ReadReg8(0x71)
-                   .transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_GetStatus}; })
-                   | and_then([pThis](i2c::I2CDevice &d, uint8_t status)->ExpectedResult{
+                   | AdaptError("AHT21::Init", ErrorCode::Init_GetStatus)
+                   | and_then([&](uint8_t status)->ExpectedResult{
                         if (!(status & 0x04))
                         {
                             //not calibrated
-                            return d.WriteReg16(0xbe, 0x0800)
-                                       | transform_error([](auto &&e){ return Err{e, "AHT21::Init", ErrorCode::Init_Calibration}; })
-                                       | and_then([](i2c::I2CDevice &d){
+                            return m_Device.WriteReg16(0xbe, 0x0800)
+                                       | AdaptError("AHT21::Init", ErrorCode::Init_Calibration)
+                                       | and_then([&]{
                                             std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                                            return d.ReadReg8(0x71)
-                                                   | transform_error([](auto &&e){ return Err{e, "AHT21::Init 2", ErrorCode::Init_GetStatus}; });
+                                            return m_Device.ReadReg8(0x71)
+                                                   | AdaptError("AHT21::Init 2", ErrorCode::Init_GetStatus);
                                        })
-                                       | and_then([pThis](i2c::I2CDevice &d, uint8_t status)->ExpectedResult{
+                                       | and_then([&](uint8_t status)->ExpectedResult{
                                             if ((status & 0x18) != 0x18)
                                             {
-                                                pThis->ResetReg(0x1b);
-                                                pThis->ResetReg(0x1c);
-                                                pThis->ResetReg(0x1e);
+                                                ResetReg(0x1b);
+                                                ResetReg(0x1c);
+                                                ResetReg(0x1e);
                                                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                                             }
-                                            return std::ref(*pThis);
+                                            return std::ref(*this);
                                        });
                         }
-                        return std::ref(*pThis);
+                        return std::ref(*this);
                     });
 }
 
 AHT21::ExpectedValue<AHT21::Measurements> AHT21::UpdateMeasurements()
 {
     using namespace functional;
+    using R = ExpectedValue<Measurements>;
     return m_Device.WriteReg16(0xAC, 0x3300)
-        .transform_error([](auto &&e){ return Err{e, "AHT21::UpdateMeasurements", ErrorCode::Measure_IssueComand}; })
-        .and_then([this](i2c::I2CDevice &d)->ExpectedValue<Measurements>{
-            std::this_thread::sleep_for(std::chrono::milliseconds(80));
-            int retries = 3;
-            uint8_t data[7];
-            do
-            {
-                auto r = d.Recv(data, sizeof(data));
-                if (!r) return std::unexpected(Err{r.error(), "AHT21::UpdateMeasurements", ErrorCode::Measure_IssueComand});
+        | AdaptError("AHT21::UpdateMeasurements", ErrorCode::Measure_IssueComand)
+        | and_then([]{ std::this_thread::sleep_for(std::chrono::milliseconds(80)); })
+        | retry_on_fail(
+        /*attempts=  */ 3, 
+        /*Target func*/ [&]()->R{
+                            uint8_t data[7];
+                            return m_Device.Recv(data, sizeof(data))
+                                    | AdaptError("AHT21::UpdateMeasurements", ErrorCode::Measure_IssueComand)
+                                    | and_then([&]()->R{
+                                            StatusReg *pStatus = reinterpret_cast<StatusReg *>(&data[0]);
+                                            if (!pStatus->bits.busy)
+                                                return std::unexpected(Err{{}, "AHT21::UpdateMeasurements", ErrorCode::Measure_Busy});
 
-                StatusReg *pStatus = reinterpret_cast<StatusReg *>(&data[0]);
-                if (!pStatus->bits.busy)
-                    break;
-                if (--retries < 0)
-                    break;
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }while(true);
-            if (retries < 0) return std::unexpected(Err{{}, "AHT21::UpdateMeasurements", ErrorCode::Measure_Busy});
-            ConvertHumidity(data);
-            ConvertTemperature(data);
-            return RetValue{*this, *GetLastMeasurements()};
-        });
+                                            ConvertHumidity(data);
+                                            ConvertTemperature(data);
+                                            return RetValue{*this, *GetLastMeasurements()};
+                                      });
+                        },
+        /*Error handl*/ []{ std::this_thread::sleep_for(std::chrono::milliseconds(10)); return true; }
+        );
 }
 
 void AHT21::ConvertTemperature(uint8_t *data)
