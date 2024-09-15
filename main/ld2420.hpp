@@ -9,6 +9,7 @@
 class LD2420: protected uart::Channel
 {
 public:
+    static const constexpr duration_ms_t kRestartTimeout{2000};
     static const constexpr bool kDebugFrame = false;
     static const constexpr bool kDebugCommands = false;
     enum class ErrorCode: uint8_t
@@ -38,6 +39,7 @@ public:
         FillBuffer_ReadFailure,
 
         MatchError,
+        RestartFailed,
     };
     static const char* err_to_str(ErrorCode e);
 
