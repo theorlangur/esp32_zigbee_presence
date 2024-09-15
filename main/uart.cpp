@@ -213,7 +213,10 @@ namespace uart
         return Read(&b, 1, wait)
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
+                    {
+                        printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
+                    }
                     return RetVal{std::ref(*this), b};
                 });
     }
