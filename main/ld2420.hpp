@@ -283,6 +283,14 @@ private:
                 );
     }
 
+    auto AdaptToCmdResult()
+    {
+        return functional::adapt_to<ExpectedGenericCmdResult>(
+                      [&](auto &c){ return std::ref(*this); }
+                    , [&](Err e){ return CmdErr{e, 0}; }
+                );
+    }
+
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
@@ -294,8 +302,7 @@ private:
             })
             | uart::write_any(*this, std::forward<T>(args)...)
             | and_then([&]{ return Send(kFrameFooter, sizeof(kFrameFooter)); })
-            | transform_error([&](::Err e){ return Err{e, "SendFrameV2", ErrorCode::SendFrame}; })
-            | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+            | AdaptToResult("SendFrameV2", ErrorCode::SendFrame);
     }
 
     template<class...T>
@@ -318,8 +325,7 @@ private:
                   /*if*/   [&]{ return len; }
                   /*then*/,[&]{ return start_sequence() | uart::skip_bytes(*this, len); })
                 | uart::match_bytes(*this, kFrameFooter)
-                | transform_error([&](::Err e){ return Err{e, "RecvFrameV2", ErrorCode::RecvFrame_Malformed}; })
-                | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+                | AdaptToResult("RecvFrameV2", ErrorCode::RecvFrame_Malformed);
     }
 
     template<class... ToSend>
@@ -360,8 +366,7 @@ private:
                 | and_then([&]{ return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
                 | and_then([&]{ return WaitAllSent() | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed};}); })
                 | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
-                | transform_error([&](Err e){ return CmdErr{e, 0}; })
-                | and_then([&]()->ExpectedGenericCmdResult{ return std::ref(*this); });
+                | AdaptToCmdResult();
     }
 
     ExpectedOpenCmdModeResult OpenCommandMode();
