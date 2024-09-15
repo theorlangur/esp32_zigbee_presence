@@ -235,13 +235,11 @@ private:
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,
     };
+
     friend uint16_t operator|(Cmd r, uint16_t v)
     {
         return uint16_t(r) | v;
     }
-
-    constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
-    constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
 
     struct OpenCmdModeResponse
     {
@@ -263,6 +261,9 @@ private:
     using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
     using ExpectedGenericCmdResult = std::expected<Ref, CmdErr>;
     using ExpectedCloseCmdModeResult = ExpectedGenericCmdResult;
+
+    constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
+    constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
 
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
