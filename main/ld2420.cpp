@@ -109,11 +109,11 @@ LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()
         | and_then([&]()->ExpectedOpenCmdModeResult{ return OpenCmdModeRetVal{std::ref(*this), r}; });
 }
 
-LD2420::ExpectedCloseCmdModeResult LD2420::CloseCommandMode()
+LD2420::ExpectedGenericCmdResult LD2420::CloseCommandMode()
 {
     using namespace functional;
     return SendCommandV2(Cmd::CloseCmd, to_send(), to_recv())
-            | and_then([&]()->ExpectedCloseCmdModeResult{ return std::ref(*this); });
+            | and_then([&]()->ExpectedGenericCmdResult{ return std::ref(*this); });
 }
 
 std::string_view LD2420::GetVersion() const

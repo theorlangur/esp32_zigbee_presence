@@ -270,7 +270,6 @@ private:
     using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
     using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;
     using ExpectedGenericCmdResult = std::expected<Ref, CmdErr>;
-    using ExpectedCloseCmdModeResult = ExpectedGenericCmdResult;
 
     constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
     constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
@@ -370,7 +369,7 @@ private:
     }
 
     ExpectedOpenCmdModeResult OpenCommandMode();
-    ExpectedCloseCmdModeResult CloseCommandMode();
+    ExpectedGenericCmdResult CloseCommandMode();
 
     ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
     ExpectedGenericCmdResult UpdateVersion();
