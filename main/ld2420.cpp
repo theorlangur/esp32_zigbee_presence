@@ -65,12 +65,32 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
 LD2420::ExpectedResult LD2420::Restart()
 {
     using namespace functional;
-    //m_dbg = true;
     return OpenCommandMode()
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
         | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(2000)); });
-        //| and_then([&]()->ExpectedResult{ return std::ref(*this); });
+}
+
+LD2420::ExpectedResult LD2420::FactoryReset()
+{
+    auto &ch = ChangeConfiguration()
+                .SetTimeout(120)
+                .SetMinDistanceRaw(1)
+                .SetMaxDistanceRaw(12);
+    constexpr uint16_t kMoveThreshold[] = {
+//Gates:  0      1     2    3    4    5    6    7    8    9    10   11   12   13   14   15
+        60000, 30000, 400, 300, 250, 250, 250, 250, 300, 250, 250, 250, 250, 200, 200, 200
+    };
+    constexpr uint16_t kStillThreshold[] = {
+//Gates:  0      1     2    3    4    5    6    7    8    9    10   11   12   13   14   15
+        40000, 20000, 200, 250, 150, 150, 150, 150, 150, 150, 150, 150, 100, 100, 100, 100
+    };
+
+    for(uint8_t g = 0; g < 16; ++g)
+        ch.SetMoveThreshold(g, kMoveThreshold[g])
+          .SetStillThreshold(g, kStillThreshold[g]);
+
+    return ch.EndChange();
 }
 
 LD2420::ExpectedOpenCmdModeResult LD2420::OpenCommandMode()

@@ -197,6 +197,8 @@ public:
 
     ExpectedResult Restart();
 
+    ExpectedResult FactoryReset();
+
     PresenceResult GetPresence() const { return m_Presence; }
 
     ExpectedResult ReadSimpleFrame();
@@ -280,7 +282,6 @@ private:
         return Send(kFrameHeader, sizeof(kFrameHeader))
             | and_then([&]{ 
                     uint16_t len = (sizeof(args) + ...);
-                    if (m_dbg){ printf("SendFv2 to write %d\n", int(len)); fflush(stdout);}
                     return Send((uint8_t const*)&len, sizeof(len)); 
             })
             | uart::write_any(*this, std::forward<T>(args)...)
@@ -300,7 +301,6 @@ private:
                 | uart::match_bytes(*this, kFrameHeader)
                 | uart::read_into(*this, len)
                 | and_then([&]()->Channel::ExpectedResult{
-                        if (m_dbg){ printf("RecvFv2 len %d\n", int(len)); fflush(stdout);}
                         if (arg_size > len)
                             return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
                         return std::ref((Channel&)*this);
