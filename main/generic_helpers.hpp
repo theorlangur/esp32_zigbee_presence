@@ -6,6 +6,7 @@
 #include <chrono>
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
+inline static constexpr const duration_ms_t kForever = duration_ms_t(-1);
 
 template<class CB>
 struct ScopeExit

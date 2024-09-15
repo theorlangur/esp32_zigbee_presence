@@ -8,7 +8,7 @@
 namespace i2c
 {
     using duration_t = ::duration_ms_t;
-    inline static constexpr const duration_t kForever = duration_t(-1);
+    //inline static constexpr const duration_t kForever = ::kForever;
 
     class SDAType: public StrongType<gpio_num_t, struct SDATag>//, Comparable
     {
