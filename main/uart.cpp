@@ -202,6 +202,11 @@ namespace uart
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Read", ESP_ERR_INVALID_ARG});
 
+        if ((size_t(r) + size_t(addedPeek)) == 0)
+        {
+            printf("Read of 0. Not sent data: %d\n", int(m_TxBufferSize - GetReadyToWriteDataLen().value().v));
+        }
+
         return RetVal<size_t>{*this, size_t(r) + size_t(addedPeek)};
     }
 

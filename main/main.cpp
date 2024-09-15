@@ -140,6 +140,7 @@ auto changeConfig = cfg.EndChange();
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
+    vTaskDelay(600 * 1000 / portTICK_PERIOD_MS);
     while(true)
     {
         if (presence.GetSystemMode() == LD2420::SystemMode::Simple)
