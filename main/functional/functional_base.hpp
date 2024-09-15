@@ -155,6 +155,16 @@ namespace functional
         template<class Val, class Cont, class... Args>
             using ret_type_continuation_lval_t = decltype(invoke_continuation_lval(std::declval<Val&>(), std::declval<Cont&>(), std::declval<Args>()...));
     }
+
+    struct dummy_t 
+    {
+            using functional_block_t = void;
+    };
+    template<class ExpVal, class ExpErr>
+    auto operator|(std::expected<ExpVal, ExpErr> &&e, dummy_t cont)
+    {
+        return e;
+    }
 }
 
 #endif

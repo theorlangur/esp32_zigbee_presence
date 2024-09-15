@@ -38,7 +38,7 @@ namespace functional
 
 
         template<class ExpVal>
-        auto operator()(ExpVal &&v)
+        auto operator()(ExpVal &&v) const
         {
             using namespace internals;
             using ret_type_if_t = std::remove_cvref_t<ret_type_continuation_lval_t<ExpVal, WrapIf<If>>>;
@@ -101,7 +101,7 @@ namespace functional
     }
 
     template<class ExpVal, class ExpErr, class If, class Then, class Else>
-    auto operator|(std::expected<ExpVal, ExpErr> &&e, if_then_else_t<If,Then,Else> &&cond)
+    auto operator|(std::expected<ExpVal, ExpErr> &&e, if_then_else_t<If,Then,Else> const&cond)
     {
         using namespace internals;
         using ret_type_t = std::remove_cvref_t<decltype(cond(e.value()))>;

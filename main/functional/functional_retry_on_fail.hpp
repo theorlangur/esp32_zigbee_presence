@@ -12,7 +12,7 @@ namespace functional
             int attempts;
 
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 using namespace internals;
                 for(int i = 0; i < attempts - 1; ++i)
@@ -40,7 +40,7 @@ namespace functional
 
 
         template<class ExpVal>
-        auto operator()(ExpVal &&v)
+        auto operator()(ExpVal &&v) const
         {
             using namespace internals;
             constexpr auto arity = get_arity_of<ErrorHandler>();
@@ -75,7 +75,7 @@ namespace functional
 
 
     template<class ExpVal, class ExpErr, class V>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_t<V> &&def)->std::expected<ExpVal, ExpErr>
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_t<V> const&def)->std::expected<ExpVal, ExpErr>
         {
             using namespace internals;
             if (!e)
@@ -85,7 +85,7 @@ namespace functional
         }
 
     template<class ExpVal, class ExpErr, class V, class E>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, E> &&def)->std::expected<ExpVal, ExpErr>
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, E> const&def)->std::expected<ExpVal, ExpErr>
         {
             using namespace internals;
             if (!e)

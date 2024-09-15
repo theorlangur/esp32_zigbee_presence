@@ -15,7 +15,7 @@ namespace functional
             Ctx ctx;
 
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 using namespace internals;
                 for(int i = 0; i < (n - 1); ++i)
@@ -34,7 +34,7 @@ namespace functional
 
 
     template<class ExpVal, class ExpErr, class V, class Ctx>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> &&def)
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_n_t<V, Ctx> const&def)
         {
             using namespace internals;
             using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(def), int>;

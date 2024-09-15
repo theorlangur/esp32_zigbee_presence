@@ -11,7 +11,7 @@ namespace functional
             T t;
 
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 static_assert(false, "Makes no sense to call it directly. It converts an error");
             }
@@ -24,7 +24,7 @@ namespace functional
         }
 
     template<class ExpVal, class ExpErr, class TransformErrV>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, transform_error_t<TransformErrV> &&tr_err)->std::expected<ExpVal, std::invoke_result_t<TransformErrV, ExpErr&>>
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, transform_error_t<TransformErrV> const&tr_err)->std::expected<ExpVal, std::invoke_result_t<TransformErrV, ExpErr&>>
         {
             if (!e)
                 return std::unexpected(tr_err.t(e.error()));

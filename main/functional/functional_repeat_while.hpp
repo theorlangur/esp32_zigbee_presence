@@ -23,10 +23,10 @@ namespace functional
             While w;
             CB t;
             Default d;
-            Ctx ctx;
+            mutable Ctx ctx;
 
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 using namespace internals;
                 using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(*this), decltype(ctx)>;
@@ -74,7 +74,7 @@ namespace functional
 
 
     template<class ExpVal, class ExpErr, class W, class V, class D, class Ctx>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> &&def)
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, repeat_while_t<W,V,D,Ctx> const &def)
         {
             using namespace internals;
             using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(def), decltype(def.ctx)>;

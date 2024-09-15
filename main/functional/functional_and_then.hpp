@@ -13,7 +13,7 @@ namespace functional
             T t;
 
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 using namespace internals;
                 using PureVal = std::remove_cvref_t<ExpVal>;
@@ -47,7 +47,7 @@ namespace functional
         }
 
     template<class ExpVal, class ExpErr, class AndThenV>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> &&cont)
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, and_then_t<AndThenV> const& cont)
         {
             using namespace internals;
             using ret_type_t = std::remove_cvref_t<decltype(cont(e.value()))>;

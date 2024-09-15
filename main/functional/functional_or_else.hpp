@@ -10,7 +10,7 @@ namespace functional
             V t;
 
             template<class Dummy>
-            auto operator()(Dummy &&)
+            auto operator()(Dummy &&) const
             {
                 return t;
             }
@@ -24,7 +24,7 @@ namespace functional
 
 
     template<class ExpVal, class ExpErr, class V>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, or_else_t<V> &&def)->std::expected<ExpVal, ExpErr>
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, or_else_t<V> const&def)->std::expected<ExpVal, ExpErr>
         {
             if (!e)
                 return def(e);

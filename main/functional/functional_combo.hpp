@@ -34,7 +34,7 @@ namespace functional
             static const constexpr size_t my_arity = 1;
             T t;
             template<class ExpVal>
-            auto operator()(ExpVal &&v)
+            auto operator()(ExpVal &&v) const
             {
                 return t(std::forward<ExpVal>(v));
             }
@@ -43,17 +43,17 @@ namespace functional
     template<class Block1, class Block2> requires internals::is_functional_block<Block1> && internals::is_functional_block<Block2>
         auto operator|(Block1 &&b1, Block2 &&b2)
         {
-            return combo_t{[b1=std::move(b1), b2=std::move(b2)]<class E>(E &&e) mutable {
+            return combo_t{[b1=std::move(b1), b2=std::move(b2)]<class E>(E &&e) {
                 if constexpr (internals::is_expected_type_v<E>)
-                    return std::move(e) | std::move(b1) | std::move(b2);
+                    return std::move(e) | b1 | b2;
                 else
-                    return b1(std::forward<E>(e)) | std::move(b2);
+                    return b1(std::forward<E>(e)) | b2;
             }
             };
         }
 
     template<class ExpVal, class ExpErr, class CB>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, combo_t<CB> &&def)
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, combo_t<CB> const&def)
         {
             using namespace internals;
             using ret_type_t = ret_type_continuation_lval_t<decltype(e.value()), decltype(def), decltype(e)>;
