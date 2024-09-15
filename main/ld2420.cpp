@@ -48,8 +48,7 @@ LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
     return Configure() 
         | and_then([&]{ return SetPins(txPin, rxPin); })
         | and_then([&]{ return Open(); })
-        | transform_error([](::Err &c){ return Err{c, "LD2420::Init", ErrorCode::Init}; })
-        | and_then([&]()->ExpectedResult { return std::ref(*this); });
+        | AdaptToResult("LD2420::Init", ErrorCode::Init);
 }
 
 LD2420::ExpectedResult LD2420::ReloadConfig()
@@ -173,8 +172,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                                         | uart::match_bytes(*this, "\r\n")
                                         | and_then([&]{ m_Presence.m_Distance = float(val) / 100; })
                             )
-                    | transform_error([&](::Err e){ return Err{e, "LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure};})
-                    | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+                    | AdaptToResult("LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure)
                     ;
 
 }
@@ -202,8 +200,8 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
         | and_then([&]{ m_Presence.m_Distance = float(distance) / 100; })
         | repeat_n(16, [&](int i){ return start_sequence() | uart::read_into(*this, m_Gates[i].m_Energy); })
         | uart::match_bytes(*this, footer)
-        | transform_error([&](::Err e){ return Err{e, "LD2420::ReadEnergyFrame", ErrorCode::EnergyData_Failure};})
-        | and_then([&]()->ExpectedResult{ return std::ref(*this); });
+        | AdaptToResult("LD2420::ReadEnergyFrame", ErrorCode::EnergyData_Failure)
+        ;
 }
 
 LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts)
