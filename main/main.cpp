@@ -82,6 +82,7 @@ extern "C" void app_main(void)
         return;
     }
 
+    printf("Before change\n");
     printf("Version: %s\n", presence.GetVersion().data());
     printf("Current Mode: %d\n", (int)presence.GetSystemMode());
     printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", presence.GetMinDistance(), presence.GetMaxDistance(), presence.GetTimeout());
@@ -90,15 +91,53 @@ extern "C" void app_main(void)
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
-    auto changeConfig = presence.ChangeConfiguration()
-                                    .SetTimeout(5)
+    auto cfg = presence.ChangeConfiguration();
+                                    cfg.SetTimeout(5)
                                     .SetSystemMode(LD2420::SystemMode::Energy)
-                                .EndChange();
+                                    .SetMinDistanceRaw(1)
+                                    .SetMaxDistanceRaw(8)
+                                    .SetMoveThreshold(0, 60000)
+                                    .SetStillThreshold(0, 40000)
+                                    .SetMoveThreshold(1, 30000)
+                                    .SetStillThreshold(1, 20000)
+                                    .SetMoveThreshold(2, 400)
+                                    .SetStillThreshold(2, 200)
+                                    .SetMoveThreshold(3, 300)
+                                    .SetStillThreshold(3, 250);
+    
+for(uint8_t gate = 4; gate < 16; ++gate)
+{
+    cfg.SetMoveThreshold(gate, 250)
+        .SetStillThreshold(gate, 150);
+}
+auto changeConfig = cfg.EndChange();
+                                    //.SetMoveThreshold(4, 250)
+                                    //.SetStillThreshold(4, 150)
+                                    //.SetMoveThreshold(5, 250)
+                                    //.SetStillThreshold(5, 150)
+                                    //.SetMoveThreshold(6, 250)
+                                    //.SetStillThreshold(6, 150)
+                                //.EndChange();
 
     if (!changeConfig)
     {
         print_ld2420_error(changeConfig.error());
         return;
+    }
+
+    if (auto e = presence.ReloadConfig(); !e)
+    {
+        print_ld2420_error(e.error());
+        return;
+    }
+
+    printf("After change\n");
+    printf("Version: %s\n", presence.GetVersion().data());
+    printf("Current Mode: %d\n", (int)presence.GetSystemMode());
+    printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", presence.GetMinDistance(), presence.GetMaxDistance(), presence.GetTimeout());
+    for(uint8_t i = 0; i < 16; ++i)
+    {
+        printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
     while(true)
