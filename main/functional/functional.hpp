@@ -2,6 +2,7 @@
 #define FUNCTIONAL_H_
 
 #include "functional_base.hpp"
+#include "functional_adaptor.hpp"
 #include "functional_and_then.hpp"
 #include "functional_if_then_else.hpp"
 #include "functional_or_else.hpp"
