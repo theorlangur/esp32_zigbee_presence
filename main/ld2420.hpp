@@ -214,9 +214,9 @@ private:
         MoveThresholdGateBase = 0x10,
         StillThresholdGateBase = 0x20,
     };
-    friend uint16_t operator+(ADBRegs r, uint16_t off)
+    friend ADBRegs operator+(ADBRegs r, uint16_t off)
     {
-        return uint16_t(r) + off;
+        return ADBRegs(uint16_t(r) + off);
     }
 
     enum class SysRegs: uint16_t
@@ -236,9 +236,9 @@ private:
         CloseCmd = 0x00fe,
     };
 
-    friend uint16_t operator|(Cmd r, uint16_t v)
+    friend Cmd operator|(Cmd r, uint16_t v)
     {
-        return uint16_t(r) | v;
+        return Cmd(uint16_t(r) | v);
     }
 
     struct OpenCmdModeResponse
@@ -248,14 +248,16 @@ private:
     };
 
 #pragma pack(push,1)
+    template<class ParamT>
     struct SetParam
     {
-        uint16_t param;
+        static_assert(sizeof(ParamT) == 2, "Must be 2 bytes");
+        ParamT param;
         uint32_t value;
     };
 #pragma pack(pop)
 
-    using ADBParam = SetParam;
+    using ADBParam = SetParam<ADBRegs>;
 
     using OpenCmdModeRetVal = RetValT<Ref, OpenCmdModeResponse>;
     using ExpectedOpenCmdModeResult = std::expected<OpenCmdModeRetVal, CmdErr>;

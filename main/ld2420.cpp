@@ -260,9 +260,9 @@ LD2420::ExpectedResult LD2420::ConfigBlock::EndChange()
                             if (m_Changed.Timeout) d.m_Timeout = m_NewTimeout;
                             return d.SendCommandV2(Cmd::WriteADB
                                     ,to_send(
-                                        ADBParam{uint16_t(ADBRegs::MinDistance), d.m_MinDistance}
-                                        , ADBParam{uint16_t(ADBRegs::MaxDistance), d.m_MaxDistance}
-                                        , ADBParam{uint16_t(ADBRegs::Timeout), d.m_Timeout} 
+                                        ADBParam{ADBRegs::MinDistance, d.m_MinDistance}
+                                        , ADBParam{ADBRegs::MaxDistance, d.m_MaxDistance}
+                                        , ADBParam{ADBRegs::Timeout, d.m_Timeout} 
                                         )
                                     ,to_recv());
                        })
