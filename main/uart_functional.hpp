@@ -276,6 +276,17 @@ namespace uart
         }
     };
 
+    template<class T, class D>
+    struct read_var_t
+    {
+        using functional_read_helper = void;
+        const T &len;
+        D *v;
+
+        static constexpr size_t size() { return 0; }
+        size_t rt_size() const { return len; }
+        auto run(Channel &c) { return functional::and_then([&]{ return c.Read((uint8_t*)v, len); }); } };
+
     template<class C>
     concept is_functional_read_helper = requires{ typename C::functional_read_helper; };
 
@@ -286,6 +297,17 @@ namespace uart
             return T::size();
         else
             return sizeof(T);
+    }
+
+    template<class T>
+    constexpr size_t uart_rtsize(T &a)
+    {
+        if constexpr (requires{ a.rt_size(); })
+            return a.rt_size();
+        else
+        {
+            return uart_sizeof<T>();
+        }
     }
 
     template<class T>
@@ -304,9 +326,10 @@ namespace uart
         using PureT = std::remove_cvref_t<T>;
         using namespace functional;
         auto check_limit = and_then([&]()->Channel::ExpectedResult{ 
-                if (limit < uart_sizeof<PureT>())
+                auto sz = uart_rtsize(a);
+                if (limit < sz)
                     return std::unexpected(::Err{"Insufficient length", ESP_OK}); 
-                limit -= uart_sizeof<PureT>();
+                limit -= sz;
                 return std::ref(c);
             });
 
