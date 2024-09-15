@@ -78,18 +78,34 @@ namespace functional
         auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_t<V> const&def)->std::expected<ExpVal, ExpErr>
         {
             using namespace internals;
+            using ret_type_t = std::remove_cvref_t<decltype(def(e.value()))>;
+            using ret_error_type_t = typename ret_type_t::error_type;
+
             if (!e)
-                return std::move(e);
+            {
+                if constexpr (std::is_same_v<ret_type_t, std::expected<ExpVal,ExpErr>>)
+                    return std::move(e);
+                else
+                    return ret_type_t(std::unexpected(ret_error_type_t(e.error())));
+            }
 
             return def(e.value());
         }
 
     template<class ExpVal, class ExpErr, class V, class E>
-        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, E> const&def)->std::expected<ExpVal, ExpErr>
+        auto operator|(std::expected<ExpVal, ExpErr> &&e, retry_on_fail_err_handle_t<V, E> const&def)
         {
             using namespace internals;
+            using ret_type_t = std::remove_cvref_t<decltype(def(e.value()))>;
+            using ret_error_type_t = typename ret_type_t::error_type;
+
             if (!e)
-                return std::move(e);
+            {
+                if constexpr (std::is_same_v<ret_type_t, std::expected<ExpVal,ExpErr>>)
+                    return std::move(e);
+                else
+                    return ret_type_t(std::unexpected(ret_error_type_t(e.error())));
+            }
 
             return def(e.value());
         }
