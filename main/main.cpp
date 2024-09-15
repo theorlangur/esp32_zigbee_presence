@@ -91,11 +91,18 @@ extern "C" void app_main(void)
         printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
     }
 
+    //printf("Restarting...\n");
+    //if (auto e = presence.Restart(); !e)
+    //{
+    //    print_ld2420_error(e.error());
+    //    return;
+    //}
+
     auto cfg = presence.ChangeConfiguration();
                                     cfg.SetTimeout(5)
                                     .SetSystemMode(LD2420::SystemMode::Energy)
                                     .SetMinDistanceRaw(1)
-                                    .SetMaxDistanceRaw(8)
+                                    .SetMaxDistanceRaw(12)
                                     .SetMoveThreshold(0, 60000)
                                     .SetStillThreshold(0, 40000)
                                     .SetMoveThreshold(1, 30000)
