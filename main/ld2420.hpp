@@ -290,6 +290,8 @@ private:
                 );
     }
 
+    static auto AdaptError(const char *pLocation, ErrorCode ec) { return functional::transform_error([&](::Err e){ return Err{e, pLocation, ec}; }); }
+
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
@@ -327,17 +329,8 @@ private:
                 | AdaptToResult("RecvFrameV2", ErrorCode::RecvFrame_Malformed);
     }
 
-    template<class... ToSend>
-    static auto to_send(ToSend&&...args)
-    {
-        return std::forward_as_tuple(std::forward<ToSend>(args)...);
-    }
-
-    template<class... ToRecv>
-    static auto to_recv(ToRecv&&...args)
-    {
-        return std::forward_as_tuple(std::forward<ToRecv>(args)...);
-    }
+    template<class... ToSend> static auto to_send(ToSend&&...args) { return std::forward_as_tuple(std::forward<ToSend>(args)...); }
+    template<class... ToRecv> static auto to_recv(ToRecv&&...args) { return std::forward_as_tuple(std::forward<ToRecv>(args)...); }
 
     template<class CmdT, class... ToSend, class... ToRecv>
     ExpectedGenericCmdResult SendCommandV2(CmdT cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
@@ -361,9 +354,9 @@ private:
                 std::get<idx>(recvArgs)...);
         };
         return Flush() 
-                | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed}; })
+                | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed)
                 | and_then([&]{ return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
-                | and_then([&]{ return WaitAllSent() | transform_error([&](::Err e){ return Err{e, "SendCommandV2", ErrorCode::SendCommand_Failed};}); })
+                | and_then([&]{ return WaitAllSent() | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed); })
                 | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
                 | AdaptToCmdResult();
     }
