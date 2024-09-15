@@ -66,14 +66,10 @@ LD2420::ExpectedResult LD2420::ReloadConfig()
 LD2420::ExpectedResult LD2420::Restart()
 {
     using namespace functional;
-    auto result_adaptor = adapt_to<ExpectedResult>(
-                      [&](auto &c){ return std::ref(*this); }
-                    , [&](::Err e){ return Err{e, "LD2420::Restart", ErrorCode::RestartFailed}; }
-                );
     return OpenCommandMode()
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | uart::flush_and_wait(*this, kRestartTimeout , result_adaptor)
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2420::Restart", ErrorCode::RestartFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
           /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }

@@ -275,7 +275,13 @@ private:
     constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
     constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
 
-    bool m_dbg = false;
+    auto AdaptToResult(const char *pLocation, ErrorCode ec)
+    {
+        return functional::adapt_to<ExpectedResult>(
+                      [&](auto &c){ return std::ref(*this); }
+                    , [&,pLocation,ec](::Err e){ return Err{e, pLocation, ec}; }
+                );
+    }
 
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
@@ -382,6 +388,7 @@ private:
     Gate m_Gates[16];
 
     PresenceResult m_Presence;
+    bool m_dbg = false;
 };
 
 #endif
