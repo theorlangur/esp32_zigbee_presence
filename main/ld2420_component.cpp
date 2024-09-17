@@ -66,6 +66,70 @@ namespace ld2420
         }
     }
 
+    static void ld2420_handle_msg(LD2420 &d, QueueMsg &msg)
+    {
+        switch(msg.m_Type)
+        {
+            case QueueMsg::Type::Restart:
+                {
+                    auto te = d.Restart();
+                    if (!te)
+                    {
+                        //report
+                    }
+                }
+                break;
+            case QueueMsg::Type::SetMode:
+                {
+                    auto te = d.ChangeConfiguration()
+                        .SetSystemMode(msg.m_Mode == Mode::Simple ? LD2420::SystemMode::Simple : LD2420::SystemMode::Energy)
+                        .EndChange();
+                    if (!te)
+                    {
+                        //report
+                    }
+                }
+                break;
+            case QueueMsg::Type::SetTimeout:
+                {
+                    auto te = d.ChangeConfiguration()
+                        .SetTimeout(msg.m_Timeout)
+                        .EndChange();
+                    if (!te)
+                    {
+                        //report
+                    }
+                }
+                break;
+            case QueueMsg::Type::SetMinDistance:
+                {
+                    auto te = d.ChangeConfiguration()
+                        .SetMinDistance(msg.m_MinDistance)
+                        .EndChange();
+                    if (!te)
+                    {
+                        //report
+                    }
+                }
+                break;
+            case QueueMsg::Type::SetMaxDistance:
+                {
+                    auto te = d.ChangeConfiguration()
+                        .SetMaxDistance(msg.m_MaxDistance)
+                        .EndChange();
+                    if (!te)
+                    {
+                        //report
+                    }
+                }
+                break;
+            default:
+                //don't care
+                //report
+                break;
+        }
+    }
+
     static void ld2420_managing_loop(LD2420 &d)
     {
         bool initial = true;
@@ -74,27 +138,8 @@ namespace ld2420
         QueueMsg msg;
         while(true)
         {
-            if (xQueueReceive(g_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS))
-            {
-                //process
-                switch(msg.m_Type)
-                {
-                    case QueueMsg::Type::Restart:
-                    d.Restart();
-                    break;
-                    case QueueMsg::Type::SetMode:
-                    break;
-                    case QueueMsg::Type::SetTimeout:
-                    break;
-                    case QueueMsg::Type::SetMinDistance:
-                    break;
-                    case QueueMsg::Type::SetMaxDistance:
-                    break;
-                    default:
-                    //don't care
-                    break;
-                }
-            }
+            if (xQueueReceive(g_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS)) //process
+                ld2420_handle_msg(d, msg);
 
             bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
             auto te = simpleMode
@@ -146,6 +191,19 @@ namespace ld2420
         }
     }
 
+    static configure_presence_isr_pin()
+    {
+        gpio_config_t ld2420_presence_pin_cfg = {
+            .pin_bit_mask = 1ULL << kLD2420_PresencePin,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_ANYEDGE,
+        };
+        gpio_config(&ld2420_presence_pin_cfg);
+        gpio_isr_handler_add(gpio_num_t(kLD2420_PresencePin), presence_pin_isr, nullptr);
+    }
+
     bool setup_ld2420()
     {
         auto e = g_Presence.Init(11, 10) 
@@ -181,15 +239,7 @@ namespace ld2420
         std::thread ld2420_task(ld2420_managing_loop, std::ref(presence));
         ld2420_task.detach();
 
-        gpio_config_t ld2420_presence_pin_cfg = {
-            .pin_bit_mask = 1ULL << kLD2420_PresencePin,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_ENABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_ANYEDGE,
-        };
-        gpio_config(&ld2420_presence_pin_cfg);
-        gpio_isr_handler_add(gpio_num_t(kLD2420_PresencePin), presence_pin_isr, nullptr);
+        configure_presence_isr_pin();
 
         return true;
 
