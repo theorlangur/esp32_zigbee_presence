@@ -204,10 +204,10 @@ public:
     PresenceResult GetPresence() const { return m_Presence; }
 
     ExpectedResult ReadSimpleFrame();
-    ExpectedResult TryReadSimpleFrame(int attempts = 3);
+    ExpectedResult TryReadSimpleFrame(int attempts = 3, bool flush = false);
 
     ExpectedResult ReadEnergyFrame();
-    ExpectedResult TryReadEnergyFrame(int attempts = 3);
+    ExpectedResult TryReadEnergyFrame(int attempts = 3, bool flush = false);
 private:
     enum class ADBRegs: uint16_t
     {

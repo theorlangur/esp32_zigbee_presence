@@ -177,10 +177,15 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 
 }
 
-LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts)
+LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts, bool flush)
 {
     using namespace functional;
-    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadSimpleFrame(); });
+    return start_sequence(std::ref(*this)) 
+        | if_then(
+                [&]{ return flush; }
+                ,[&]{ return Flush() | AdaptToResult("LD2420::TryReadSimpleFrame", ErrorCode::SimpleData_Failure); }
+          )
+        | retry_on_fail(attempts, [&]{ return ReadSimpleFrame(); });
 }
 
 LD2420::ExpectedResult LD2420::ReadEnergyFrame()
@@ -204,10 +209,15 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
         ;
 }
 
-LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts)
+LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts, bool flush)
 {
     using namespace functional;
-    return ExpectedResult{std::ref(*this)} | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
+    return start_sequence(std::ref(*this)) 
+        | if_then(
+                [&]{ return flush; }
+                ,[&]{ return Flush() | AdaptToResult("LD2420::TryReadEnergyFrame", ErrorCode::EnergyData_Failure); }
+          )
+        | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
 }
 
 
