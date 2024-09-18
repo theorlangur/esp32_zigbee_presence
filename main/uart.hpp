@@ -60,8 +60,11 @@ namespace uart
 
         static const constexpr duration_ms_t kDefaultWait = duration_ms_t{-1};
 
-        Channel(Port p, int baud_rate = 115200, Parity parity = Parity::Disable);
+        Channel(Port p = Port::Port1, int baud_rate = 115200, Parity parity = Parity::Disable);
         ~Channel();
+
+        Channel& SetPort(Port p);
+        Port GetPort() const;
 
         Channel& SetBaudRate(int rate);
         int GetBaudRate() const;

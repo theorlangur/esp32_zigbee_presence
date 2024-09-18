@@ -3,15 +3,45 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include "ld2420_component.hpp"
-#include "ld2420.hpp"
 #include "driver/gpio.h"
 #include <thread>
 
 namespace ld2420
 {
-    QueueHandle_t g_FastQueue;
-    QueueHandle_t g_ManagingQueue;
-    LD2420 g_Presence(uart::Port::Port1);
+    struct Component::QueueMsg
+    {
+        enum class Type: std::size_t 
+        {
+            //commands
+            Stop,
+            Restart,
+            StartCalibrate,
+            StopCalibrate,
+            //report
+            Presence,
+            PresenceIntr,
+            Distance,
+            PresenceAndDistance,
+            //config
+            SetTimeout,
+            SetMinDistance,
+            SetMaxDistance,
+            SetMode,
+        };
+
+        Type m_Type;
+        union
+        {
+            bool m_Presence;
+            float m_Distance;
+            struct{
+                bool m_Presence;
+                float m_Distance;
+            }m_PresenceAndDistance;
+            uint32_t m_Timeout;
+            Mode m_Mode;
+        };
+    };
 
     void print_ld2420_error(::Err &uartErr) 
     { 
@@ -33,42 +63,21 @@ namespace ld2420
         fflush(stdout); 
     }
 
-    void presence_pin_isr(void *_)
+    Component::~Component()
     {
+        gpio_isr_handler_remove(gpio_num_t(m_PresencePin));
+    }
+
+    void Component::presence_pin_isr(void *param)
+    {
+        Component &c = *static_cast<Component*>(param);
         QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Presence=false};
-        xQueueSendFromISR(g_FastQueue, &msg, nullptr);
+        xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
     }
 
-    static void ld2420_fast_loop(LD2420 &d)
+    void Component::HandleMessage(QueueMsg &msg)
     {
-        printf("Entering level tracking loop\n");
-        fflush(stdout);
-        QueueMsg msg;
-        while(true)
-        {
-            if (xQueueReceive(g_FastQueue, &msg, 10000 / portTICK_PERIOD_MS))
-            {
-                switch(msg.m_Type)
-                {
-                    case QueueMsg::Type::Stop: return;
-                    case QueueMsg::Type::PresenceIntr: 
-                    {
-                        int l = gpio_get_level(gpio_num_t(kLD2420_PresencePin));
-                        printf("Level changed to %d\n", l);
-                        fflush(stdout);
-                    }
-                    break;
-                    default:
-                    //don't care
-                    printf("Unprocessed message of type %d\n", (int)msg.m_Type);
-                    break;
-                }
-            }
-        }
-    }
-
-    static void ld2420_handle_msg(LD2420 &d, QueueMsg &msg)
-    {
+        auto &d = m_Sensor;
         switch(msg.m_Type)
         {
             case QueueMsg::Type::Restart:
@@ -131,21 +140,48 @@ namespace ld2420
         }
     }
 
-    static void ld2420_managing_loop(LD2420 &d)
+    void Component::fast_loop(Component &c)
+    {
+        printf("Entering level tracking loop\n");
+        fflush(stdout);
+        QueueMsg msg;
+        while(true)
+        {
+            if (xQueueReceive(c.m_FastQueue, &msg, 10000 / portTICK_PERIOD_MS))
+            {
+                switch(msg.m_Type)
+                {
+                    case QueueMsg::Type::Stop: return;
+                    case QueueMsg::Type::PresenceIntr: 
+                    {
+                        int l = gpio_get_level(gpio_num_t(c.m_PresencePin));
+                        printf("Level changed to %d\n", l);
+                        fflush(stdout);
+                    }
+                    break;
+                    default:
+                    //don't care
+                    printf("Unprocessed message of type %d\n", (int)msg.m_Type);
+                    break;
+                }
+            }
+        }
+    }
+
+    void Component::manage_loop(Component &c)
     {
         bool initial = true;
         bool lastPresence;
         float lastDistance;
+        auto &d = c.m_Sensor;
         QueueMsg msg;
         while(true)
         {
-            if (xQueueReceive(g_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS)) //process
-                ld2420_handle_msg(d, msg);
+            if (xQueueReceive(c.m_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS)) //process
+                c.HandleMessage(msg);
 
             bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
-            auto te = simpleMode
-                ? d.TryReadSimpleFrame(3/*, true*/)
-                : d.TryReadEnergyFrame(3/*, true*/);
+            auto te = d.TryReadFrame(3, true, LD2420::Drain::Try);
 
             bool reportPresence = false;
             bool reportDistance = false;
@@ -188,27 +224,33 @@ namespace ld2420
             }
 
             if (reportDistance || reportPresence)
-                xQueueSend(g_FastQueue, &msg, portMAX_DELAY);
+                xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
         }
     }
 
-    static void configure_presence_isr_pin()
+    void Component::ConfigurePresenceIsr()
     {
+        if (m_PresencePin == -1)
+            return;
         gpio_config_t ld2420_presence_pin_cfg = {
-            .pin_bit_mask = 1ULL << kLD2420_PresencePin,
+            .pin_bit_mask = 1ULL << m_PresencePin,
             .mode = GPIO_MODE_INPUT,
             .pull_up_en = GPIO_PULLUP_ENABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
             .intr_type = GPIO_INTR_ANYEDGE,
         };
+
         gpio_config(&ld2420_presence_pin_cfg);
-        gpio_isr_handler_add(gpio_num_t(kLD2420_PresencePin), presence_pin_isr, nullptr);
+        gpio_isr_handler_add(gpio_num_t(m_PresencePin), presence_pin_isr, this);
     }
 
-    bool setup_ld2420()
+    bool Component::Setup(setup_args_t const& args)
     {
-        auto e = g_Presence.Init(11, 10) 
-            | functional::and_then([&]{ return g_Presence.ReloadConfig(); });
+        if (m_Setup)
+            return false;
+
+        auto e = m_Sensor.Init(args.txPin, args.rxPin) 
+            | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
 
         if (!e)
         {
@@ -216,7 +258,7 @@ namespace ld2420
             return false;
         }
 
-        auto changeConfig = g_Presence.ChangeConfiguration()
+        auto changeConfig = m_Sensor.ChangeConfiguration()
                                 .SetSystemMode(LD2420::SystemMode::Simple)
                                 .SetTimeout(5)
                                 .EndChange();
@@ -226,60 +268,23 @@ namespace ld2420
             return false;
         }
 
-        printf("Version: %s\n", g_Presence.GetVersion().data());
-        printf("Current Mode: %d\n", (int)g_Presence.GetSystemMode());
-        printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", g_Presence.GetMinDistance(), g_Presence.GetMaxDistance(), g_Presence.GetTimeout());
+        printf("Version: %s\n", m_Sensor.GetVersion().data());
+        printf("Current Mode: %d\n", (int)m_Sensor.GetSystemMode());
+        printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", m_Sensor.GetMinDistance(), m_Sensor.GetMaxDistance(), m_Sensor.GetTimeout());
         for(uint8_t i = 0; i < 16; ++i)
         {
-            printf("Gate %d Thresholds: Move=%d Still=%d\n", i, g_Presence.GetMoveThreshold(i), g_Presence.GetStillThreshold(i));
+            printf("Gate %d Thresholds: Move=%d Still=%d\n", i, m_Sensor.GetMoveThreshold(i), m_Sensor.GetStillThreshold(i));
         }
 
-        g_FastQueue = xQueueCreate(10, sizeof(QueueMsg));
-        g_ManagingQueue = xQueueCreate(10, sizeof(QueueMsg));
+        m_FastQueue = xQueueCreate(10, sizeof(QueueMsg));
+        m_ManagingQueue = xQueueCreate(10, sizeof(QueueMsg));
 
-        std::thread ld2420_task(ld2420_managing_loop, std::ref(g_Presence));
-        ld2420_task.detach();
+        m_ManagingTask = std::jthread(&manage_loop, std::ref(*this));
+        m_FastTask = std::jthread(&fast_loop, std::ref(*this));
 
-        std::thread ld2420_task_fast(ld2420_fast_loop, std::ref(g_Presence));
-        ld2420_task_fast.detach();
+        ConfigurePresenceIsr();
 
-        configure_presence_isr_pin();
-
+        m_Setup = true;
         return true;
-
-    //printf("Restarting...\n");
-    //if (auto e = presence.Restart(); !e)
-    //{
-    //    print_ld2420_error(e.error());
-    //    return;
-    //}
-
-    //auto cfg = presence.ChangeConfiguration();
-    //                                cfg.SetTimeout(5)
-    //                                .SetSystemMode(LD2420::SystemMode::Energy)
-    //                                .SetMinDistanceRaw(1)
-    //                                .SetMaxDistanceRaw(12)
-    //                                .SetMoveThreshold(0, 60000)
-    //                                .SetStillThreshold(0, 40000)
-    //                                .SetMoveThreshold(1, 30000)
-    //                                .SetStillThreshold(1, 20000)
-    //                                .SetMoveThreshold(2, 400)
-    //                                .SetStillThreshold(2, 200)
-    //                                .SetMoveThreshold(3, 300)
-    //                                .SetStillThreshold(3, 250);
-    //
-    //for(uint8_t gate = 4; gate < 16; ++gate)
-    //{
-    //    cfg.SetMoveThreshold(gate, 250)
-    //        .SetStillThreshold(gate, 150);
-    //}
-    //auto changeConfig = cfg.EndChange();
-                                    //.SetMoveThreshold(4, 250)
-                                    //.SetStillThreshold(4, 150)
-                                    //.SetMoveThreshold(5, 250)
-                                    //.SetStillThreshold(5, 150)
-                                    //.SetMoveThreshold(6, 250)
-                                    //.SetStillThreshold(6, 150)
-                                //.EndChange();
     }
 }

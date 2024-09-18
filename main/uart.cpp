@@ -24,6 +24,17 @@ namespace uart
         Close();
     }
 
+    Channel& Channel::SetPort(Port p)
+    {
+        m_Port = uart_port_t(p);
+        return *this;
+    }
+
+    Port Channel::GetPort() const
+    {
+        return Port(m_Port);
+    }
+
     Channel& Channel::SetBaudRate(int rate)
     {
         m_Config.baud_rate = rate;

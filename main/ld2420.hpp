@@ -177,7 +177,10 @@ public:
         };
     };
 
-    LD2420(uart::Port p, int baud_rate = 115200);
+    LD2420(uart::Port p = uart::Port::Port1, int baud_rate = 115200);
+
+    void SetPort(uart::Port p);
+    uart::Port GetPort() const;
 
     ExpectedResult Init(int txPin, int rxPin);
 

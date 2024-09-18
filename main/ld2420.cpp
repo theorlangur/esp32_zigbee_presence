@@ -42,6 +42,16 @@ LD2420::LD2420(uart::Port p, int baud_rate):
     SetTxBufferSize(1024);
 }
 
+void LD2420::SetPort(uart::Port p)
+{
+    Channel::SetPort(p);
+}
+
+uart::Port LD2420::GetPort() const
+{
+    return Channel::GetPort();
+}
+
 LD2420::ExpectedResult LD2420::Init(int txPin, int rxPin)
 {
     using namespace functional;

@@ -73,7 +73,8 @@ extern "C" void app_main(void)
 
     gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
-    if (!ld2420::setup_ld2420())
+    ld2420::Component ld2420;
+    if (!ld2420.Setup(ld2420::Component::setup_args_t{.txPin=10, .rxPin=11, .presencePin=13}))
     {
         printf("Failed to configure ld2420\n");
         fflush(stdout);
