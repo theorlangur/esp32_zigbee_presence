@@ -49,6 +49,13 @@ public:
         Energy = 0x04,
     };
 
+    enum class Drain
+    {
+        No,
+        Try,
+        Only,
+    };
+
     using Ref = std::reference_wrapper<LD2420>;
     struct Err
     {
@@ -209,7 +216,7 @@ public:
     ExpectedResult ReadEnergyFrame();
     ExpectedResult TryReadEnergyFrame(int attempts = 3, bool flush = false);
 
-    ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, bool drainOnly = false);
+    ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, Drain drain = Drain::No);
 private:
     enum class ADBRegs: uint16_t
     {

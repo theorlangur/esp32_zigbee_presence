@@ -220,10 +220,10 @@ LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts, bool flush)
         | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
 }
 
-LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, bool drainOnly)
+LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, Drain drain)
 {
     using namespace functional;
-    if (drainOnly)
+    if (drain != Drain::No)
     {
         using ExpectedCondition = std::expected<bool, ::Err>;
         SetDefaultWait(duration_ms_t(0));
@@ -234,8 +234,10 @@ LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, bool drain
                     ,[&]{ ++i; return (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); }
                     ,[&]()->ExpectedResult{ return std::ref(*this); }
                     );
-        if (i)
+        if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
             return std::ref(*this);
+        else if (drain == Drain::Try)
+            return TryReadFrame(attempts, flush, Drain::No);
         else
             return r;
     }else
