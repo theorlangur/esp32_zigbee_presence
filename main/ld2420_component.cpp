@@ -1,3 +1,4 @@
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdio.h>
 #include <inttypes.h>
@@ -34,7 +35,7 @@ namespace ld2420
 
     void presence_pin_isr(void *_)
     {
-        QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr};
+        QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Presence=false};
         xQueueSendFromISR(g_FastQueue, &msg, nullptr);
     }
 
@@ -52,7 +53,7 @@ namespace ld2420
                     case QueueMsg::Type::Stop: return;
                     case QueueMsg::Type::PresenceIntr: 
                     {
-                        int l = gpio_get_level(kLD2420_PresencePin);
+                        int l = gpio_get_level(gpio_num_t(kLD2420_PresencePin));
                         printf("Level changed to %d\n", l);
                         fflush(stdout);
                     }
@@ -104,7 +105,7 @@ namespace ld2420
             case QueueMsg::Type::SetMinDistance:
                 {
                     auto te = d.ChangeConfiguration()
-                        .SetMinDistance(msg.m_MinDistance)
+                        .SetMinDistance(msg.m_Distance)
                         .EndChange();
                     if (!te)
                     {
@@ -115,7 +116,7 @@ namespace ld2420
             case QueueMsg::Type::SetMaxDistance:
                 {
                     auto te = d.ChangeConfiguration()
-                        .SetMaxDistance(msg.m_MaxDistance)
+                        .SetMaxDistance(msg.m_Distance)
                         .EndChange();
                     if (!te)
                     {
@@ -187,11 +188,11 @@ namespace ld2420
             }
 
             if (reportDistance || reportPresence)
-                xQueueSend(g_FastQueue, &msg, nullptr);
+                xQueueSend(g_FastQueue, &msg, portMAX_DELAY);
         }
     }
 
-    static configure_presence_isr_pin()
+    static void configure_presence_isr_pin()
     {
         gpio_config_t ld2420_presence_pin_cfg = {
             .pin_bit_mask = 1ULL << kLD2420_PresencePin,
@@ -222,22 +223,25 @@ namespace ld2420
         if (!changeConfig)
         {
             print_ld2420_error(changeConfig.error());
-            return;
+            return false;
         }
 
-        printf("Version: %s\n", presence.GetVersion().data());
-        printf("Current Mode: %d\n", (int)presence.GetSystemMode());
-        printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", presence.GetMinDistance(), presence.GetMaxDistance(), presence.GetTimeout());
+        printf("Version: %s\n", g_Presence.GetVersion().data());
+        printf("Current Mode: %d\n", (int)g_Presence.GetSystemMode());
+        printf("Min distance: %dm; Max distance: %dm; Timeout: %ld\n", g_Presence.GetMinDistance(), g_Presence.GetMaxDistance(), g_Presence.GetTimeout());
         for(uint8_t i = 0; i < 16; ++i)
         {
-            printf("Gate %d Thresholds: Move=%d Still=%d\n", i, presence.GetMoveThreshold(i), presence.GetStillThreshold(i));
+            printf("Gate %d Thresholds: Move=%d Still=%d\n", i, g_Presence.GetMoveThreshold(i), g_Presence.GetStillThreshold(i));
         }
 
         g_FastQueue = xQueueCreate(10, sizeof(QueueMsg));
         g_ManagingQueue = xQueueCreate(10, sizeof(QueueMsg));
 
-        std::thread ld2420_task(ld2420_managing_loop, std::ref(presence));
+        std::thread ld2420_task(ld2420_managing_loop, std::ref(g_Presence));
         ld2420_task.detach();
+
+        std::thread ld2420_task_fast(ld2420_fast_loop, std::ref(g_Presence));
+        ld2420_task_fast.detach();
 
         configure_presence_isr_pin();
 
