@@ -161,7 +161,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
             );
 
     return start_sequence(*this)
-                    | uart::read_until(*this, 'O')
+                    | uart::read_until(*this, 'O', duration_ms_t(1000))
                     | uart::match_any_str(*this, "ON", "OFF")
                     | and_then([&](int match){ m_Presence.m_Detected = match == 0; })
                     | uart::match_bytes(*this, "\r\n")
@@ -197,7 +197,7 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
     uint16_t reportLen = 0;
     uint16_t distance = 0;
     return start_sequence()
-        | uart::read_until(*this, header[0])
+        | uart::read_until(*this, header[0], duration_ms_t(1000))
         | uart::match_bytes(*this, header)
         | uart::read_into(*this, reportLen)
         | uart::read_into(*this, m_Presence.m_Detected)
