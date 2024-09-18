@@ -221,21 +221,28 @@ namespace uart
         return match_any_bytes_term(c, 0, std::forward<BytePtr>(bytes)...);
     }
 
-    inline auto read_until(Channel &c, uint8_t until)
+    inline auto read_until(Channel &c, uint8_t until, duration_ms_t maxWait = kForever)
     {
         using namespace functional;
+        using clock_t = std::chrono::system_clock;
+        using time_point_t = std::chrono::time_point<clock_t>;
         struct ctx_t
         {
             Channel &c;
             uint8_t until;
+            time_point_t start;
         };
         using ExpectedResult = std::expected<Channel::Ref, ::Err>;
         using ExpectedCondition = std::expected<bool, ::Err>;
         return repeat_while(
-                /*condition*/[](ctx_t &ctx)->ExpectedCondition{ return ctx.c.PeekByte() | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); },
-                /*iteration*/[](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
+                /*condition*/[maxWait](ctx_t &ctx)->ExpectedCondition{ 
+                        if (maxWait != kForever && std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - ctx.start) >= maxWait)
+                            return std::unexpected(::Err{"read_until timeout", ESP_OK});
+                        return ctx.c.PeekByte() | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); 
+                },
+                /*iteration*/[maxWait](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
-                /*context  */ctx_t{c, until}
+                /*context  */ctx_t{c, until, clock_t::now()}
                 );
     }
 
