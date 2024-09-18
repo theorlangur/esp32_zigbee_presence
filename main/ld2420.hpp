@@ -208,6 +208,8 @@ public:
 
     ExpectedResult ReadEnergyFrame();
     ExpectedResult TryReadEnergyFrame(int attempts = 3, bool flush = false);
+
+    ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, bool drainOnly = false);
 private:
     enum class ADBRegs: uint16_t
     {

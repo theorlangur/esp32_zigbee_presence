@@ -152,7 +152,6 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 {
     using namespace functional;
-    SetDefaultWait(duration_ms_t(150));
     uint16_t val = 0;
     auto ParseNum = repeat_while(
             [&]()->WhileResult<::Err>{ return PeekByte() | and_then([&](uint8_t b)->WhileResult<::Err>{ return b >= '0' && b <= '9'; }); },
@@ -180,6 +179,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts, bool flush)
 {
     using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
     return start_sequence(std::ref(*this)) 
         | if_then(
                 [&]{ return flush; }
@@ -191,7 +191,6 @@ LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts, bool flush)
 LD2420::ExpectedResult LD2420::ReadEnergyFrame()
 {
     using namespace functional;
-    SetDefaultWait(duration_ms_t(150));
     constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
     constexpr uint8_t footer[] = {0xf8, 0xf7, 0xf6, 0xf5};
     uint16_t reportLen = 0;
@@ -212,6 +211,7 @@ LD2420::ExpectedResult LD2420::ReadEnergyFrame()
 LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts, bool flush)
 {
     using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
     return start_sequence(std::ref(*this)) 
         | if_then(
                 [&]{ return flush; }
@@ -220,6 +220,35 @@ LD2420::ExpectedResult LD2420::TryReadEnergyFrame(int attempts, bool flush)
         | retry_on_fail(attempts, [&]{ return ReadEnergyFrame(); });
 }
 
+LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, bool drainOnly)
+{
+    using namespace functional;
+    if (drainOnly)
+    {
+        using ExpectedCondition = std::expected<bool, ::Err>;
+        SetDefaultWait(duration_ms_t(0));
+        int i = 0, maxIterations = 100;
+        auto r = start_sequence(std::ref(*this)) 
+            | repeat_while(
+                     [&]()->ExpectedCondition{ return i < maxIterations; }
+                    ,[&]{ ++i; return (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); }
+                    ,[&]()->ExpectedResult{ return std::ref(*this); }
+                    );
+        if (i)
+            return std::ref(*this);
+        else
+            return r;
+    }else
+    {
+        SetDefaultWait(duration_ms_t(150));
+        return start_sequence(std::ref(*this)) 
+            | if_then(
+                    [&]{ return flush; }
+                    ,[&]{ return Flush() | AdaptToResult("LD2420::TryReadFrame", (m_Mode == SystemMode::Energy) ? ErrorCode::EnergyData_Failure : ErrorCode::SimpleData_Failure); }
+              )
+            | retry_on_fail(attempts, [&]{ return (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); });
+    }
+}
 
 /**********************************************************************/
 /* ConfigBlock                                                        */
