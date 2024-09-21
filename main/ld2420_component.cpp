@@ -144,6 +144,8 @@ namespace ld2420
     {
         printf("Entering level tracking loop\n");
         fflush(stdout);
+        bool lastPresence = false;
+        float lastDistance = 0;
         QueueMsg msg;
         while(true)
         {
@@ -155,9 +157,35 @@ namespace ld2420
                     case QueueMsg::Type::PresenceIntr: 
                     {
                         int l = gpio_get_level(gpio_num_t(c.m_PresencePin));
-                        printf("Level changed to %d\n", l);
-                        fflush(stdout);
+                        printf("Msg presence interrupt: %d\n", l);
+                        lastPresence = l == 1;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastDistance);
+                        //printf("Level changed to %d\n", l);
+                        //fflush(stdout);
                     }
+                    break;
+                    case QueueMsg::Type::Presence: 
+                        printf("Msg Presence\n");
+                        if (lastPresence != msg.m_Presence)
+                        {
+                            lastPresence = msg.m_Presence;
+                            if (c.m_MovementCallback)
+                                c.m_MovementCallback(lastPresence, lastDistance);
+                        }
+                    break;
+                    case QueueMsg::Type::Distance: 
+                        printf("Msg Distance\n");
+                        lastDistance = msg.m_Distance;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastDistance);
+                    break;
+                    case QueueMsg::Type::PresenceAndDistance: 
+                        printf("Msg PresenceAndDistance\n");
+                        lastDistance = msg.m_PresenceAndDistance.m_Distance;
+                        lastPresence = msg.m_PresenceAndDistance.m_Presence;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastDistance);
                     break;
                     default:
                     //don't care
@@ -181,7 +209,9 @@ namespace ld2420
                 c.HandleMessage(msg);
 
             bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
+            //printf("manage loop before read frame\n");
             auto te = d.TryReadFrame(3, true, LD2420::Drain::Try);
+            //printf("manage loop after read frame\n");
 
             bool reportPresence = false;
             bool reportDistance = false;
@@ -249,6 +279,7 @@ namespace ld2420
         if (m_Setup)
             return false;
 
+        printf("Init\n");
         auto e = m_Sensor.Init(args.txPin, args.rxPin) 
             | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
 
@@ -258,6 +289,9 @@ namespace ld2420
             return false;
         }
 
+        m_PresencePin = args.presencePin;
+
+        printf("Config\n");
         auto changeConfig = m_Sensor.ChangeConfiguration()
                                 .SetSystemMode(LD2420::SystemMode::Simple)
                                 .SetTimeout(5)
@@ -265,6 +299,13 @@ namespace ld2420
         if (!changeConfig)
         {
             print_ld2420_error(changeConfig.error());
+            return false;
+        }
+
+        printf("Reload config\n");
+        if (auto e = m_Sensor.ReloadConfig(); !e)
+        {
+            print_ld2420_error(e.error());
             return false;
         }
 

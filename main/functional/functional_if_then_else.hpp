@@ -35,6 +35,7 @@ namespace functional
         If _if;
         Then t;
         Else _else;
+        const char *pDbg = "";
 
 
         template<class ExpVal>
@@ -50,7 +51,10 @@ namespace functional
             {
                 static_assert(std::is_convertible_v<ret_type_if_t, ret_type_then_t>, "If and Then return types must be compatible");
                 if (auto te = invoke_continuation_lval(std::forward<ExpVal>(v), _wif); !te)
+                {
+                    //printf("if_then_else(%s) returned an error\n", (const char*)(pDbg ? pDbg : ""));
                     return te;
+                }
                 else
                     condition = te.value();
             }else
@@ -83,21 +87,21 @@ namespace functional
     };
 
     template<class If, class Then, class Else>
-    auto if_then_else(If &&_if, Then &&_then, Else &&_else)
+    auto if_then_else(If &&_if, Then &&_then, Else &&_else, const char *pDbg = "")
     {
         if constexpr (std::is_convertible_v<If,bool>)
-            return if_then_else_t{[&]()->bool{ return _if; }, std::forward<Then>(_then), std::forward<Else>(_else)};
+            return if_then_else_t{[&]()->bool{ return _if; }, std::forward<Then>(_then), std::forward<Else>(_else), pDbg};
         else
-            return if_then_else_t{std::forward<If>(_if), std::forward<Then>(_then), std::forward<Else>(_else)};
+            return if_then_else_t{std::forward<If>(_if), std::forward<Then>(_then), std::forward<Else>(_else), pDbg};
     }
 
     template<class If, class Then>
-    auto if_then(If &&_if, Then &&_then)
+    auto if_then(If &&_if, Then &&_then, const char *pDbg = "")
     {
         if constexpr (std::is_convertible_v<If,bool>)
-            return if_then_else_t{[&]()->bool{ return _if; }, std::forward<Then>(_then), internals::dummy_else_t{}};
+            return if_then_else_t{[&]()->bool{ return _if; }, std::forward<Then>(_then), internals::dummy_else_t{}, pDbg};
         else
-            return if_then_else_t{std::forward<If>(_if), std::forward<Then>(_then), internals::dummy_else_t{}};
+            return if_then_else_t{std::forward<If>(_if), std::forward<Then>(_then), internals::dummy_else_t{}, pDbg};
     }
 
     template<class ExpVal, class ExpErr, class If, class Then, class Else>
@@ -111,15 +115,21 @@ namespace functional
             if (!e)
             {
                 if constexpr (std::is_same_v<ret_type_t, std::expected<ExpVal,ExpErr>>)
+                {
+                    //printf("if_then_else(%s) passing an error\n", (const char*)(cond.pDbg ? cond.pDbg : ""));
                     return std::move(e);
+                }
                 else
+                {
+                    //printf("if_then_else(%s) passing an error\n", (const char*)(cond.pDbg ? cond.pDbg : ""));
                     return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
+                }
             }
 
             return cond(e.value());
         }else
         {
-            if (e)
+            if (!!e)
                 cond(e.value());
             return e;
         }

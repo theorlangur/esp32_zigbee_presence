@@ -213,10 +213,10 @@ namespace uart
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Read", ESP_ERR_INVALID_ARG});
 
-        if ((size_t(r) + size_t(addedPeek)) == 0)
-        {
-            printf("Read of 0. Not sent data: %d\n", int(m_TxBufferSize - GetReadyToWriteDataLen().value().v));
-        }
+        //if ((size_t(r) + size_t(addedPeek)) == 0)
+        //{
+        //    printf("Read of 0. Not sent data: %d\n", int(m_TxBufferSize - GetReadyToWriteDataLen().value().v));
+        //}
 
         return RetVal<size_t>{*this, size_t(r) + size_t(addedPeek)};
     }
@@ -230,7 +230,7 @@ namespace uart
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
                     {
-                        printf("Nothing to read. Wait: %d\n", wait.count());
+                        //printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
                     }
                     return RetVal{std::ref(*this), b};

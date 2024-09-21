@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include <cstdint>
 #include <thread>
+#include "generic_function.hpp"
 #include "ld2420.hpp"
 
 namespace ld2420
@@ -23,6 +24,7 @@ namespace ld2420
         static constexpr const float kDistanceReportChangeThreshold = 0.1f;//10cm
         struct QueueMsg;
     public:
+        using MovementCallback = GenericCallback<void(bool detected, float distance)>;
         ~Component();
 
         struct setup_args_t{
@@ -33,6 +35,8 @@ namespace ld2420
         };
 
         bool Setup(setup_args_t const& args);
+
+        void SetCallbackOnMovement(MovementCallback cb) { m_MovementCallback = std::move(cb); }
     private:
         void ConfigurePresenceIsr();
         void HandleMessage(QueueMsg &msg);
@@ -44,6 +48,8 @@ namespace ld2420
         bool m_Setup = false;
         LD2420 m_Sensor;
         int m_PresencePin = -1;
+
+        MovementCallback m_MovementCallback;
 
         QueueHandle_t m_FastQueue;
         QueueHandle_t m_ManagingQueue;

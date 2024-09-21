@@ -24,6 +24,7 @@ namespace functional
             CB t;
             Default d;
             mutable Ctx ctx;
+            const char *pDbg = "";
 
             template<class ExpVal>
             auto operator()(ExpVal &&v) const
@@ -48,7 +49,10 @@ namespace functional
                 while(true)
                 {
                     if (auto te = while_condition(*this); !te)
+                    {
+                        //printf("repeat_while(%s) returned an error\n", (const char*)(pDbg ? pDbg : ""));
                         return ret_type_t(std::unexpected(te.error()));
+                    }
                     else if (!te.value())
                         break;
                     if (auto te = invoke_continuation_lval(std::forward<ExpVal>(v), *this, ctx); !te)
@@ -67,9 +71,9 @@ namespace functional
         };
 
     template<class While, class CB, class Default, class LoopCtx = dummy_loop_ctx_t>
-        auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={})
+        auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={}, const char *pDbg = "")
         {
-            return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx)};
+            return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx), pDbg};
         }
 
 
@@ -80,7 +84,10 @@ namespace functional
             using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(def), decltype(def.ctx)>;
             using ret_err_type_t = typename ret_type_t::error_type;
             if (!e)
+            {
+                //printf("repeat_while(%s) got initial error. passing\n", (const char*)(def.pDbg ? def.pDbg : ""));
                 return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
+            }
 
             return def(e.value());
         }

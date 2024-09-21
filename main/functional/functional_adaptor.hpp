@@ -22,12 +22,18 @@ namespace functional
         template<class ExpVal>
         NewExpected operator()(ExpVal &&v) const
         {
-            if constexpr (internals::is_expected_type_v<ExpVal>)
+            if constexpr (internals::is_expected_type_v<std::remove_cvref_t<ExpVal>>)
             {
-                if (v.has_error())
+                if (!!v)
+                {
+                    //printf("Adapting a value\n");
                     return this->v(v.value());
+                }
                 else
-                    return std::unexpected(this->e(e.error()));
+                {
+                    //printf("Adapting an error\n");
+                    return std::unexpected(this->e(v.error()));
+                }
             }
             else
                 return this->v(v);

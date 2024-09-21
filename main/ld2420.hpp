@@ -289,8 +289,14 @@ private:
     auto AdaptToResult(const char *pLocation, ErrorCode ec)
     {
         return functional::adapt_to<ExpectedResult>(
-                      [&](auto &c){ return std::ref(*this); }
-                    , [&,pLocation,ec](::Err e){ return Err{e, pLocation, ec}; }
+                      [&](auto &c){ 
+                    //printf("ld2420: adapting a value\n");
+                      return std::ref(*this); 
+                      }
+                    , [&,pLocation,ec](::Err e){ 
+                    //printf("ld2420: adapting an error\n");
+                    return Err{e, pLocation, ec}; 
+                    }
                 );
     }
 

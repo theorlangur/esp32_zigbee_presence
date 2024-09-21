@@ -38,8 +38,8 @@ LD2420::LD2420(uart::Port p, int baud_rate):
     SetParity(uart::Parity::Disable);
     SetHWFlowControl(uart::HWFlowCtrl::Disable);
     SetQueueSize(10);
-    SetRxBufferSize(1024);
-    SetTxBufferSize(1024);
+    SetRxBufferSize(256);
+    SetTxBufferSize(256);
 }
 
 void LD2420::SetPort(uart::Port p)
@@ -180,6 +180,7 @@ LD2420::ExpectedResult LD2420::ReadSimpleFrame()
                                         | ParseNum
                                         | uart::match_bytes(*this, "\r\n")
                                         | and_then([&]{ m_Presence.m_Distance = float(val) / 100; })
+                                        , "Detected-range"
                             )
                     | AdaptToResult("LD2420::ReadSimpleFrameV2", ErrorCode::SimpleData_Failure)
                     ;
@@ -236,22 +237,45 @@ LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, Drain drai
     if (drain != Drain::No)
     {
         using ExpectedCondition = std::expected<bool, ::Err>;
+        //printf("TryReadFRame: draining first\n");
         SetDefaultWait(duration_ms_t(0));
         int i = 0, maxIterations = 100;
         auto r = start_sequence(std::ref(*this)) 
             | repeat_while(
                      [&]()->ExpectedCondition{ return i < maxIterations; }
-                    ,[&]{ ++i; return (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); }
+                    ,[&]{ ++i; 
+                        //vTaskDelay(1);
+                        //auto r = (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); 
+                        //if (!r)
+                        //{
+                        //    printf("TryReadFRame: drain iteration %d failed\n", i);
+                        //}else
+                        //{
+                        //    //printf("TryReadFRame: drain iteration %d ok\n", i);
+                        //}
+                        //return r;
+                        return (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); 
+                    }
                     ,[&]()->ExpectedResult{ return std::ref(*this); }
                     );
         if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
+        {
+            //printf("TryReadFrame: %d iterations\n", i);
             return std::ref(*this);
+        }
         else if (drain == Drain::Try)
+        {
+            //printf("TryReadFrame: no iterations; Trying to wait for read\n");
             return TryReadFrame(attempts, flush, Drain::No);
+        }
         else
+        {
+            //printf("TryReadFrame: result\n");
             return r;
+        }
     }else
     {
+        //printf("TryReadFrame: no drain\n");
         SetDefaultWait(duration_ms_t(150));
         return start_sequence(std::ref(*this)) 
             | if_then(

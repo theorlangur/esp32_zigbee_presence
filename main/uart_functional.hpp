@@ -33,6 +33,7 @@ namespace uart
                             },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, bytes, {}}
+                    ,"skip_bytes"
                 );
     }
 
@@ -63,6 +64,7 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, bytes}
+                    ,"match_bytes"
                 );
     }
 
@@ -111,6 +113,7 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, {bytes...}}
+                        ,"match_any_bytes"
                 );
     }
 
@@ -142,6 +145,7 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, pBytes, terminator}
+                        ,"match_bytes"
                 );
     }
 
@@ -209,6 +213,7 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, term, {(const uint8_t*)bytes...}}
+                    ,"match_any_bytes_term"
                 );
     }
 
@@ -240,9 +245,11 @@ namespace uart
                             return std::unexpected(::Err{"read_until timeout", ESP_OK});
                         return ctx.c.PeekByte() | and_then([&](uint8_t b)->ExpectedCondition{ return b != ctx.until; }); 
                 },
-                /*iteration*/[maxWait](ctx_t &ctx)->ExpectedResult{ return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
+                /*iteration*/[maxWait](ctx_t &ctx)->ExpectedResult{ 
+                return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, until, clock_t::now()}
+                    ,"read_until"
                 );
     }
 
