@@ -168,7 +168,7 @@ namespace functional
         };
 
         template<class C>
-        constexpr bool is_expected_type_v = is_expected_type<C>::value;
+        constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::value;
     }
 
     struct dummy_t 
