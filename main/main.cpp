@@ -74,7 +74,10 @@ extern "C" void app_main(void)
     gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
     ld2420::Component ld2420;
-    if (!ld2420.Setup(ld2420::Component::setup_args_t{.txPin=10, .rxPin=11, .presencePin=13}))
+    ld2420.SetCallbackOnMovement([&](bool presence, float distance){
+            printf("Presence: %d; Distance: %f; Addr: %p\n", (int)presence, distance, &ld2420);
+    });
+    if (!ld2420.Setup(ld2420::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
     {
         printf("Failed to configure ld2420\n");
         fflush(stdout);
