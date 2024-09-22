@@ -39,7 +39,7 @@ namespace ld2420
                 float m_Distance;
             }m_PresenceAndDistance;
             uint32_t m_Timeout;
-            Mode m_Mode;
+            LD2420::SystemMode m_Mode;
         };
     };
 
@@ -86,13 +86,14 @@ namespace ld2420
                     if (!te)
                     {
                         //report
+                        printf("Restarting request has failed");
                     }
                 }
                 break;
             case QueueMsg::Type::SetMode:
                 {
                     auto te = d.ChangeConfiguration()
-                        .SetSystemMode(msg.m_Mode == Mode::Simple ? LD2420::SystemMode::Simple : LD2420::SystemMode::Energy)
+                        .SetSystemMode(msg.m_Mode)
                         .EndChange();
                     if (!te)
                     {

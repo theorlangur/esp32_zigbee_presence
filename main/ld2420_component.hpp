@@ -10,15 +10,6 @@
 
 namespace ld2420
 {
-
-    enum class Mode
-    {
-        Simple,
-        Energy
-    };
-
-    bool setup_ld2420();
-
     class Component
     {
         static constexpr const float kDistanceReportChangeThreshold = 0.1f;//10cm
