@@ -63,6 +63,7 @@ public:
         const char *pLocation;
         ErrorCode code;
     };
+
     using ExpectedResult = std::expected<Ref, Err>;
     struct CmdErr
     {
@@ -398,6 +399,26 @@ private:
 
     PresenceResult m_Presence;
     bool m_dbg = false;
+};
+
+template<>
+struct std::formatter<LD2420::Err,char>
+{
+    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+    auto format(LD2420::Err const& e, auto& ctx) const
+    {
+        return std::format_to(ctx.out(), "Err{{uart=[{}] at {} with {} }}", e.uartErr, e.pLocation, LD2420::err_to_str(e.code));
+    }
+};
+
+template<>
+struct std::formatter<LD2420::CmdErr,char>
+{
+    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+    auto format(LD2420::CmdErr const& e, auto& ctx) const
+    {
+        return std::format_to(ctx.out(), "CmdErr{{Err=[{}]; return={} }}", e.e, e.returnCode);
+    }
 };
 
 #endif

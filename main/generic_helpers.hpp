@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include <thread>
 #include <chrono>
+#include <format>
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
 inline static constexpr const duration_ms_t kForever = duration_ms_t(-1);
@@ -99,6 +100,16 @@ struct Err
     esp_err_t code = ESP_OK;
 };
 
+template<>
+struct std::formatter<Err,char>
+{
+    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+    auto format(Err const& e, auto& ctx) const
+    {
+        return std::format_to(ctx.out(), "::Err{{at {}: {}}}", e.pLocation, esp_err_to_name(e.code));
+    }
+};
+
 template<class Ref, class Val>
 struct RetValT
 {
@@ -146,5 +157,6 @@ namespace std{
     if (auto err = f; err != ESP_OK) \
         return std::unexpected(Err{location, err})
 
+#define FMT_PRINT(fmt,...) { char buf[256]; std::format_to_n(buf, sizeof(buf), fmt __VA_OPT__(,) __VA_ARGS__); printf("%s", buf); }
 
 #endif

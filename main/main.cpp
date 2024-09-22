@@ -21,26 +21,6 @@
 #include "ld2420.hpp"
 #include "ld2420_component.hpp"
 
-void print_ld2420_error(::Err &uartErr) 
-{ 
-    printf("uart Error at %s: %s\n", uartErr.pLocation, esp_err_to_name(uartErr.code)); 
-    fflush(stdout); 
-}
-
-void print_ld2420_error(LD2420::Err &e) 
-{ 
-    print_ld2420_error(e.uartErr);
-    printf("LD2420 Error at %s: %s\n", e.pLocation, LD2420::err_to_str(e.code)); 
-    fflush(stdout); 
-}
-
-void print_ld2420_error(LD2420::CmdErr &e) 
-{ 
-    print_ld2420_error(e.e);
-    printf("CmdStatus %d\n", e.returnCode);
-    fflush(stdout); 
-}
-
 void print_bytes(std::span<uint8_t> d)
 {
     printf("1 Received hex bytes: ");
@@ -83,6 +63,7 @@ extern "C" void app_main(void)
         fflush(stdout);
         return;
     }
+    fflush(stdout);
 
     while(true)
     {

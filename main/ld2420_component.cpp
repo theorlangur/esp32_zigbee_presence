@@ -5,6 +5,7 @@
 #include "ld2420_component.hpp"
 #include "driver/gpio.h"
 #include <thread>
+#include <format>
 
 namespace ld2420
 {
@@ -43,26 +44,6 @@ namespace ld2420
         };
     };
 
-    void print_ld2420_error(::Err &uartErr) 
-    { 
-        printf("uart Error at %s: %s\n", uartErr.pLocation, esp_err_to_name(uartErr.code)); 
-        fflush(stdout); 
-    }
-
-    void print_ld2420_error(LD2420::Err &e) 
-    { 
-        print_ld2420_error(e.uartErr);
-        printf("LD2420 Error at %s: %s\n", e.pLocation, LD2420::err_to_str(e.code)); 
-        fflush(stdout); 
-    }
-
-    void print_ld2420_error(LD2420::CmdErr &e) 
-    { 
-        print_ld2420_error(e.e);
-        printf("CmdStatus %d\n", e.returnCode);
-        fflush(stdout); 
-    }
-
     Component::~Component()
     {
         gpio_isr_handler_remove(gpio_num_t(m_PresencePin));
@@ -84,10 +65,7 @@ namespace ld2420
                 {
                     auto te = d.Restart();
                     if (!te)
-                    {
-                        //report
-                        printf("Restarting request has failed");
-                    }
+                        FMT_PRINT("Restarting request has failed: {}\n", te.error());
                 }
                 break;
             case QueueMsg::Type::SetMode:
@@ -97,7 +75,7 @@ namespace ld2420
                         .EndChange();
                     if (!te)
                     {
-                        //report
+                        FMT_PRINT("Setting mode has failed: {}\n", te.error());
                     }
                 }
                 break;
@@ -108,7 +86,7 @@ namespace ld2420
                         .EndChange();
                     if (!te)
                     {
-                        //report
+                        FMT_PRINT("Setting timeout has failed: {}\n", te.error());
                     }
                 }
                 break;
@@ -119,7 +97,7 @@ namespace ld2420
                         .EndChange();
                     if (!te)
                     {
-                        //report
+                        FMT_PRINT("Setting min distance has failed: {}\n", te.error());
                     }
                 }
                 break;
@@ -130,7 +108,7 @@ namespace ld2420
                         .EndChange();
                     if (!te)
                     {
-                        //report
+                        FMT_PRINT("Setting max distance has failed: {}\n", te.error());
                     }
                 }
                 break;
@@ -158,16 +136,14 @@ namespace ld2420
                     case QueueMsg::Type::PresenceIntr: 
                     {
                         int l = gpio_get_level(gpio_num_t(c.m_PresencePin));
-                        printf("Msg presence interrupt: %d\n", l);
+                        FMT_PRINT("Msg presence interrupt: {}\n", l);
                         lastPresence = l == 1;
                         if (c.m_MovementCallback)
                             c.m_MovementCallback(lastPresence, lastDistance);
-                        //printf("Level changed to %d\n", l);
-                        //fflush(stdout);
                     }
                     break;
                     case QueueMsg::Type::Presence: 
-                        printf("Msg Presence\n");
+                        FMT_PRINT("Msg presence\n");
                         if (lastPresence != msg.m_Presence)
                         {
                             lastPresence = msg.m_Presence;
@@ -176,13 +152,13 @@ namespace ld2420
                         }
                     break;
                     case QueueMsg::Type::Distance: 
-                        printf("Msg Distance\n");
+                        FMT_PRINT("Msg Distance\n");
                         lastDistance = msg.m_Distance;
                         if (c.m_MovementCallback)
                             c.m_MovementCallback(lastPresence, lastDistance);
                     break;
                     case QueueMsg::Type::PresenceAndDistance: 
-                        printf("Msg PresenceAndDistance\n");
+                        FMT_PRINT("Msg PresenceAndDistance\n");
                         lastDistance = msg.m_PresenceAndDistance.m_Distance;
                         lastPresence = msg.m_PresenceAndDistance.m_Presence;
                         if (c.m_MovementCallback)
@@ -190,7 +166,7 @@ namespace ld2420
                     break;
                     default:
                     //don't care
-                    printf("Unprocessed message of type %d\n", (int)msg.m_Type);
+                    FMT_PRINT("Unprocessed message of type {}\n", (int)msg.m_Type);
                     break;
                 }
             }
@@ -280,34 +256,40 @@ namespace ld2420
         if (m_Setup)
             return false;
 
-        printf("Init\n");
-        auto e = m_Sensor.Init(args.txPin, args.rxPin) 
-            | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
-
-        if (!e)
         {
-            print_ld2420_error(e.error());
-            return false;
+            printf("Init\n");
+            auto e = m_Sensor.Init(args.txPin, args.rxPin) 
+                | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
+
+            if (!e)
+            {
+                FMT_PRINT("Setup failed to init and reload config: {}\n", e.error());
+                return false;
+            }
         }
 
         m_PresencePin = args.presencePin;
 
-        printf("Config\n");
-        auto changeConfig = m_Sensor.ChangeConfiguration()
-                                .SetSystemMode(LD2420::SystemMode::Simple)
-                                .SetTimeout(5)
-                                .EndChange();
-        if (!changeConfig)
         {
-            print_ld2420_error(changeConfig.error());
-            return false;
+            printf("Config\n");
+            auto changeConfig = m_Sensor.ChangeConfiguration()
+                .SetSystemMode(LD2420::SystemMode::Simple)
+                .SetTimeout(5)
+                .EndChange();
+            if (!changeConfig)
+            {
+                FMT_PRINT("Setup failed to set system mode to simple and a timeout: {}\n", changeConfig.error());
+                return false;
+            }
         }
 
-        printf("Reload config\n");
-        if (auto e = m_Sensor.ReloadConfig(); !e)
         {
-            print_ld2420_error(e.error());
-            return false;
+            printf("Reload config\n");
+            if (auto e = m_Sensor.ReloadConfig(); !e)
+            {
+                FMT_PRINT("Setup failed to reload config: {}\n", e.error());
+                return false;
+            }
         }
 
         printf("Version: %s\n", m_Sensor.GetVersion().data());
