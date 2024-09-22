@@ -10,6 +10,7 @@ namespace functional
             using Callback = CB;
             CB t;
             int attempts;
+            const char *pContext = "";
 
             template<class ExpVal>
             auto operator()(ExpVal &&v) const
@@ -24,7 +25,7 @@ namespace functional
             }
         };
     template<class CB>
-        auto retry_on_fail(int attempts, CB &&f)
+        auto retry_on_fail(int attempts, CB &&f, const char *pCtx = "")
         {
             return retry_on_fail_t{std::move(f), attempts};
         }
@@ -32,8 +33,8 @@ namespace functional
     template<class CB, class ErrorHandler>
         struct retry_on_fail_err_handle_t: retry_on_fail_t<CB>
     {
-        retry_on_fail_err_handle_t(CB &&f, int attempts, ErrorHandler &&e):
-            retry_on_fail_t<CB>{std::move(f), attempts},
+        retry_on_fail_err_handle_t(CB &&f, int attempts, ErrorHandler &&e, const char *pCtx):
+            retry_on_fail_t<CB>{std::move(f), attempts, pCtx},
             err{std::move(e)}
         {}
         ErrorHandler err;
@@ -68,9 +69,9 @@ namespace functional
     };
 
     template<class CB, class ErrorHandler>
-        auto retry_on_fail(int attempts, CB &&f, ErrorHandler &&err)
+        auto retry_on_fail(int attempts, CB &&f, ErrorHandler &&err, const char *pCtx = "")
         {
-            return retry_on_fail_err_handle_t{std::move(f), attempts, std::move(err)};
+            return retry_on_fail_err_handle_t{std::move(f), attempts, std::move(err), pCtx};
         }
 
 
@@ -83,6 +84,8 @@ namespace functional
 
             if (!e)
             {
+                if constexpr (kPrintContextOnError)
+                    printf("retry_on_fail(%s) condition returned an error\n", def.pContext);
                 if constexpr (std::is_same_v<ret_type_t, std::expected<ExpVal,ExpErr>>)
                     return std::move(e);
                 else
@@ -101,6 +104,8 @@ namespace functional
 
             if (!e)
             {
+                if constexpr (kPrintContextOnError)
+                    printf("retry_on_fail_err_handle(%s) condition returned an error\n", def.pContext);
                 if constexpr (std::is_same_v<ret_type_t, std::expected<ExpVal,ExpErr>>)
                     return std::move(e);
                 else

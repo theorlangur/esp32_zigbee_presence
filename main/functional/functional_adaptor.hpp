@@ -18,6 +18,7 @@ namespace functional
         using functional_block_t = void;
         ConvertValue v;
         ConvertError e;
+        const char *pContext = "";
 
         template<class ExpVal>
         NewExpected operator()(ExpVal &&v) const
@@ -31,7 +32,8 @@ namespace functional
                 }
                 else
                 {
-                    //printf("Adapting an error\n");
+                    if constexpr (kPrintContextOnError)
+                        printf("Adapting (%s) an error\n", pContext);
                     return std::unexpected(this->e(v.error()));
                 }
             }

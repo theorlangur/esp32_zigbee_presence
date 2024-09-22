@@ -11,6 +11,7 @@ namespace functional
             using functional_block_t = void;
             using Callback = T;
             T t;
+            const char *pContext = "";
 
             template<class ExpVal>
             auto operator()(ExpVal &&v) const
@@ -41,9 +42,9 @@ namespace functional
         };
 
     template<class T>
-        auto and_then(T &&f)
+        auto and_then(T &&f, const char *pCtx = nullptr)
         {
-            return and_then_t{std::forward<T>(f)};
+            return and_then_t{std::forward<T>(f), pCtx};
         }
 
     template<class ExpVal, class ExpErr, class AndThenV>
@@ -56,7 +57,8 @@ namespace functional
                 using ret_err_type_t = typename ret_type_t::error_type;
                 if (!e)
                 {
-                    //printf("and_then: got initial error. passing\n");
+                    if constexpr (kPrintContextOnError)
+                        printf("and_then (%s): got an error. passing\n", cont.pContext);
                     return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
                 }
 
@@ -67,7 +69,8 @@ namespace functional
                     cont(e.value());
                 else
                 {
-                    //printf("and_then pure callback: got initial error. passing\n");
+                    if constexpr (kPrintContextOnError)
+                        printf("and_then (%s): got initial error\n", cont.pContext);
                 }
                 return e;
             }

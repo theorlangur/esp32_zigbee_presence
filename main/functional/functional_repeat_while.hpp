@@ -24,7 +24,7 @@ namespace functional
             CB t;
             Default d;
             mutable Ctx ctx;
-            const char *pDbg = "";
+            const char *pContext = "";
 
             template<class ExpVal>
             auto operator()(ExpVal &&v) const
@@ -50,13 +50,18 @@ namespace functional
                 {
                     if (auto te = while_condition(*this); !te)
                     {
-                        //printf("repeat_while(%s) returned an error\n", (const char*)(pDbg ? pDbg : ""));
+                        if constexpr (kPrintContextOnError)
+                            printf("repeat_while(%s) condition returned an error\n", pContext);
                         return ret_type_t(std::unexpected(te.error()));
                     }
                     else if (!te.value())
                         break;
                     if (auto te = invoke_continuation_lval(std::forward<ExpVal>(v), *this, ctx); !te)
+                    {
+                        if constexpr (kPrintContextOnError)
+                            printf("repeat_while(%s) iteration returned an error\n", pContext);
                         return te;
+                    }
                     else
                     {
                         if (!pRes) pRes = new (resMem) ret_type_t(std::move(te));
@@ -71,9 +76,9 @@ namespace functional
         };
 
     template<class While, class CB, class Default, class LoopCtx = dummy_loop_ctx_t>
-        auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={}, const char *pDbg = "")
+        auto repeat_while(While &&w, CB &&f, Default &&d, LoopCtx ctx={}, const char *pCtx = "")
         {
-            return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx), pDbg};
+            return repeat_while_t{std::move(w), std::move(f), std::move(d), std::move(ctx), pCtx};
         }
 
 
@@ -85,7 +90,8 @@ namespace functional
             using ret_err_type_t = typename ret_type_t::error_type;
             if (!e)
             {
-                //printf("repeat_while(%s) got initial error. passing\n", (const char*)(def.pDbg ? def.pDbg : ""));
+                if constexpr (kPrintContextOnError)
+                    printf("repeat_while(%s) passing an error\n", def.pContext);
                 return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
             }
 

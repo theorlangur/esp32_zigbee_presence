@@ -8,6 +8,7 @@ namespace functional
         {
             using functional_block_t = void;
             V t;
+            const char *pContext = "";
 
             template<class Dummy>
             auto operator()(Dummy &&) const
@@ -17,9 +18,9 @@ namespace functional
         };
 
     template<class V>
-        auto or_else(V &&f)
+        auto or_else(V &&f, const char *pCtx = "")
         {
-            return or_else_t{std::move(f)};
+            return or_else_t{std::move(f), pCtx};
         }
 
 
@@ -27,7 +28,11 @@ namespace functional
         auto operator|(std::expected<ExpVal, ExpErr> &&e, or_else_t<V> const&def)->std::expected<ExpVal, ExpErr>
         {
             if (!e)
+            {
+                if constexpr (kPrintContextOnError)
+                    printf("or_else(%s) passing an error to error handling\n", def.pContext);
                 return def(e);
+            }
             else
                 return std::move(e);
         }

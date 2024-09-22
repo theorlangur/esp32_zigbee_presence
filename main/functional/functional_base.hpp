@@ -8,6 +8,7 @@
 
 namespace functional
 {
+    constexpr const bool kPrintContextOnError = false;
     namespace internals{
         template <class T>
             struct wrapper {

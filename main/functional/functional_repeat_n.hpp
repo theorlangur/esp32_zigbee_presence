@@ -13,6 +13,7 @@ namespace functional
             CB t;
             int n;
             Ctx ctx;
+            const char *pContext = "";
 
             template<class ExpVal>
             auto operator()(ExpVal &&v) const
@@ -27,9 +28,9 @@ namespace functional
             }
         };
     template<class CB, class LoopCtx = dummy_loop_ctx_t>
-        auto repeat_n(int n, CB &&f, LoopCtx ctx={})
+        auto repeat_n(int n, CB &&f, LoopCtx ctx={}, const char *pCtx = "")
         {
-            return repeat_n_t{std::move(f), n, std::move(ctx)};
+            return repeat_n_t{std::move(f), n, std::move(ctx), pCtx};
         }
 
 
@@ -40,7 +41,11 @@ namespace functional
             using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(def), int>;
             using ret_err_type_t = typename ret_type_t::error_type;
             if (!e)
+            {
+                if constexpr (kPrintContextOnError)
+                    printf("repeat_n(%s) passing an error\n", def.pContext);
                 return ret_type_t(std::unexpected(ret_err_type_t{std::move(e).error()}));
+            }
 
             return def(e.value());
         }

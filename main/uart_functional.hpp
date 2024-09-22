@@ -7,14 +7,14 @@
 namespace uart
 {
     template<class Adaptor = functional::dummy_t>
-    inline auto flush_and_wait(Channel &c, duration_ms_t maxWait = kForever, Adaptor adapt = {})
+    inline auto flush_and_wait(Channel &c, duration_ms_t maxWait = kForever, Adaptor adapt = {}, const char *pCtx = "")
     {
         using namespace functional;
-        return and_then([&,adapt]{ return c.Flush() | adapt; })
-             | and_then([&,maxWait,adapt]{ return c.PeekByte(maxWait) | adapt; });
+        return and_then([&,adapt]{ return c.Flush() | adapt; }, pCtx)
+             | and_then([&,maxWait,adapt]{ return c.PeekByte(maxWait) | adapt; }, pCtx);
     }
 
-    inline auto skip_bytes(Channel &c, size_t bytes)
+    inline auto skip_bytes(Channel &c, size_t bytes, const char *pCtx = "")
     {
         using namespace functional;
         struct ctx_t
@@ -33,11 +33,11 @@ namespace uart
                             },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, bytes, {}}
-                    ,"skip_bytes"
+                    ,pCtx
                 );
     }
 
-    inline auto match_bytes(Channel &c, std::span<const uint8_t> bytes)
+    inline auto match_bytes(Channel &c, std::span<const uint8_t> bytes, const char *pCtx = "")
     {
         using namespace functional;
         struct ctx_t
@@ -64,7 +64,7 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, bytes}
-                    ,"match_bytes"
+                    ,pCtx
                 );
     }
 
@@ -117,7 +117,7 @@ namespace uart
                 );
     }
 
-    inline auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator)
+    inline auto match_bytes(Channel &c, const uint8_t *pBytes, uint8_t terminator, const char *pCtx = "")
     {
         using namespace functional;
         //printf("match_bytes for: %s\n", pBytes);
@@ -145,25 +145,25 @@ namespace uart
                             },
                 /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, pBytes, terminator}
-                        ,"match_bytes"
+                        , pCtx
                 );
     }
 
-    inline auto match_bytes(Channel &c, const char *pStr)
+    inline auto match_bytes(Channel &c, const char *pStr, const char *pCtx = "")
     {
-        return match_bytes(c, (const uint8_t*)pStr, 0);
+        return match_bytes(c, (const uint8_t*)pStr, 0, pCtx);
     }
 
     template<size_t N>
-    inline auto match_bytes(Channel &c, const char (&arr)[N])
+    inline auto match_bytes(Channel &c, const char (&arr)[N], const char *pCtx = "")
     {
-        return match_bytes(c, (const uint8_t*)arr, 0);
+        return match_bytes(c, (const uint8_t*)arr, 0, pCtx);
     }
 
     template<size_t N>
-    inline auto match_bytes(Channel &c, const uint8_t (&arr)[N])
+    inline auto match_bytes(Channel &c, const uint8_t (&arr)[N], const char *pCtx = "")
     {
-        return match_bytes(c, std::span<const uint8_t>(arr, N));
+        return match_bytes(c, std::span<const uint8_t>(arr, N), pCtx);
     }
 
     template<class... BytePtr>
@@ -226,7 +226,7 @@ namespace uart
         return match_any_bytes_term(c, 0, std::forward<BytePtr>(bytes)...);
     }
 
-    inline auto read_until(Channel &c, uint8_t until, duration_ms_t maxWait = kForever)
+    inline auto read_until(Channel &c, uint8_t until, duration_ms_t maxWait = kForever, const char *pCtx = "")
     {
         using namespace functional;
         using clock_t = std::chrono::system_clock;
@@ -249,15 +249,15 @@ namespace uart
                 return ctx.c.ReadByte() | and_then([&]()->ExpectedResult{ return std::ref(ctx.c); }); },
                 /*default  */[](ctx_t &ctx)->ExpectedResult{ return std::ref(ctx.c); },
                 /*context  */ctx_t{c, until, clock_t::now()}
-                    ,"read_until"
+                    , pCtx
                 );
     }
 
     template<class T>
-    inline auto read_into(Channel &c, T &dst)
+    inline auto read_into(Channel &c, T &dst, const char *pCtx = "")
     {
         using namespace functional;
-        return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); });
+        return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); }, pCtx);
     }
 
     template<class... Args>
