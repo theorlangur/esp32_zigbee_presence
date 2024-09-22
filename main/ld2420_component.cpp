@@ -18,6 +18,7 @@ namespace ld2420
             Restart,
             StartCalibrate,
             StopCalibrate,
+            ResetEnergyStat,
             //report
             Presence,
             PresenceIntr,
@@ -66,6 +67,55 @@ namespace ld2420
                     auto te = d.Restart();
                     if (!te)
                         FMT_PRINT("Restarting request has failed: {}\n", te.error());
+                }
+                break;
+            case QueueMsg::Type::ResetEnergyStat:
+                {
+                    for(auto &e : m_MeasuredMinMax)
+                    {
+                        e.min = 0xffff;
+                        e.max = 0;
+                    }
+                }
+                break;
+            case QueueMsg::Type::StartCalibrate:
+                {
+                    if (!m_CalibrationStarted)
+                    {
+                        m_ModeBeforeCalibration = d.GetSystemMode();
+                        auto te = d.ChangeConfiguration()
+                            .SetSystemMode(LD2420::SystemMode::Energy)
+                            .EndChange();
+                        if (!te)
+                        {
+                            FMT_PRINT("Setting mode to energy for calibration has failed: {}\n", te.error());
+                        }else
+                            m_CalibrationStarted = true;
+                    }else
+                    {
+                        FMT_PRINT("Calibration is already running\n");
+                    }
+                }
+                break;
+            case QueueMsg::Type::StopCalibrate:
+                {
+                    if (m_CalibrationStarted)
+                    {
+                        m_CalibrationStarted = false;
+                        auto te = d.ChangeConfiguration()
+                            .SetSystemMode(m_ModeBeforeCalibration)
+                            .EndChange();
+                        if (!te)
+                        {
+                            FMT_PRINT("Setting mode to back after calibration has failed: {}\n", te.error());
+                        }else
+                        {
+                            //todo: implement me
+                        }
+                    }else
+                    {
+                        FMT_PRINT("Calibration was not running. Nothing to stop\n");
+                    }
                 }
                 break;
             case QueueMsg::Type::SetMode:
@@ -186,9 +236,19 @@ namespace ld2420
                 c.HandleMessage(msg);
 
             bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
-            //printf("manage loop before read frame\n");
             auto te = d.TryReadFrame(3, true, LD2420::Drain::Try);
-            //printf("manage loop after read frame\n");
+
+            if (!simpleMode)
+            {
+                for(uint8_t g = 0; g < 16; ++g)
+                {
+                    auto e = c.GetMeasuredEnergy(g);
+                    if (e > c.m_MeasuredMinMax[g].max)
+                        c.m_MeasuredMinMax[g].max = e;
+                    if (e < c.m_MeasuredMinMax[g].min)
+                        c.m_MeasuredMinMax[g].min = e;
+                }
+            }
 
             bool reportPresence = false;
             bool reportDistance = false;
@@ -254,22 +314,41 @@ namespace ld2420
     void Component::ChangeMode(LD2420::SystemMode m)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetMode, .m_Mode = m};
-        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
     void Component::ChangeTimeout(uint32_t to)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetTimeout, .m_Timeout = to};
-        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
     void Component::ChangeMinDistance(float d)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetMinDistance, .m_Distance = d};
-        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
     void Component::ChangeMaxDistance(float d)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetMaxDistance, .m_Distance = d};
-        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
+    void Component::StartCalibration()
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::ResetEnergyStat, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+        msg = {.m_Type = QueueMsg::Type::StartCalibrate, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+    void Component::StopCalibration()
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::StopCalibrate, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
+    void Component::ResetEnergyStatistics()
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::ResetEnergyStat, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
 
     LD2420::SystemMode Component::GetMode() const { return m_Sensor.GetSystemMode(); }

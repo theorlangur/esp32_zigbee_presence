@@ -16,6 +16,12 @@ namespace ld2420
         struct QueueMsg;
     public:
         using MovementCallback = GenericCallback<void(bool detected, float distance)>;
+        struct EnergyReading
+        {
+            uint32_t min;
+            uint32_t max;
+        };
+
         ~Component();
 
         struct setup_args_t{
@@ -31,6 +37,10 @@ namespace ld2420
         void ChangeTimeout(uint32_t to);
         void ChangeMinDistance(float d);
         void ChangeMaxDistance(float d);
+
+        void StartCalibration();
+        void StopCalibration();
+        void ResetEnergyStatistics();
 
         LD2420::SystemMode GetMode() const;
 
@@ -66,6 +76,11 @@ namespace ld2420
 
         std::jthread m_FastTask;
         std::jthread m_ManagingTask;
+
+        EnergyReading m_MeasuredMinMax[16];
+
+        bool m_CalibrationStarted = false;
+        LD2420::SystemMode m_ModeBeforeCalibration;
     };
 }
 
