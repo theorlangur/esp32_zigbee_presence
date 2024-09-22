@@ -214,13 +214,8 @@ public:
 
     PresenceResult GetPresence() const { return m_Presence; }
 
-    ExpectedResult ReadSimpleFrame();
-    ExpectedResult TryReadSimpleFrame(int attempts = 3, bool flush = false);
-
-    ExpectedResult ReadEnergyFrame();
-    ExpectedResult TryReadEnergyFrame(int attempts = 3, bool flush = false);
-
     ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, Drain drain = Drain::No);
+
 private:
     enum class ADBRegs: uint16_t
     {
@@ -382,7 +377,14 @@ private:
     //ExpectedGenericCmdResult UpdateSystemMode();
     ExpectedGenericCmdResult UpdateMinMaxTimeout();
     ExpectedGenericCmdResult UpdateGate(uint8_t gate);
-private:
+
+    ExpectedResult ReadSimpleFrame();
+    ExpectedResult TryReadSimpleFrame(int attempts = 3, bool flush = false);
+
+    ExpectedResult ReadEnergyFrame();
+    ExpectedResult TryReadEnergyFrame(int attempts = 3, bool flush = false);
+
+    //data
     char m_Version[10];
     SystemMode m_Mode = SystemMode::Simple;
     OpenCmdModeResponse m_ProtoInfo{0, 0};
