@@ -272,6 +272,19 @@ namespace ld2420
         xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
     }
 
+    LD2420::SystemMode Component::GetMode() const { return m_Sensor.GetSystemMode(); }
+    int Component::GetMinDistance() const { return m_Sensor.GetMinDistance(); }
+    uint32_t Component::GetMinDistanceRaw() const { return m_Sensor.GetMinDistanceRaw(); }
+
+    int Component::GetMaxDistance() const { return m_Sensor.GetMaxDistance(); }
+    uint32_t Component::GetMaxDistanceRaw() const { return m_Sensor.GetMaxDistanceRaw(); }
+
+    uint32_t Component::GetMoveThreshold(uint8_t gate) const { return m_Sensor.GetMoveThreshold(gate); }
+    uint32_t Component::GetStillThreshold(uint8_t gate) const { return m_Sensor.GetStillThreshold(gate); }
+    uint16_t Component::GetMeasuredEnergy(uint8_t gate) const { return m_Sensor.GetMeasuredEnergy(gate); }
+
+    uint32_t Component::GetTimeout() const { return m_Sensor.GetTimeout(); }
+
     bool Component::Setup(setup_args_t const& args)
     {
         if (m_Setup)

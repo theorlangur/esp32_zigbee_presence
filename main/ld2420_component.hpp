@@ -32,6 +32,20 @@ namespace ld2420
         void ChangeMinDistance(float d);
         void ChangeMaxDistance(float d);
 
+        LD2420::SystemMode GetMode() const;
+
+        int GetMinDistance() const;
+        uint32_t GetMinDistanceRaw() const;
+
+        int GetMaxDistance() const;
+        uint32_t GetMaxDistanceRaw() const;
+
+        uint32_t GetMoveThreshold(uint8_t gate) const;
+        uint32_t GetStillThreshold(uint8_t gate) const;
+        uint16_t GetMeasuredEnergy(uint8_t gate) const;
+
+        uint32_t GetTimeout() const;
+                                                         //
         void SetCallbackOnMovement(MovementCallback cb) { m_MovementCallback = std::move(cb); }
     private:
         void ConfigurePresenceIsr();
