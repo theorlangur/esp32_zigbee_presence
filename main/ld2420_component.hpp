@@ -27,6 +27,11 @@ namespace ld2420
 
         bool Setup(setup_args_t const& args);
 
+        void ChangeMode(LD2420::SystemMode m);
+        void ChangeTimeout(uint32_t to);
+        void ChangeMinDistance(float d);
+        void ChangeMaxDistance(float d);
+
         void SetCallbackOnMovement(MovementCallback cb) { m_MovementCallback = std::move(cb); }
     private:
         void ConfigurePresenceIsr();

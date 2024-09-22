@@ -251,6 +251,27 @@ namespace ld2420
         gpio_isr_handler_add(gpio_num_t(m_PresencePin), presence_pin_isr, this);
     }
 
+    void Component::ChangeMode(LD2420::SystemMode m)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetMode, .m_Mode = m};
+        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+    }
+    void Component::ChangeTimeout(uint32_t to)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetTimeout, .m_Timeout = to};
+        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+    }
+    void Component::ChangeMinDistance(float d)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetMinDistance, .m_Distance = d};
+        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+    }
+    void Component::ChangeMaxDistance(float d)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetMaxDistance, .m_Distance = d};
+        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+    }
+
     bool Component::Setup(setup_args_t const& args)
     {
         if (m_Setup)
