@@ -101,12 +101,19 @@ namespace ld2420
                 {
                     if (m_CalibrationStarted)
                     {
+                        FMT_PRINT("Applying calibration...\n");
                         m_CalibrationStarted = false;
                         auto cfg = d.ChangeConfiguration();
                         for(uint8_t g = 0; g < 16; ++g)
                         {
-                            cfg.SetStillThreshold(g, m_MeasuredMinMax[g].max * 11 / 10)
-                               .SetMoveThreshold(g, m_MeasuredMinMax[g].max * 15 / 10);
+                            uint32_t still = m_MeasuredMinMax[g].max * 11 / 10;
+                            uint32_t move = m_MeasuredMinMax[g].max * 15 / 10;
+                            FMT_PRINT("Gate {}: prev=[still:{}; move:{}]; new=[still:{}; move:{}]; measured=[min:{}; max:{}]\n"
+                                    , g, d.GetStillThreshold(g), d.GetMoveThreshold(g)
+                                    , still, move
+                                    , m_MeasuredMinMax[g].min, m_MeasuredMinMax[g].max);
+                            cfg.SetStillThreshold(g, still)
+                               .SetMoveThreshold(g, move);
                         }
                         auto te = cfg.SetSystemMode(m_ModeBeforeCalibration).EndChange();
 
