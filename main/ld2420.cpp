@@ -161,6 +161,7 @@ LD2420::ExpectedGenericCmdResult LD2420::UpdateGate(uint8_t gate)
 
 LD2420::ExpectedResult LD2420::ReadSimpleFrame()
 {
+    //FMT_PRINT("ReadSimpleFrame\n");
     using namespace functional;
     uint16_t val = 0;
     auto ParseNum = repeat_while(
@@ -201,6 +202,7 @@ LD2420::ExpectedResult LD2420::TryReadSimpleFrame(int attempts, bool flush)
 
 LD2420::ExpectedResult LD2420::ReadEnergyFrame()
 {
+    //FMT_PRINT("ReadEnergyFrame\n");
     using namespace functional;
     constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
     constexpr uint8_t footer[] = {0xf8, 0xf7, 0xf6, 0xf5};
@@ -260,22 +262,22 @@ LD2420::ExpectedResult LD2420::TryReadFrame(int attempts, bool flush, Drain drai
                     );
         if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
         {
-            //printf("TryReadFrame: %d iterations\n", i);
+            //FMT_PRINT("TryReadFrame: {} iterations\n", i);
             return std::ref(*this);
         }
         else if (drain == Drain::Try)
         {
-            //printf("TryReadFrame: no iterations; Trying to wait for read\n");
+            //FMT_PRINT("TryReadFrame: no iterations; Trying to wait for read\n");
             return TryReadFrame(attempts, flush, Drain::No);
         }
         else
         {
-            //printf("TryReadFrame: result\n");
+            //FMT_PRINT("TryReadFrame: result\n");
             return r;
         }
     }else
     {
-        //printf("TryReadFrame: no drain\n");
+        //FMT_PRINT("TryReadFrame: no drain\n");
         SetDefaultWait(duration_ms_t(150));
         return start_sequence(std::ref(*this)) 
             | if_then(

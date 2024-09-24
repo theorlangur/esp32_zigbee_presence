@@ -120,6 +120,7 @@ namespace ld2420
                 break;
             case QueueMsg::Type::SetMode:
                 {
+                    FMT_PRINT("Changing mode to: {}\n", msg.m_Mode);
                     auto te = d.ChangeConfiguration()
                         .SetSystemMode(msg.m_Mode)
                         .EndChange();
@@ -255,7 +256,7 @@ namespace ld2420
             auto p = d.GetPresence();
             if (!te)
             {
-                //report?
+                FMT_PRINT("Failed to read frame: {}\n", te.error());
             }else if (initial)
             {
                 reportPresence = !simpleMode;//in simple mode the reporting is via interrupt

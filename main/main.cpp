@@ -63,6 +63,7 @@ extern "C" void app_main(void)
         fflush(stdout);
         return;
     }
+    //ld2420.ChangeMode(LD2420::SystemMode::Energy);
     fflush(stdout);
 
     while(true)
