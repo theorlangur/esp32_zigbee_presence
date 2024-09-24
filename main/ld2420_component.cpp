@@ -16,6 +16,7 @@ namespace ld2420
             //commands
             Stop,
             Restart,
+            FactoryReset,
             StartCalibrate,
             StopCalibrate,
             ResetEnergyStat,
@@ -67,6 +68,13 @@ namespace ld2420
                     auto te = d.Restart();
                     if (!te)
                         FMT_PRINT("Restarting request has failed: {}\n", te.error());
+                }
+                break;
+            case QueueMsg::Type::FactoryReset:
+                {
+                    auto te = d.FactoryReset();
+                    if (!te)
+                        FMT_PRINT("Factory resetting has failed: {}\n", te.error());
                 }
                 break;
             case QueueMsg::Type::ResetEnergyStat:
