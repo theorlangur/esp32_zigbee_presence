@@ -102,15 +102,17 @@ namespace ld2420
                     if (m_CalibrationStarted)
                     {
                         m_CalibrationStarted = false;
-                        auto te = d.ChangeConfiguration()
-                            .SetSystemMode(m_ModeBeforeCalibration)
-                            .EndChange();
+                        auto cfg = d.ChangeConfiguration();
+                        for(uint8_t g = 0; g < 16; ++g)
+                        {
+                            cfg.SetStillThreshold(g, m_MeasuredMinMax[g].max * 11 / 10)
+                               .SetMoveThreshold(g, m_MeasuredMinMax[g].max * 15 / 10);
+                        }
+                        auto te = cfg.SetSystemMode(m_ModeBeforeCalibration).EndChange();
+
                         if (!te)
                         {
-                            FMT_PRINT("Setting mode to back after calibration has failed: {}\n", te.error());
-                        }else
-                        {
-                            //todo: implement me
+                            FMT_PRINT("Applying calibration and setting mode has failed: {}\n", te.error());
                         }
                     }else
                     {
