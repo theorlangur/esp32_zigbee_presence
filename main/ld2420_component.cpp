@@ -358,6 +358,18 @@ namespace ld2420
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
 
+    void Component::Restart()
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::Restart, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
+    void Component::FactoryReset()
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::FactoryReset, .m_Presence = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
     void Component::StartCalibration()
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::ResetEnergyStat, .m_Presence = true};

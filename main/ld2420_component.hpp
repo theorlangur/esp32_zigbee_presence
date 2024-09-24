@@ -42,6 +42,9 @@ namespace ld2420
         void StopCalibration();
         void ResetEnergyStatistics();
 
+        void Restart();
+        void FactoryReset();
+
         LD2420::SystemMode GetMode() const;
 
         int GetMinDistance() const;
