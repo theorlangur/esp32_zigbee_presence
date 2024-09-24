@@ -176,6 +176,7 @@ namespace ld2420
         fflush(stdout);
         bool lastPresence = false;
         float lastDistance = 0;
+
         QueueMsg msg;
         while(true)
         {
@@ -231,6 +232,13 @@ namespace ld2420
         float lastDistance;
         auto &d = c.m_Sensor;
         QueueMsg msg;
+        if ((c.m_PresencePin != -1) && (d.GetSystemMode() == LD2420::SystemMode::Simple))
+        {
+            //need to read initial state
+            QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Presence=false};
+            xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
+        }
+
         while(true)
         {
             if (xQueueReceive(c.m_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS)) //process
@@ -259,7 +267,7 @@ namespace ld2420
                 FMT_PRINT("Failed to read frame: {}\n", te.error());
             }else if (initial)
             {
-                reportPresence = !simpleMode;//in simple mode the reporting is via interrupt
+                reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
                 reportDistance = true;
                 initial = false;
                 lastPresence = p.m_Detected;
@@ -269,7 +277,7 @@ namespace ld2420
                 lastPresence = p.m_Detected;
                 lastDistance = p.m_Distance;
                 reportDistance = true;
-                reportPresence = !simpleMode;//in simple mode the reporting is via interrupt
+                reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
             }else if (std::abs(p.m_Distance - lastDistance) > kDistanceReportChangeThreshold)//10cm
             {
                 reportDistance = true;
