@@ -404,22 +404,22 @@ private:
 };
 
 template<>
-struct std::formatter<LD2420::Err,char>
+struct tools::formatter_t<LD2420::Err>
 {
-    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
-    auto format(LD2420::Err const& e, auto& ctx) const
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2420::Err const& e)
     {
-        return std::format_to(ctx.out(), "Err{{uart=[{}] at {} with {} }}", e.uartErr, e.pLocation, LD2420::err_to_str(e.code));
+        return tools::format_to(std::forward<Dest>(dst), "Err\\{uart=[{}] at {} with {} }", e.uartErr, e.pLocation, LD2420::err_to_str(e.code));
     }
 };
 
 template<>
-struct std::formatter<LD2420::CmdErr,char>
+struct tools::formatter_t<LD2420::CmdErr>
 {
-    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
-    auto format(LD2420::CmdErr const& e, auto& ctx) const
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2420::CmdErr const& e)
     {
-        return std::format_to(ctx.out(), "CmdErr{{Err=[{}]; return={} }}", e.e, e.returnCode);
+        return tools::format_to(std::forward<Dest>(dst), "CmdErr\\{{Err=[{}]; return={} }", e.e, e.returnCode);
     }
 };
 

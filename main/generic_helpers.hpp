@@ -4,7 +4,7 @@
 #include "esp_err.h"
 #include <thread>
 #include <chrono>
-#include <format>
+#include "formatter.h"
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
 inline static constexpr const duration_ms_t kForever = duration_ms_t(-1);
@@ -101,12 +101,12 @@ struct Err
 };
 
 template<>
-struct std::formatter<Err,char>
+struct tools::formatter_t<Err>
 {
-    constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
-    auto format(Err const& e, auto& ctx) const
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, Err const& e)
     {
-        return std::format_to(ctx.out(), "::Err{{at {}: {}}}", e.pLocation, esp_err_to_name(e.code));
+        return tools::format_to(std::forward<Dest>(dst), "::Err\\{at {}: {}}", e.pLocation, esp_err_to_name(e.code));
     }
 };
 
@@ -157,6 +157,6 @@ namespace std{
     if (auto err = f; err != ESP_OK) \
         return std::unexpected(Err{location, err})
 
-#define FMT_PRINT(fmt,...) { char buf[256]; std::format_to_n(buf, sizeof(buf), fmt __VA_OPT__(,) __VA_ARGS__); printf("%s", buf); }
+#define FMT_PRINT(fmt,...) { char buf[256]; tools::format_to(tools::BufferFormatter(buf), fmt __VA_OPT__(,) __VA_ARGS__); printf("%s", buf); }
 
 #endif
