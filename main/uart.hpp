@@ -3,6 +3,7 @@
 
 #include "driver/uart.h"
 #include <expected>
+#include "generic_function.hpp"
 #include "generic_helpers.hpp"
 
 namespace uart
@@ -111,7 +112,12 @@ namespace uart
         ExpectedResult WaitAllSent();
         ExpectedValue<uint8_t> ReadByte(duration_ms_t wait=kDefaultWait);
         ExpectedValue<uint8_t> PeekByte(duration_ms_t wait=kDefaultWait);
+
+        using EventCallback = GenericCallback<void(uart_event_type_t)>;
+        void SetEventCallback(EventCallback cb) { m_EventCallback = std::move(cb); }
     private:
+        static void uart_event_loop(Channel &c);
+
         uart_port_t m_Port;
         uart_config_t m_Config;
         QueueHandle_t m_Handle = nullptr;
@@ -128,6 +134,9 @@ namespace uart
         };
         bool m_HasPeekByte = false;
         uint8_t m_PeekByte = 0;
+        std::atomic<bool> m_DataReady={false};
+        EventCallback m_EventCallback;
+        std::jthread m_QueueTask;
     };
 }
 #endif

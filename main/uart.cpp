@@ -140,12 +140,44 @@ namespace uart
         return std::ref(*this);
     }
 
+    void Channel::uart_event_loop(Channel &c)
+    {
+        uart_event_t event;
+        while (true) {
+            if (xQueueReceive(c.m_Handle, &event, pdMS_TO_TICKS(2000))) 
+            {
+                switch (event.type) 
+                {
+                    case UART_DATA:
+                        if (!c.GetReadyToReadDataLen().value().v)//only if data really available
+                            continue;
+                        break;
+                    case UART_BUFFER_FULL:
+                    case UART_FIFO_OVF:
+                        xQueueReset(c.m_Handle);
+                        break;
+                    case UART_EVENT_MAX:
+                        return;//we're done
+                    default:
+                        break;
+                }
+                c.m_EventCallback(event.type);
+            }
+        }
+    }
+
     Channel::ExpectedResult Channel::Open()
     {
         if (!m_State.pins_set)
             return std::unexpected(Err{"uart::Channel::Open", ESP_ERR_INVALID_STATE});
 
-        CALL_ESP_EXPECTED("uart::Channel::Open", uart_driver_install(m_Port, m_RxBufferSize, m_TxBufferSize, m_QueueSize, &m_Handle, 0));
+        if (m_EventCallback)
+        {
+            CALL_ESP_EXPECTED("uart::Channel::Open", uart_driver_install(m_Port, m_RxBufferSize, m_TxBufferSize, m_QueueSize, &m_Handle, 0));
+            m_QueueTask = std::jthread(uart_event_loop, std::ref(*this));
+        }
+        else
+            CALL_ESP_EXPECTED("uart::Channel::Open no events", uart_driver_install(m_Port, m_RxBufferSize, m_TxBufferSize, 0, nullptr, 0));
         return std::ref(*this);
     }
 

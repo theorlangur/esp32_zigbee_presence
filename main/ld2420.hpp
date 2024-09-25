@@ -216,6 +216,9 @@ public:
 
     ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, Drain drain = Drain::No);
 
+    using Channel::SetEventCallback;
+    using Channel::Flush;
+    using Channel::GetReadyToReadDataLen;
 private:
     enum class ADBRegs: uint16_t
     {

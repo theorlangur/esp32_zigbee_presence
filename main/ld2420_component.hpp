@@ -74,8 +74,8 @@ namespace ld2420
 
         MovementCallback m_MovementCallback;
 
-        QueueHandle_t m_FastQueue;
-        QueueHandle_t m_ManagingQueue;
+        QueueHandle_t m_FastQueue = 0;
+        std::atomic<QueueHandle_t> m_ManagingQueue{0};
 
         std::jthread m_FastTask;
         std::jthread m_ManagingTask;

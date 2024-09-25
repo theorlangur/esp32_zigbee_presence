@@ -20,6 +20,8 @@ namespace ld2420
             StartCalibrate,
             StopCalibrate,
             ResetEnergyStat,
+            Flush,
+            ReadData,
             //report
             Presence,
             PresenceIntr,
@@ -63,6 +65,12 @@ namespace ld2420
         auto &d = m_Sensor;
         switch(msg.m_Type)
         {
+            case QueueMsg::Type::Flush:
+                {
+                    if (auto te = d.Flush(); !te)
+                        FMT_PRINT("Flushing has failed: {}\n", te.error());
+                }
+                break;
             case QueueMsg::Type::Restart:
                 {
                     auto te = d.Restart();
@@ -259,65 +267,71 @@ namespace ld2420
         while(true)
         {
             if (xQueueReceive(c.m_ManagingQueue, &msg, 200 / portTICK_PERIOD_MS)) //process
-                c.HandleMessage(msg);
-
-            bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
-            auto te = d.TryReadFrame(3, true, LD2420::Drain::Try);
-
-            if (!simpleMode)
             {
-                for(uint8_t g = 0; g < 16; ++g)
+                if (msg.m_Type != QueueMsg::Type::ReadData)
                 {
-                    auto e = c.GetMeasuredEnergy(g);
-                    if (e > c.m_MeasuredMinMax[g].max)
-                        c.m_MeasuredMinMax[g].max = e;
-                    if (e < c.m_MeasuredMinMax[g].min)
-                        c.m_MeasuredMinMax[g].min = e;
+                    c.HandleMessage(msg);
+                    continue;
                 }
-            }
 
-            bool reportPresence = false;
-            bool reportDistance = false;
-            auto p = d.GetPresence();
-            if (!te)
-            {
-                FMT_PRINT("Failed to read frame: {}\n", te.error());
-            }else if (initial)
-            {
-                reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
-                reportDistance = true;
-                initial = false;
-                lastPresence = p.m_Detected;
-                lastDistance = p.m_Distance;
-            }else if (lastPresence != p.m_Detected)
-            {
-                lastPresence = p.m_Detected;
-                lastDistance = p.m_Distance;
-                reportDistance = true;
-                reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
-            }else if (std::abs(p.m_Distance - lastDistance) > kDistanceReportChangeThreshold)//10cm
-            {
-                reportDistance = true;
-                lastDistance = p.m_Distance;
-            }
+                bool simpleMode = d.GetSystemMode() == LD2420::SystemMode::Simple;
+                auto te = d.TryReadFrame(3, true, LD2420::Drain::Try);
 
-            if (reportDistance && reportPresence)
-            {
-                msg.m_Type = QueueMsg::Type::PresenceAndDistance;
-                msg.m_PresenceAndDistance.m_Presence = lastPresence;
-                msg.m_PresenceAndDistance.m_Distance = lastDistance;
-            }else if (reportPresence)
-            {
-                msg.m_Type = QueueMsg::Type::Presence;
-                msg.m_Presence = lastPresence;
-            }else if (reportDistance)
-            {
-                msg.m_Type = QueueMsg::Type::Distance;
-                msg.m_Distance = lastDistance;
-            }
+                if (!simpleMode)
+                {
+                    for(uint8_t g = 0; g < 16; ++g)
+                    {
+                        auto e = c.GetMeasuredEnergy(g);
+                        if (e > c.m_MeasuredMinMax[g].max)
+                            c.m_MeasuredMinMax[g].max = e;
+                        if (e < c.m_MeasuredMinMax[g].min)
+                            c.m_MeasuredMinMax[g].min = e;
+                    }
+                }
 
-            if (reportDistance || reportPresence)
-                xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+                bool reportPresence = false;
+                bool reportDistance = false;
+                auto p = d.GetPresence();
+                if (!te)
+                {
+                    FMT_PRINT("Failed to read frame: {}\n", te.error());
+                }else if (initial)
+                {
+                    reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
+                    reportDistance = true;
+                    initial = false;
+                    lastPresence = p.m_Detected;
+                    lastDistance = p.m_Distance;
+                }else if (lastPresence != p.m_Detected)
+                {
+                    lastPresence = p.m_Detected;
+                    lastDistance = p.m_Distance;
+                    reportDistance = true;
+                    reportPresence = !simpleMode || (c.m_PresencePin == -1);//in simple mode the reporting is via interrupt
+                }else if (std::abs(p.m_Distance - lastDistance) > kDistanceReportChangeThreshold)//10cm
+                {
+                    reportDistance = true;
+                    lastDistance = p.m_Distance;
+                }
+
+                if (reportDistance && reportPresence)
+                {
+                    msg.m_Type = QueueMsg::Type::PresenceAndDistance;
+                    msg.m_PresenceAndDistance.m_Presence = lastPresence;
+                    msg.m_PresenceAndDistance.m_Distance = lastDistance;
+                }else if (reportPresence)
+                {
+                    msg.m_Type = QueueMsg::Type::Presence;
+                    msg.m_Presence = lastPresence;
+                }else if (reportDistance)
+                {
+                    msg.m_Type = QueueMsg::Type::Distance;
+                    msg.m_Distance = lastDistance;
+                }
+
+                if (reportDistance || reportPresence)
+                    xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+            }
         }
     }
 
@@ -409,6 +423,38 @@ namespace ld2420
 
         {
             printf("Init\n");
+            m_Sensor.SetEventCallback([this](uart_event_type_t e){
+                auto q = m_ManagingQueue.load(std::memory_order_relaxed);
+                if (!q)
+                    return;//ignore, too early
+                switch (e) 
+                {
+                    case UART_DATA:
+                    {
+                        //using clock_t = std::chrono::system_clock;
+                        //using time_point_t = std::chrono::time_point<clock_t>;
+                        //static time_point_t prev = clock_t::now();
+                        //auto now = clock_t::now();
+                        //FMT_PRINT("Data available: {}; Ellapsed since prev: {}ms\n"
+                        //        , m_Sensor.GetReadyToReadDataLen().value().v
+                        //        , std::chrono::duration_cast<std::chrono::milliseconds>(now - prev).count());
+                        //prev = now;
+                        QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Presence = true};
+                        xQueueSend(q, &msg, 0);
+                    }
+                    break;
+                    case UART_BUFFER_FULL:
+                    case UART_FIFO_OVF:
+                    {
+                        FMT_PRINT("{}\n", e == UART_BUFFER_FULL ? "buffer full" : "fifo overflow");
+                        QueueMsg msg{.m_Type = QueueMsg::Type::Flush, .m_Presence = true};
+                        xQueueSend(q, &msg, 0);
+                    }
+                    break;
+                    default:
+                    break;
+                }
+            });
             auto e = m_Sensor.Init(args.txPin, args.rxPin) 
                 | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
 
@@ -452,7 +498,12 @@ namespace ld2420
         }
 
         m_FastQueue = xQueueCreate(10, sizeof(QueueMsg));
-        m_ManagingQueue = xQueueCreate(10, sizeof(QueueMsg));
+        m_ManagingQueue.store(xQueueCreate(10, sizeof(QueueMsg)), std::memory_order_relaxed);
+        {
+            //enque reading data first
+            QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Presence = true};
+            xQueueSend(m_ManagingQueue.load(std::memory_order_relaxed), &msg, 0);
+        }
 
         m_ManagingTask = std::jthread(&manage_loop, std::ref(*this));
         m_FastTask = std::jthread(&fast_loop, std::ref(*this));
