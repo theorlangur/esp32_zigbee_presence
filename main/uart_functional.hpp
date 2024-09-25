@@ -257,7 +257,9 @@ namespace uart
     inline auto read_into(Channel &c, T &dst, const char *pCtx = "")
     {
         using namespace functional;
-        return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); }, pCtx);
+        using ExpectedResult = std::expected<Channel::Ref, ::Err>;
+        return and_then([&]{ return c.Read((uint8_t*)&dst, sizeof(T)); }, pCtx)
+            | and_then([&c]->ExpectedResult{ return std::ref(c); });
     }
 
     template<class... Args>

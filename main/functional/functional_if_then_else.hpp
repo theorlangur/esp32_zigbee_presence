@@ -23,8 +23,8 @@ namespace functional
     template<class Else>
     struct WrapElse
     {
-        using Callback = WrapElse;
-        WrapElse &t;
+        using Callback = Else;
+        Else &t;
     };
 
     template<class If, class Then, class Else>
