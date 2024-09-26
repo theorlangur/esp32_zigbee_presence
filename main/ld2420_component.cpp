@@ -253,8 +253,8 @@ namespace ld2420
     void Component::manage_loop(Component &c)
     {
         bool initial = true;
-        bool lastPresence;
-        float lastDistance;
+        bool lastPresence = {};
+        float lastDistance = {};
         auto &d = c.m_Sensor;
         QueueMsg msg;
         if ((c.m_PresencePin != -1) && (d.GetSystemMode() == LD2420::SystemMode::Simple))
