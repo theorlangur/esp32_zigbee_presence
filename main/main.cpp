@@ -20,6 +20,7 @@
 #include <atomic>
 #include "ld2420.hpp"
 #include "ld2420_component.hpp"
+#include "ld2412.hpp"
 
 void print_bytes(std::span<uint8_t> d)
 {
@@ -30,6 +31,28 @@ void print_bytes(std::span<uint8_t> d)
     ((char*)d.data())[d.size()] = 0;
     printf("ASCII:%s\n", (const char*)d.data());
     fflush(stdout);
+}
+
+void test_ld2412()
+{
+    LD2412 d;
+    if (auto te = d.Init(11, 10); !te)
+    {
+        FMT_PRINT("2412: Init failed: {}\n", te.error());
+    }
+
+    while(true)
+    {
+        if (auto te = d.TryReadFrame(); !te)
+        {
+            FMT_PRINT("2412: reading frame failed: {}\n", te.error());
+        }else
+        {
+            auto p = d.GetPresence();
+            FMT_PRINT("2412: presence data: {}\n", p);
+        }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
 }
 
 extern "C" void app_main(void)
@@ -53,6 +76,10 @@ extern "C" void app_main(void)
 
     gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
+    test_ld2412();
+    fflush(stdout);
+    return;
+
     ld2420::Component ld2420;
     ld2420.SetCallbackOnMovement([&](bool presence, float distance){
             printf("Presence: %d; Distance: %f; Addr: %p\n", (int)presence, distance, &ld2420);
@@ -63,7 +90,6 @@ extern "C" void app_main(void)
         fflush(stdout);
         return;
     }
-    //ld2420.ChangeMode(LD2420::SystemMode::Energy);
     fflush(stdout);
 
     while(true)
