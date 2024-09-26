@@ -165,7 +165,7 @@ LD2412::ExpectedGenericCmdResult LD2412::UpdateVersion()
 
 LD2412::ExpectedResult LD2412::ReadFrame()
 {
-    //FMT_PRINT("ReadFrame\n");
+//ReadFrame: Read bytes: f4 f3 f2 f1 0b 00 02 aa 02 00 00 00 a0 00 64 55 00 f8 f7 f6 f5 
     using namespace functional;
     constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
     constexpr uint8_t footer[] = {0xf8, 0xf7, 0xf6, 0xf5};
@@ -174,21 +174,16 @@ LD2412::ExpectedResult LD2412::ReadFrame()
     SystemMode mode;
     uint8_t check;
     uint16_t reportLen = 0;
-    uint16_t distance = 0;
     return start_sequence()
-        | uart::read_until(*this, header[0], duration_ms_t(1000))
-        | uart::match_bytes(*this, header)
-        | uart::read_into(*this, reportLen)
-        | uart::read_into(*this, mode)
-        | uart::match_bytes(*this, report_begin)
+        | uart::read_until(*this, header[0], duration_ms_t(1000), "Searching for header")
+        | uart::match_bytes(*this, header, "Matching header")
+        | uart::read_into(*this, reportLen, "Reading report len")
+        | uart::read_into(*this, mode, "Reading mode")
+        | uart::match_bytes(*this, report_begin, "Matching rep begin")
         | if_then_else(
                 [&]{ return mode == SystemMode::Simple; }
-                ,[&]{ return  start_sequence()
-                                | uart::read_into(*this, m_Presence);}
-                                //| AdaptToResult("LD2412::ReadFrame", ErrorCode::SimpleData_Failure); }
-                ,[&]{ return  start_sequence()
-                                | uart::skip_bytes(*this, reportLen - 4);}//skip all except for [<type> 0xAA and 0x55 <Check>]
-                                //| AdaptToResult("LD2412::ReadFrame", ErrorCode::SimpleData_Failure); }
+                ,[&]{ return  start_sequence() | uart::read_into(*this, m_Presence);}
+                ,[&]{ return  start_sequence() | uart::skip_bytes(*this, reportLen - 4); }//skip all except for [<type> 0xAA and 0x55 <Check>]
           )
         | uart::match_bytes(*this, report_end)
         | uart::read_into(*this, check)

@@ -89,6 +89,7 @@ public:
     /**********************************************************************/
     /* PresenceResult                                                     */
     /**********************************************************************/
+#pragma pack(push,1)
     struct PresenceResult
     {
         TargetState m_State = TargetState::Clear;
@@ -97,6 +98,7 @@ public:
         uint16_t m_StillDistance = 0;//cm
         uint8_t m_StillEnergy = 0;
     };
+#pragma pack(pop)
 
 
     /**********************************************************************/
@@ -410,6 +412,54 @@ struct tools::formatter_t<LD2412::CmdErr>
     static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::CmdErr const& e)
     {
         return tools::format_to(std::forward<Dest>(dst), "CmdErr\\{{Err=[{}]; return={} }", e.e, e.returnCode);
+    }
+};
+
+template<>
+struct tools::formatter_t<LD2412::TargetState>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::TargetState const& p)
+    {
+        const char *pStr = "<unk>";
+        switch(p)
+        {
+            case LD2412::TargetState::Clear: pStr = "Clear"; break;
+            case LD2412::TargetState::Still: pStr = "Still"; break;
+            case LD2412::TargetState::Move: pStr = "Move"; break;
+            case LD2412::TargetState::MoveAndStill: pStr = "MoveAndStill"; break;
+        }
+        return tools::format_to(std::forward<Dest>(dst), "{}", pStr);
+    }
+};
+
+template<>
+struct tools::formatter_t<LD2412::SystemMode>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::SystemMode const& p)
+    {
+        const char *pStr = "<unk>";
+        switch(p)
+        {
+            case LD2412::SystemMode::Simple: pStr = "Simple"; break;
+            case LD2412::SystemMode::Energy: pStr = "Energy"; break;
+        }
+        return tools::format_to(std::forward<Dest>(dst), "{}", pStr);
+    }
+};
+
+template<>
+struct tools::formatter_t<LD2412::PresenceResult>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::PresenceResult const& p)
+    {
+        return tools::format_to(std::forward<Dest>(dst), "[{}; move(dist={}cm; energy={}); still(dist={}cm; energy={})]"
+                , p.m_State
+                , p.m_MoveDistance, p.m_MoveEnergy
+                , p.m_StillDistance, p.m_StillEnergy
+            );
     }
 };
 
