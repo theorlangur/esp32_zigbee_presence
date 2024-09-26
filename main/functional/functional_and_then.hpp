@@ -42,7 +42,7 @@ namespace functional
         };
 
     template<class T>
-        auto and_then(T &&f, const char *pCtx = nullptr)
+        auto and_then(T &&f, const char *pCtx = "")
         {
             return and_then_t{std::forward<T>(f), pCtx};
         }
