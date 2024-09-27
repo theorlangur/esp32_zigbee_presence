@@ -126,8 +126,8 @@ public:
     };
     struct Version
     {
-        uint8_t m_Major;
         uint8_t m_Minor;
+        uint8_t m_Major;
         uint32_t m_Misc;
     };
 #pragma pack(pop)
