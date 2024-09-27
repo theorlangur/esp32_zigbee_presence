@@ -251,7 +251,8 @@ private:
         RunDynamicBackgroundAnalysis = 0x000B,
         QuearyDynamicBackgroundAnalysis = 0x001B,
 
-        Restart = 0x0068,
+        FactoryReset = 0x00a2,
+        Restart = 0x00a3,
 
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,

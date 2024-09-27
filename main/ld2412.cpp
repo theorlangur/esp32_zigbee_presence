@@ -76,38 +76,30 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
 
 LD2412::ExpectedResult LD2412::Restart()
 {
-    return std::ref(*this);
-    //using namespace functional;
-    //return OpenCommandMode()
-    //    | transform_error([&](CmdErr e){ return e.e; })
-    //    | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-    //    | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
-    //    | if_then(//after restart the default mode 'Simple'. We might want to switch
-    //      /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
-    //      /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
-    //            );
+    using namespace functional;
+    return OpenCommandMode()
+        | transform_error([&](CmdErr e){ return e.e; })
+        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
+        | if_then(//after restart the default mode 'Simple'. We might want to switch
+          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
+          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
+                );
 }
 
 LD2412::ExpectedResult LD2412::FactoryReset()
 {
-//    auto &ch = ChangeConfiguration()
-//                .SetTimeout(120)
-//                .SetMinDistanceRaw(1)
-//                .SetMaxDistanceRaw(12);
-//    constexpr uint16_t kMoveThreshold[] = {
-////Gates:  0      1     2    3    4    5    6    7    8    9    10   11   12   13   14   15
-//        60000, 30000, 400, 300, 250, 250, 250, 250, 300, 250, 250, 250, 250, 200, 200, 200
-//    };
-//    constexpr uint16_t kStillThreshold[] = {
-////Gates:  0      1     2    3    4    5    6    7    8    9    10   11   12   13   14   15
-//        40000, 20000, 200, 250, 150, 150, 150, 150, 150, 150, 150, 150, 100, 100, 100, 100
-//    };
-//
-//    for(uint8_t g = 0; g < 16; ++g)
-//        ch.SetMoveThreshold(g, kMoveThreshold[g])
-//          .SetStillThreshold(g, kStillThreshold[g]);
-//
-//    return ch.EndChange();
+    using namespace functional;
+    return OpenCommandMode()
+        | and_then([&]{ return SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()); })
+        | transform_error([&](CmdErr e){ return e.e; })
+        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
+        | if_then(//after restart the default mode 'Simple'. We might want to switch
+          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
+          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
+                )
+        | and_then([&]{ return ReloadConfig(); });
     return std::ref(*this);
 }
 
