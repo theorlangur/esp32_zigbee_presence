@@ -180,10 +180,14 @@ LD2412::ExpectedResult LD2412::ReadFrame()
         | uart::read_into(*this, reportLen, "Reading report len")
         | uart::read_into(*this, mode, "Reading mode")
         | uart::match_bytes(*this, report_begin, "Matching rep begin")
-        | if_then_else(
-                [&]{ return mode == SystemMode::Simple; }
-                ,[&]{ return  start_sequence() | uart::read_into(*this, m_Presence);}
-                ,[&]{ return  start_sequence() | uart::skip_bytes(*this, reportLen - 4); }//skip all except for [<type> 0xAA and 0x55 <Check>]
+        | uart::read_into(*this, m_Presence) //simple Part of the detection is always there
+        | if_then(
+                [&]{ return mode == SystemMode::Energy; }
+                ,[&]{ 
+                    if ((reportLen - 4 - sizeof(m_Presence)) != sizeof(m_Engeneering))
+                        return uart::Channel::ExpectedResult{std::unexpected(::Err{"Wrong engeneering size"})};
+                    return  start_sequence() | uart::read_into(*this, m_Engeneering);
+                }
           )
         | uart::match_bytes(*this, report_end)
         | uart::read_into(*this, check)
@@ -204,19 +208,7 @@ LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drai
         auto r = start_sequence(std::ref(*this)) 
             | repeat_while(
                      [&]()->ExpectedCondition{ return i < maxIterations; }
-                    ,[&]{ ++i; 
-                        //vTaskDelay(1);
-                        //auto r = (m_Mode == SystemMode::Energy) ? ReadEnergyFrame() : ReadSimpleFrame(); 
-                        //if (!r)
-                        //{
-                        //    printf("TryReadFRame: drain iteration %d failed\n", i);
-                        //}else
-                        //{
-                        //    //printf("TryReadFRame: drain iteration %d ok\n", i);
-                        //}
-                        //return r;
-                        return ReadFrame(); 
-                    }
+                    ,[&]{ ++i; return ReadFrame(); }
                     ,[&]()->ExpectedResult{ return std::ref(*this); }
                     );
         if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
@@ -311,58 +303,57 @@ LD2412::ConfigBlock& LD2412::ConfigBlock::SetStillThreshold(uint8_t gate, uint16
 
 LD2412::ExpectedResult LD2412::ConfigBlock::EndChange()
 {
+    using namespace functional;
+    if (!m_GateChanges && !m_MiscChanges)
         return std::ref(d);
-    //using namespace functional;
-    //if (!m_GateChanges && !m_MiscChanges)
-    //    return std::ref(d);
-    //ScopeExit clearChanges = [&]{ m_GateChanges = m_MiscChanges = 0; };
-    //return d.OpenCommandMode()
-    //    | if_then([&]()->bool{ return m_Changed.Mode; }
-    //                , [&]{ d.m_Mode = m_NewMode; return d.SetSystemModeInternal(d.m_Mode); })
-    //    | if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout; }, 
-    //                [&]{ 
-    //                        if (m_Changed.MinDistance) d.m_MinDistance = m_NewMinDistance;
-    //                        if (m_Changed.MaxDistance) d.m_MaxDistance = m_NewMaxDistance;
-    //                        if (m_Changed.Timeout) d.m_Timeout = m_NewTimeout;
-    //                        return d.SendCommandV2(Cmd::WriteADB
-    //                                ,to_send(
-    //                                    ADBParam{ADBRegs::MinDistance, d.m_MinDistance}
-    //                                    , ADBParam{ADBRegs::MaxDistance, d.m_MaxDistance}
-    //                                    , ADBParam{ADBRegs::Timeout, d.m_Timeout} 
-    //                                    )
-    //                                ,to_recv());
-    //                   })
-    //    | if_then(m_GateChanges, 
-    //          repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
-    //                if (m_GateChanges & (uint32_t(3) << (g * 2))) //check if both
-    //                {
-    //                    d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
-    //                    d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-    //                    return d.SendCommandV2(Cmd::WriteADB
-    //                            ,to_send(
-    //                                  ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
-    //                                , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}
-    //                                )
-    //                            ,to_recv());
-    //                }
-    //                else if (m_GateChanges & (1 << (g * 2)))
-    //                {
-    //                    d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
-    //                    return d.SendCommandV2(Cmd::WriteADB
-    //                            ,to_send( ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold})
-    //                            ,to_recv());
-    //                }
-    //                else if (m_GateChanges & (1 << (g * 2 + 1)))
-    //                {
-    //                    d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-    //                    return d.SendCommandV2(Cmd::WriteADB
-    //                            ,to_send( ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold})
-    //                            ,to_recv());
-    //                }
-    //                else
-    //                    return std::ref(d);
-    //          })
-    //      )
-    //    | and_then([&]{ return d.CloseCommandMode(); })
-    //    | transform_error([&](CmdErr e){ return e.e; });
+    ScopeExit clearChanges = [&]{ m_GateChanges = m_MiscChanges = 0; };
+    return d.OpenCommandMode()
+        | if_then([&]()->bool{ return m_Changed.Mode; }
+                    , [&]{ d.m_Mode = m_NewMode; return d.SetSystemModeInternal(d.m_Mode); })
+        //| if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout; }, 
+        //            [&]{ 
+        //                    if (m_Changed.MinDistance) d.m_MinDistance = m_NewMinDistance;
+        //                    if (m_Changed.MaxDistance) d.m_MaxDistance = m_NewMaxDistance;
+        //                    if (m_Changed.Timeout) d.m_Timeout = m_NewTimeout;
+        //                    return d.SendCommandV2(Cmd::WriteADB
+        //                            ,to_send(
+        //                                ADBParam{ADBRegs::MinDistance, d.m_MinDistance}
+        //                                , ADBParam{ADBRegs::MaxDistance, d.m_MaxDistance}
+        //                                , ADBParam{ADBRegs::Timeout, d.m_Timeout} 
+        //                                )
+        //                            ,to_recv());
+        //               })
+        //| if_then(m_GateChanges, 
+        //      repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
+        //            if (m_GateChanges & (uint32_t(3) << (g * 2))) //check if both
+        //            {
+        //                d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
+        //                d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
+        //                return d.SendCommandV2(Cmd::WriteADB
+        //                        ,to_send(
+        //                              ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
+        //                            , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}
+        //                            )
+        //                        ,to_recv());
+        //            }
+        //            else if (m_GateChanges & (1 << (g * 2)))
+        //            {
+        //                d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
+        //                return d.SendCommandV2(Cmd::WriteADB
+        //                        ,to_send( ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold})
+        //                        ,to_recv());
+        //            }
+        //            else if (m_GateChanges & (1 << (g * 2 + 1)))
+        //            {
+        //                d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
+        //                return d.SendCommandV2(Cmd::WriteADB
+        //                        ,to_send( ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold})
+        //                        ,to_recv());
+        //            }
+        //            else
+        //                return std::ref(d);
+        //      })
+        //  )
+        | and_then([&]{ return d.CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
 }

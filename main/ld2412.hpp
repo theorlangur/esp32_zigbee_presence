@@ -206,9 +206,10 @@ public:
     int GetMaxDistance() const { return m_MaxDistance * 75 / 100; }
     uint32_t GetMaxDistanceRaw() const { return m_MaxDistance; }
 
-    auto GetMoveThreshold(uint8_t gate) const { return uint16_t(m_Gates[gate].m_MoveThreshold); }
-    auto GetStillThreshold(uint8_t gate) const { return uint16_t(m_Gates[gate].m_StillThreshold); }
-    auto GetMeasuredEnergy(uint8_t gate) const { return m_Gates[gate].m_Energy; }
+    auto GetMoveThreshold(uint8_t gate) const { return m_MoveThreshold[gate]; }
+    auto GetStillThreshold(uint8_t gate) const { return m_StillThreshold[gate]; }
+    auto GetMeasuredMoveEnergy(uint8_t gate) const { return m_Engeneering.m_MoveEnergy[gate]; }
+    auto GetMeasuredStillEnergy(uint8_t gate) const { return m_Engeneering.m_StillEnergy[gate]; }
 
     uint32_t GetTimeout() const { return m_Timeout; }//seconds
 
@@ -383,15 +384,24 @@ private:
     uint8_t m_MinDistance = 1;//*75cm to get the distance
     uint8_t m_MaxDistance = 12;//*75cm to get the distance
     uint16_t m_Timeout = 30;
-    struct Gate
-    {
-        uint8_t m_StillThreshold; //config
-        uint8_t m_MoveThreshold; //config
-        uint16_t m_Energy; //output
-    };
-    Gate m_Gates[16];
 
+    uint8_t m_MoveThreshold[14];
+    uint8_t m_StillThreshold[14];
+
+    //the data will be read into as is
     PresenceResult m_Presence;
+    //at this point engeneering data starts
+    struct Engeneering
+    {
+        uint8_t m_MaxMoveGate;
+        uint8_t m_MaxStillGate;
+        uint8_t m_MoveEnergy[14];
+        uint8_t m_StillEnergy[14];
+        uint8_t m_LightSensor;
+        uint8_t m_Dummy;
+    }m_Engeneering;
+    //at this point engeneering data stops
+
     bool m_dbg = false;
 };
 
