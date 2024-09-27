@@ -203,6 +203,8 @@ public:
 
     auto GetMoveThreshold(uint8_t gate) const { return m_Configuration.m_MoveThreshold[gate]; }
     auto GetStillThreshold(uint8_t gate) const { return m_Configuration.m_StillThreshold[gate]; }
+    auto const& GetAllMoveThresholds() const { return m_Configuration.m_MoveThreshold; }
+    auto const& GetAllStillThresholds() const { return m_Configuration.m_StillThreshold; }
     auto GetMeasuredMoveEnergy(uint8_t gate) const { return m_Engeneering.m_MoveEnergy[gate]; }
     auto GetMeasuredStillEnergy(uint8_t gate) const { return m_Engeneering.m_StillEnergy[gate]; }
 

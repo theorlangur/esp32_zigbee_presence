@@ -67,9 +67,9 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
     using namespace functional;
     return OpenCommandMode()
         | and_then([&]{ return UpdateVersion(); })
-        | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(m_Configuration.m_Base), to_recv()); })
-        | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(m_Configuration.m_MoveThreshold), to_recv()); })
-        | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(m_Configuration.m_StillThreshold), to_recv()); })
+        | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(), to_recv(m_Configuration.m_Base)); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }
