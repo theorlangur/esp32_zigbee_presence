@@ -282,9 +282,10 @@ namespace uart
     {
         using functional_read_helper = void;
         const T v;
+        const char *pCtx = "";
 
         static constexpr size_t size() { return sizeof(std::remove_cvref_t<T>); }
-        auto run(Channel &c) { return match_bytes(c, std::span<const uint8_t>((uint8_t const*)&v, sizeof(T))); }
+        auto run(Channel &c) { return match_bytes(c, std::span<const uint8_t>((uint8_t const*)&v, sizeof(T)), pCtx); }
     };
 
     template<size_t N>

@@ -220,8 +220,10 @@ public:
 
     auto const& GetVersion() const { return m_Version; }
 
-    ExpectedResult Restart();
+    auto const& GetBluetoothMAC() const { return m_BluetoothMAC; }
+    ExpectedResult SwitchBluetooth(bool on);
 
+    ExpectedResult Restart();
     ExpectedResult FactoryReset();
 
     PresenceResult GetPresence() const { return m_Presence; }
@@ -253,6 +255,9 @@ private:
 
         FactoryReset = 0x00a2,
         Restart = 0x00a3,
+
+        SwitchBluetooth = 0x00a4,
+        GetMAC = 0x00a5,
 
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,
@@ -389,6 +394,8 @@ private:
     //the data will be read into as is
     PresenceResult m_Presence;
     Engeneering m_Engeneering;
+
+    uint8_t m_BluetoothMAC[6] = {0};
 
     bool m_dbg = false;
 };

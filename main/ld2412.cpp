@@ -70,8 +70,27 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
         | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(), to_recv(m_Configuration.m_Base)); })
         | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)); })
         | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
+}
+
+LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
+{
+    using namespace functional;
+    return OpenCommandMode()
+        | and_then([&]{ return SendCommandV2(Cmd::SwitchBluetooth, to_send(uint16_t(on)), to_recv()); })
+        | transform_error([&](CmdErr e){ return e.e; })
+        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        //| and_then([&]{ vTaskDelay(2000 / portTICK_PERIOD_MS); })
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
+        //| and_then([&]{ FMT_PRINT("\nBT: Wait finished\n"); })
+        | if_then(//after restart the default mode 'Simple'. We might want to switch
+          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
+          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
+                )
+        //| and_then([&]{ FMT_PRINT("\nBT: Before reload config\n"); })
+        | and_then([&]{ return ReloadConfig(); });
 }
 
 LD2412::ExpectedResult LD2412::Restart()
@@ -80,6 +99,7 @@ LD2412::ExpectedResult LD2412::Restart()
     return OpenCommandMode()
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        | and_then([&]{ vTaskDelay(1000 / portTICK_PERIOD_MS); })
         | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
@@ -94,6 +114,7 @@ LD2412::ExpectedResult LD2412::FactoryReset()
         | and_then([&]{ return SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()); })
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
+        | and_then([&]{ vTaskDelay(1000 / portTICK_PERIOD_MS); })
         | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },

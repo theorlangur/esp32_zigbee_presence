@@ -42,8 +42,15 @@ void test_ld2412()
         return;
     }
 
+    if (auto te = d.SwitchBluetooth(true); !te)
+    {
+        FMT_PRINT("2412: Turning off bluetooth failed: {}\n", te.error());
+        return;
+    }
+
     FMT_PRINT("\nInitial config:\n");
     FMT_PRINT("Version: {}\n", d.GetVersion());
+    FMT_PRINT("MAC: {}\n", d.GetBluetoothMAC());
     FMT_PRINT("Mode: {}\n", d.GetSystemMode());
     FMT_PRINT("Min dist raw: {}; Max dist raw: {};\n", d.GetMinDistanceRaw(), d.GetMaxDistanceRaw());
     FMT_PRINT("Timeout: {};\n", d.GetTimeout());
