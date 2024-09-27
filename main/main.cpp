@@ -45,7 +45,7 @@ void test_ld2412()
     FMT_PRINT("\nInitial config:\n");
     FMT_PRINT("Version: {}\n", d.GetVersion());
     FMT_PRINT("Mode: {}\n", d.GetSystemMode());
-    FMT_PRINT("Min dist raw: {}; Max dist raw: {};\n", d.GetMinDistance(), d.GetMaxDistance());
+    FMT_PRINT("Min dist raw: {}; Max dist raw: {};\n", d.GetMinDistanceRaw(), d.GetMaxDistanceRaw());
     FMT_PRINT("Timeout: {};\n", d.GetTimeout());
     FMT_PRINT("Out pin low on presence: {};\n", d.GetOutPinPolarity());
     FMT_PRINT("Move sensitivities: {};\n", d.GetAllMoveThresholds());
