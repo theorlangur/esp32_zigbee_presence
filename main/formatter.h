@@ -270,7 +270,7 @@ namespace tools
     struct formatter_t<uint8_t[N]>
     {
         template<FormatDestination Dest>
-        static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, uint8_t(&v)[N])
+        static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, const uint8_t(&v)[N])
         {
             for(uint8_t b : v)
             {
@@ -279,11 +279,11 @@ namespace tools
                 if (hi < 10)
                     dst('0' + hi);
                 else
-                    dst('a' + hi);
+                    dst('a' + hi - 10);
                 if (lo < 10)
                     dst('0' + lo);
                 else
-                    dst('a' + lo);
+                    dst('a' + lo - 10);
                 dst(' ');
             }
             return N * 3;
