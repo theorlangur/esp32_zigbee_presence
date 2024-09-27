@@ -98,6 +98,15 @@ public:
         uint16_t m_StillDistance = 0;//cm
         uint8_t m_StillEnergy = 0;
     };
+    struct Engeneering
+    {
+        uint8_t m_MaxMoveGate;
+        uint8_t m_MaxStillGate;
+        uint8_t m_MoveEnergy[14];
+        uint8_t m_StillEnergy[14];
+        uint8_t m_Light;
+        uint8_t m_Dummy;
+    };
 #pragma pack(pop)
 
 
@@ -227,6 +236,7 @@ public:
     ExpectedResult FactoryReset();
 
     PresenceResult GetPresence() const { return m_Presence; }
+    const Engeneering& GetEngeneeringData() const { return m_Engeneering; }
 
     ExpectedResult TryReadFrame(int attempts = 3, bool flush = false, Drain drain = Drain::No);
 
@@ -390,17 +400,7 @@ private:
 
     //the data will be read into as is
     PresenceResult m_Presence;
-    //at this point engeneering data starts
-    struct Engeneering
-    {
-        uint8_t m_MaxMoveGate;
-        uint8_t m_MaxStillGate;
-        uint8_t m_MoveEnergy[14];
-        uint8_t m_StillEnergy[14];
-        uint8_t m_LightSensor;
-        uint8_t m_Dummy;
-    }m_Engeneering;
-    //at this point engeneering data stops
+    Engeneering m_Engeneering;
 
     bool m_dbg = false;
 };
@@ -469,6 +469,25 @@ struct tools::formatter_t<LD2412::PresenceResult>
                 , p.m_State
                 , p.m_MoveDistance, p.m_MoveEnergy
                 , p.m_StillDistance, p.m_StillEnergy
+            );
+    }
+};
+
+template<>
+struct tools::formatter_t<LD2412::Engeneering>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::Engeneering const& p)
+    {
+        return tools::format_to(std::forward<Dest>(dst), 
+                "Max Move Gate:{} Max Still Gate:{}\n"
+                "Move: {}\n"
+                "Still: {}\n"
+                "Light: {}\n"
+                , p.m_MaxMoveGate, p.m_MaxStillGate,
+                  p.m_MoveEnergy,
+                  p.m_StillEnergy,
+                  p.m_Light
             );
     }
 };

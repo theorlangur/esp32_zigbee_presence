@@ -57,6 +57,7 @@ void test_ld2412()
         {
             auto p = d.GetPresence();
             FMT_PRINT("2412: presence data: {}\n", p);
+            FMT_PRINT("2412: eng data:\n{}\n", d.GetEngeneeringData());
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
