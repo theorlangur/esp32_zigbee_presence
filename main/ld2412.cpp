@@ -58,19 +58,20 @@ LD2412::ExpectedResult LD2412::Init(int txPin, int rxPin)
     return Configure() 
         | and_then([&]{ return SetPins(txPin, rxPin); })
         | and_then([&]{ return Open(); })
-        | AdaptToResult("LD2412::Init", ErrorCode::Init);
+        | AdaptToResult("LD2412::Init", ErrorCode::Init)
+        | and_then([&]{ return ReloadConfig(); });
 }
 
 LD2412::ExpectedResult LD2412::ReloadConfig()
 {
-    return std::ref(*this);
-    //using namespace functional;
-    //return OpenCommandMode()
-    //    | and_then([&]{ return UpdateVersion(); })
-    //    | and_then([&]{ return UpdateMinMaxTimeout(); })
-    //    | repeat_n(16, [&](uint8_t i){ return UpdateGate(i); })
-    //    | and_then([&]{ return CloseCommandMode(); })
-    //    | transform_error([&](CmdErr e){ return e.e; });
+    using namespace functional;
+    return OpenCommandMode()
+        | and_then([&]{ return UpdateVersion(); })
+        | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(m_Configuration.m_Base), to_recv()); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(m_Configuration.m_MoveThreshold), to_recv()); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(m_Configuration.m_StillThreshold), to_recv()); })
+        | and_then([&]{ return CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
 }
 
 LD2412::ExpectedResult LD2412::Restart()
@@ -129,11 +130,6 @@ LD2412::ExpectedGenericCmdResult LD2412::CloseCommandMode()
             | and_then([&]()->ExpectedGenericCmdResult{ return std::ref(*this); });
 }
 
-std::string_view LD2412::GetVersion() const
-{
-    return m_Version;
-}
-
 LD2412::ExpectedGenericCmdResult LD2412::SetSystemModeInternal(SystemMode mode)
 {
     Cmd c = mode == SystemMode::Energy ? Cmd::EnterEngMode : Cmd::LeaveEngMode;
@@ -143,25 +139,9 @@ LD2412::ExpectedGenericCmdResult LD2412::SetSystemModeInternal(SystemMode mode)
 
 LD2412::ExpectedGenericCmdResult LD2412::UpdateVersion()
 {
-    using namespace functional;
-    uint16_t verLen;
-    return SendCommandV2(Cmd::ReadVer, to_send(), to_recv(verLen, uart::read_var_t{verLen, m_Version})) 
-            | and_then([&]{ m_Version[verLen] = 0; });
+    constexpr uint16_t kVersionBegin = 0x2412;
+    return SendCommandV2(Cmd::ReadVer, to_send(), to_recv(uart::match_t{kVersionBegin}, m_Version));
 }
-
-//LD2412::ExpectedGenericCmdResult LD2412::UpdateMinMaxTimeout()
-//{
-//    using namespace functional;
-//    return SendCommandV2(Cmd::ReadADB, to_send(ADBRegs::MinDistance, ADBRegs::MaxDistance, ADBRegs::Timeout), to_recv(m_MinDistance, m_MaxDistance, m_Timeout)); 
-//}
-//
-//LD2412::ExpectedGenericCmdResult LD2412::UpdateGate(uint8_t gate)
-//{
-//    using namespace functional;
-//    return SendCommandV2(Cmd::ReadADB
-//            , to_send(ADBRegs::MoveThresholdGateBase + gate, ADBRegs::StillThresholdGateBase + gate)
-//            , to_recv(m_Gates[gate].m_MoveThreshold, m_Gates[gate].m_StillThreshold)); 
-//}
 
 LD2412::ExpectedResult LD2412::ReadFrame()
 {
@@ -251,109 +231,95 @@ LD2412::ConfigBlock& LD2412::ConfigBlock::SetSystemMode(SystemMode mode)
 LD2412::ConfigBlock& LD2412::ConfigBlock::SetMinDistance(int dist)
 {
     m_Changed.MinDistance = true;
-    m_NewMinDistance = std::clamp(dist * 10 / 7, 1, 12);
+    m_Configuration.m_Base.m_MinDistanceGate = std::clamp(dist * 10 / 7, 1, 12);
     return *this;
 }
-LD2412::ConfigBlock& LD2412::ConfigBlock::SetMinDistanceRaw(uint32_t dist)
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetMinDistanceRaw(uint8_t dist)
 {
     m_Changed.MinDistance = true;
-    m_NewMinDistance = std::clamp(dist, uint32_t(1), uint32_t(12));
+    m_Configuration.m_Base.m_MinDistanceGate = std::clamp(dist, uint8_t(1), uint8_t(12));
     return *this;
 }
 LD2412::ConfigBlock& LD2412::ConfigBlock::SetMaxDistance(int dist)
 {
     m_Changed.MaxDistance = true;
-    m_NewMaxDistance = std::clamp(dist * 10 / 7, 1, 12);
+    m_Configuration.m_Base.m_MaxDistanceGate = std::clamp(dist * 10 / 7, 1, 12);
     return *this;
 }
 
-LD2412::ConfigBlock& LD2412::ConfigBlock::SetMaxDistanceRaw(uint32_t dist)
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetMaxDistanceRaw(uint8_t dist)
 {
     m_Changed.MaxDistance = true;
-    m_NewMaxDistance = std::clamp(dist, uint32_t(1), uint32_t(12));
+    m_Configuration.m_Base.m_MaxDistanceGate = std::clamp(dist, uint8_t(1), uint8_t(12));
     return *this;
 }
 
-LD2412::ConfigBlock& LD2412::ConfigBlock::SetTimeout(uint32_t t)
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetTimeout(uint16_t t)
 {
     m_Changed.Timeout = true;
-    m_NewTimeout = t;
+    m_Configuration.m_Base.m_Duration = t;
     return *this;
 }
 
-LD2412::ConfigBlock& LD2412::ConfigBlock::SetMoveThreshold(uint8_t gate, uint16_t energy)
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetOutPinPolarity(bool lowOnPresence)
 {
-    if (gate > 15)
-        return *this;
-
-    m_GateChanges |= uint32_t(1) << (gate * 2);
-    m_NewGates[gate].move = energy;
+    m_Changed.OutPin = true;
+    m_Configuration.m_Base.m_OutputPinPolarity = lowOnPresence;
     return *this;
 }
 
-LD2412::ConfigBlock& LD2412::ConfigBlock::SetStillThreshold(uint8_t gate, uint16_t energy)
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetMoveThreshold(uint8_t gate, uint8_t energy)
 {
-    if (gate > 15)
+    if (gate > 13)
         return *this;
 
-    m_GateChanges |= uint32_t(1) << (gate * 2 + 1);
-    m_NewGates[gate].still = energy;
+    m_Changed.MoveThreshold = true;
+    m_Configuration.m_MoveThreshold[gate] = energy;
+    return *this;
+}
+
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetStillThreshold(uint8_t gate, uint8_t energy)
+{
+    if (gate > 13)
+        return *this;
+
+    m_Changed.StillThreshold = true;
+    m_Configuration.m_StillThreshold[gate] = energy;
     return *this;
 }
 
 LD2412::ExpectedResult LD2412::ConfigBlock::EndChange()
 {
     using namespace functional;
-    if (!m_GateChanges && !m_MiscChanges)
+    if (!m_Changes)
         return std::ref(d);
-    ScopeExit clearChanges = [&]{ m_GateChanges = m_MiscChanges = 0; };
+    ScopeExit clearChanges = [&]{ m_Changes = 0; };
     return d.OpenCommandMode()
         | if_then([&]()->bool{ return m_Changed.Mode; }
                     , [&]{ d.m_Mode = m_NewMode; return d.SetSystemModeInternal(d.m_Mode); })
-        //| if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout; }, 
-        //            [&]{ 
-        //                    if (m_Changed.MinDistance) d.m_MinDistance = m_NewMinDistance;
-        //                    if (m_Changed.MaxDistance) d.m_MaxDistance = m_NewMaxDistance;
-        //                    if (m_Changed.Timeout) d.m_Timeout = m_NewTimeout;
-        //                    return d.SendCommandV2(Cmd::WriteADB
-        //                            ,to_send(
-        //                                ADBParam{ADBRegs::MinDistance, d.m_MinDistance}
-        //                                , ADBParam{ADBRegs::MaxDistance, d.m_MaxDistance}
-        //                                , ADBParam{ADBRegs::Timeout, d.m_Timeout} 
-        //                                )
-        //                            ,to_recv());
-        //               })
-        //| if_then(m_GateChanges, 
-        //      repeat_n(16, [&](uint8_t g)->ExpectedGenericCmdResult{ 
-        //            if (m_GateChanges & (uint32_t(3) << (g * 2))) //check if both
-        //            {
-        //                d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
-        //                d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-        //                return d.SendCommandV2(Cmd::WriteADB
-        //                        ,to_send(
-        //                              ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold}
-        //                            , ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold}
-        //                            )
-        //                        ,to_recv());
-        //            }
-        //            else if (m_GateChanges & (1 << (g * 2)))
-        //            {
-        //                d.m_Gates[g].m_MoveThreshold = m_NewGates[g].move;
-        //                return d.SendCommandV2(Cmd::WriteADB
-        //                        ,to_send( ADBParam{ADBRegs::MoveThresholdGateBase + g, d.m_Gates[g].m_MoveThreshold})
-        //                        ,to_recv());
-        //            }
-        //            else if (m_GateChanges & (1 << (g * 2 + 1)))
-        //            {
-        //                d.m_Gates[g].m_StillThreshold = m_NewGates[g].still;
-        //                return d.SendCommandV2(Cmd::WriteADB
-        //                        ,to_send( ADBParam{ADBRegs::StillThresholdGateBase + g, d.m_Gates[g].m_StillThreshold})
-        //                        ,to_recv());
-        //            }
-        //            else
-        //                return std::ref(d);
-        //      })
-        //  )
+        | if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout || m_Changed.OutPin; }, 
+                    [&]{ 
+                            d.m_Configuration.m_Base = m_Configuration.m_Base;
+                            return d.SendCommandV2(Cmd::WriteBaseParams
+                                    ,to_send(d.m_Configuration.m_Base)
+                                    ,to_recv());
+                       })
+        | if_then(
+                [&]()->bool{ return m_Changed.MoveThreshold; }, 
+                [&]{ 
+                        std::ranges::copy(m_Configuration.m_MoveThreshold, d.m_Configuration.m_MoveThreshold);
+                        return d.SendCommandV2(Cmd::SetMoveSensitivity
+                                ,to_send(d.m_Configuration.m_MoveThreshold)
+                                ,to_recv());
+                   })
+        | if_then(
+                [&]()->bool{ return m_Changed.StillThreshold; }, 
+                [&]{ 
+                        std::ranges::copy(m_Configuration.m_StillThreshold, d.m_Configuration.m_StillThreshold);
+                        return d.SendCommandV2(Cmd::SetStillSensitivity
+                                ,to_send(d.m_Configuration.m_StillThreshold)
+                                ,to_recv());
+                   })
         | and_then([&]{ return d.CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }

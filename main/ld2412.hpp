@@ -85,6 +85,23 @@ public:
     template<class V>
     using ExpectedValue = std::expected<RetVal<V>, Err>;
 
+private:
+#pragma pack(push,1)
+    struct BaseConfigData
+    {
+        uint8_t m_MinDistanceGate;
+        uint8_t m_MaxDistanceGate;
+        uint16_t m_Duration;//seconds
+        uint8_t m_OutputPinPolarity;//0 - high on presence; 1 - low on presence
+    };
+    struct Configuration
+    {
+        BaseConfigData m_Base;
+        uint8_t m_MoveThreshold[14];
+        uint8_t m_StillThreshold[14];
+    };
+#pragma pack(pop)
+public:
 
     /**********************************************************************/
     /* PresenceResult                                                     */
@@ -107,6 +124,12 @@ public:
         uint8_t m_Light;
         uint8_t m_Dummy;
     };
+    struct Version
+    {
+        uint8_t m_Major;
+        uint8_t m_Minor;
+        uint32_t m_Misc;
+    };
 #pragma pack(pop)
 
 
@@ -117,7 +140,7 @@ public:
     {
         LD2412 &d;
 
-        ConfigBlock(LD2412 &d): d(d) {}
+        ConfigBlock(LD2412 &d): d(d), m_Configuration(d.m_Configuration) {}
         ConfigBlock(ConfigBlock const&) = delete;
         ConfigBlock(ConfigBlock &&) = delete;
         ConfigBlock& operator=(ConfigBlock const &) = delete;
@@ -127,75 +150,38 @@ public:
         ConfigBlock& SetSystemMode(SystemMode mode);
 
         ConfigBlock& SetMinDistance(int dist);
-        ConfigBlock& SetMinDistanceRaw(uint32_t dist);
+        ConfigBlock& SetMinDistanceRaw(uint8_t dist);
 
         ConfigBlock& SetMaxDistance(int dist);
-        ConfigBlock& SetMaxDistanceRaw(uint32_t dist);
+        ConfigBlock& SetMaxDistanceRaw(uint8_t dist);
 
-        ConfigBlock& SetTimeout(uint32_t t);
+        ConfigBlock& SetTimeout(uint16_t t);
 
-        ConfigBlock& SetMoveThreshold(uint8_t gate, uint16_t energy);
-        ConfigBlock& SetStillThreshold(uint8_t gate, uint16_t energy);
+        ConfigBlock& SetOutPinPolarity(bool lowOnPresence);
+
+        ConfigBlock& SetMoveThreshold(uint8_t gate, uint8_t energy);
+        ConfigBlock& SetStillThreshold(uint8_t gate, uint8_t energy);
 
         ExpectedResult EndChange();
     private:
         SystemMode m_NewMode;
-        uint32_t m_NewMinDistance;
-        uint32_t m_NewMaxDistance;
-        uint32_t m_NewTimeout;
-        struct Gate
-        {
-            uint16_t still;
-            uint16_t move;
-        };
-        Gate m_NewGates[16];
+        Configuration m_Configuration;
 
         union{
             struct
             {
-                uint32_t Gate0MoveThreshold  : 1;
-                uint32_t Gate0StillThreshold : 1;
-                uint32_t Gate1MoveThreshold  : 1;
-                uint32_t Gate1StillThreshold : 1;
-                uint32_t Gate2MoveThreshold  : 1;
-                uint32_t Gate2StillThreshold : 1;
-                uint32_t Gate3MoveThreshold  : 1;
-                uint32_t Gate3StillThreshold : 1;
-                uint32_t Gate4MoveThreshold  : 1;
-                uint32_t Gate4StillThreshold : 1;
-                uint32_t Gate5MoveThreshold  : 1;
-                uint32_t Gate5StillThreshold : 1;
-                uint32_t Gate6MoveThreshold  : 1;
-                uint32_t Gate6StillThreshold : 1;
-                uint32_t Gate7MoveThreshold  : 1;
-                uint32_t Gate7StillThreshold : 1;
-                uint32_t Gate8MoveThreshold  : 1;
-                uint32_t Gate8StillThreshold : 1;
-                uint32_t Gate9MoveThreshold  : 1;
-                uint32_t Gate9StillThreshold : 1;
-                uint32_t Gate10MoveThreshold : 1;
-                uint32_t Gate10StillThreshold: 1;
-                uint32_t Gate11MoveThreshold : 1;
-                uint32_t Gate11StillThreshold: 1;
-                uint32_t Gate12MoveThreshold : 1;
-                uint32_t Gate12StillThreshold: 1;
-                uint32_t Gate13MoveThreshold : 1;
-                uint32_t Gate13StillThreshold: 1;
-                uint32_t Gate14MoveThreshold : 1;
-                uint32_t Gate14StillThreshold: 1;
-                uint32_t Gate15MoveThreshold : 1;
-                uint32_t Gate15StillThreshold: 1;
-
-                uint32_t Mode                : 1;
-                uint32_t MinDistance         : 1;
-                uint32_t MaxDistance         : 1;
-                uint32_t Timeout             : 1;
-                uint32_t Unused              : 28;
+                uint32_t Mode             : 1;
+                uint32_t MinDistance      : 1;
+                uint32_t MaxDistance      : 1;
+                uint32_t Timeout          : 1;
+                uint32_t OutPin           : 1;
+                uint32_t MoveThreshold    : 1;
+                uint32_t StillThreshold   : 1;
+                uint32_t Unused           : 25;
             }m_Changed;
             
             struct{
-                uint32_t m_GateChanges = 0;
-                uint32_t m_MiscChanges = 0;
+                uint32_t m_Changes = 0;
             };
         };
     };
@@ -209,18 +195,19 @@ public:
 
     SystemMode GetSystemMode() const { return m_Mode; }
 
-    int GetMinDistance() const { return m_MinDistance * 75 / 100; }
-    uint32_t GetMinDistanceRaw() const { return m_MinDistance; }
+    int GetMinDistance() const { return m_Configuration.m_Base.m_MinDistanceGate * 75 / 100; }
+    uint8_t GetMinDistanceRaw() const { return m_Configuration.m_Base.m_MinDistanceGate; }
 
-    int GetMaxDistance() const { return m_MaxDistance * 75 / 100; }
-    uint32_t GetMaxDistanceRaw() const { return m_MaxDistance; }
+    int GetMaxDistance() const { return m_Configuration.m_Base.m_MaxDistanceGate * 75 / 100; }
+    uint8_t GetMaxDistanceRaw() const { return m_Configuration.m_Base.m_MaxDistanceGate; }
 
-    auto GetMoveThreshold(uint8_t gate) const { return m_MoveThreshold[gate]; }
-    auto GetStillThreshold(uint8_t gate) const { return m_StillThreshold[gate]; }
+    auto GetMoveThreshold(uint8_t gate) const { return m_Configuration.m_MoveThreshold[gate]; }
+    auto GetStillThreshold(uint8_t gate) const { return m_Configuration.m_StillThreshold[gate]; }
     auto GetMeasuredMoveEnergy(uint8_t gate) const { return m_Engeneering.m_MoveEnergy[gate]; }
     auto GetMeasuredStillEnergy(uint8_t gate) const { return m_Engeneering.m_StillEnergy[gate]; }
 
-    uint32_t GetTimeout() const { return m_Timeout; }//seconds
+    auto GetTimeout() const { return m_Configuration.m_Base.m_Duration; }//seconds
+    bool GetOutPinPolarity() const { return m_Configuration.m_Base.m_OutputPinPolarity; }
 
     ConfigBlock ChangeConfiguration() { return {*this}; }
 
@@ -229,7 +216,7 @@ public:
 
     ExpectedResult ReloadConfig();
 
-    std::string_view GetVersion() const;
+    auto const& GetVersion() const { return m_Version; }
 
     ExpectedResult Restart();
 
@@ -246,15 +233,21 @@ public:
 private:
     enum class Cmd: uint16_t
     {
-        ReadVer = 0x0000,
+        ReadVer = 0x00a0,
         WriteBaseParams = 0x0002,
         ReadBaseParams = 0x0012,
+
         EnterEngMode = 0x0062,
         LeaveEngMode = 0x0063,
-        WriteADB = 0x0007,
-        ReadADB = 0x0008,
-        WriteSys = 0x0012,
-        ReadSys = 0x0013,
+
+        SetMoveSensitivity = 0x0003,
+        GetMoveSensitivity = 0x0013,
+
+        SetStillSensitivity = 0x0004,
+        GetStillSensitivity = 0x0014,
+
+        RunDynamicBackgroundAnalysis = 0x000B,
+        QuearyDynamicBackgroundAnalysis = 0x001B,
 
         Restart = 0x0068,
 
@@ -382,21 +375,13 @@ private:
 
     ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
     ExpectedGenericCmdResult UpdateVersion();
-    //ExpectedGenericCmdResult UpdateSystemMode();
-    //ExpectedGenericCmdResult UpdateMinMaxTimeout();
-    //ExpectedGenericCmdResult UpdateGate(uint8_t gate);
 
     ExpectedResult ReadFrame();
     //data
-    char m_Version[10];
+    Version m_Version;
     SystemMode m_Mode = SystemMode::Simple;
     OpenCmdModeResponse m_ProtoInfo{0, 0};
-    uint8_t m_MinDistance = 1;//*75cm to get the distance
-    uint8_t m_MaxDistance = 12;//*75cm to get the distance
-    uint16_t m_Timeout = 30;
-
-    uint8_t m_MoveThreshold[14];
-    uint8_t m_StillThreshold[14];
+    Configuration m_Configuration;
 
     //the data will be read into as is
     PresenceResult m_Presence;
@@ -489,6 +474,16 @@ struct tools::formatter_t<LD2412::Engeneering>
                   p.m_StillEnergy,
                   p.m_Light
             );
+    }
+};
+
+template<>
+struct tools::formatter_t<LD2412::Version>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, LD2412::Version const& v)
+    {
+        return tools::format_to(std::forward<Dest>(dst), "v{}.{}.{}" , v.m_Major, v.m_Minor, v.m_Misc);
     }
 };
 
