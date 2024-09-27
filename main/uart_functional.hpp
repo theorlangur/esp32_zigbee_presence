@@ -262,6 +262,14 @@ namespace uart
             | and_then([&c]->ExpectedResult{ return std::ref(c); });
     }
 
+    inline auto read_into_bytes(Channel &c, uint8_t *pDst, int l, const char *pCtx = "")
+    {
+        using namespace functional;
+        using ExpectedResult = std::expected<Channel::Ref, ::Err>;
+        return and_then([&c,pDst,l]{ return c.Read(pDst, l); }, pCtx)
+            | and_then([&c]->ExpectedResult{ return std::ref(c); });
+    }
+
     template<class... Args>
     inline auto write_any(Channel &c, Args&&... args)
     {
