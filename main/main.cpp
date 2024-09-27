@@ -39,6 +39,13 @@ void test_ld2412()
     if (auto te = d.Init(11, 10); !te)
     {
         FMT_PRINT("2412: Init failed: {}\n", te.error());
+        return;
+    }
+
+    if (auto ce = d.ChangeConfiguration().SetSystemMode(LD2412::SystemMode::Energy).EndChange(); !ce)
+    {
+        FMT_PRINT("2412: Change mode failed: {}\n", ce.error());
+        return;
     }
 
     while(true)
@@ -74,7 +81,7 @@ extern "C" void app_main(void)
     unsigned major_rev = chip_info.revision / 100;
     unsigned minor_rev = chip_info.revision % 100;
 
-    gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
+    //gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
     test_ld2412();
     fflush(stdout);
