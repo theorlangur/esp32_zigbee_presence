@@ -269,8 +269,8 @@ namespace uart
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
                     {
-                        //printf("Nothing to read. Wait: %d\n", wait.count());
-                        return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
+                        printf("Nothing to read. Wait: %d\n", wait.count());
+                        return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
                     }
                     if (m_Dbg) printf(" %X", b);
                     return RetVal{std::ref(*this), b};

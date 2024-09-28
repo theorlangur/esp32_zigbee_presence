@@ -35,12 +35,17 @@ void print_bytes(std::span<uint8_t> d)
 
 void test_ld2412()
 {
+    FMT_PRINT("2412: tests will start in 5 seconds\n");
+    fflush(stdout);
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     LD2412 d;
     if (auto te = d.Init(11, 10); !te)
     {
         FMT_PRINT("2412: Init failed: {}\n", te.error());
         return;
     }
+    FMT_PRINT("2412: init done\n");
+    fflush(stdout);
 
     //if (auto te = d.SwitchBluetooth(true); !te)
     //{
@@ -48,7 +53,8 @@ void test_ld2412()
     //    return;
     //}
 
-    FMT_PRINT("\nInitial config:\n");
+    auto PrintConfig = [&](const char *pTitle){
+    FMT_PRINT("\n{}:\n", pTitle);
     FMT_PRINT("Version: {}\n", d.GetVersion());
     FMT_PRINT("MAC: {}\n", d.GetBluetoothMAC());
     FMT_PRINT("Mode: {}\n", d.GetSystemMode());
@@ -57,6 +63,39 @@ void test_ld2412()
     FMT_PRINT("Out pin low on presence: {};\n", d.GetOutPinPolarity());
     FMT_PRINT("Move sensitivities: {};\n", d.GetAllMoveThresholds());
     FMT_PRINT("Still sensitivities: {};\n", d.GetAllStillThresholds());
+    fflush(stdout);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    };
+    PrintConfig("Initial Config");
+
+    //{
+    //    auto te = d.ChangeConfiguration()
+    //        .SetTimeout(d.GetTimeout() + 1)
+    //        .SetMaxDistanceRaw(7)
+    //        .SetOutPinPolarity(true)
+    //        .SetStillThreshold(1, 10)
+    //        .EndChange();
+    //    if (!te)
+    //    {
+    //        FMT_PRINT("2412: Changing config failed: {}\n", te.error());
+    //        return;
+    //    }
+    //}
+    //
+    //if (auto te = d.ReloadConfig(); !te)
+    //{
+    //        FMT_PRINT("2412: Reloading config after change failed: {}\n", te.error());
+    //        return;
+    //}
+    //PrintConfig("Config after change");
+    //
+    //if (auto te = d.FactoryReset(); !te)
+    //{
+    //        FMT_PRINT("2412: Factory reset failed: {}\n", te.error());
+    //        return;
+    //}
+    //PrintConfig("Config after factory reset");
+    //return;
 
     if (auto ce = d.ChangeConfiguration().SetSystemMode(LD2412::SystemMode::Energy).EndChange(); !ce)
     {
@@ -66,16 +105,23 @@ void test_ld2412()
 
     while(true)
     {
-        if (auto te = d.TryReadFrame(); !te)
+        //if (auto te = d.TryReadFrame(); !te)
+        //{
+        //    FMT_PRINT("2412: reading frame failed: {}\n", te.error());
+        //}else
+        //{
+        //    auto p = d.GetPresence();
+        //    FMT_PRINT("2412: presence data: {}\n", p);
+        //    FMT_PRINT("2412: eng data:\n{}\n", d.GetEngeneeringData());
+        //}
+        if (auto te = d.UpdateDistanceRes(); !te)
         {
-            FMT_PRINT("2412: reading frame failed: {}\n", te.error());
+            FMT_PRINT("2412: updating distance res failed: {}\n", te.error());
         }else
         {
-            auto p = d.GetPresence();
-            FMT_PRINT("2412: presence data: {}\n", p);
-            FMT_PRINT("2412: eng data:\n{}\n", d.GetEngeneeringData());
+            FMT_PRINT("2412: distance res: {:x}\n", d.GetDistanceRes());
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }
 
