@@ -60,6 +60,12 @@ public:
         MoveAndStill
     };
 
+    enum class DistanceRes: uint16_t
+    {
+        _0_75 = 0,
+        _0_20 = 1,
+    };
+
     enum class Drain
     {
         No,
@@ -213,11 +219,13 @@ public:
 
     auto GetTimeout() const { return m_Configuration.m_Base.m_Duration; }//seconds
     bool GetOutPinPolarity() const { return m_Configuration.m_Base.m_OutputPinPolarity; }
+    auto GetDistanceRes() const { return m_DistanceRes; }
 
     ConfigBlock ChangeConfiguration() { return {*this}; }
 
     ExpectedResult UpdateMinMaxTimeoutConfig();
     ExpectedResult UpdateSystemMode();
+    ExpectedResult UpdateDistanceRes();
 
     ExpectedResult ReloadConfig();
 
@@ -264,6 +272,9 @@ private:
 
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,
+
+        SetDistanceRes = 0x00aa,
+        GetDistanceRes = 0x00ab,
     };
 
     friend Cmd operator|(Cmd r, uint16_t v)
@@ -413,6 +424,7 @@ private:
     Engeneering m_Engeneering;
 
     uint8_t m_BluetoothMAC[6] = {0};
+    DistanceRes m_DistanceRes = DistanceRes::_0_75;
 
     bool m_dbg = false;
 };

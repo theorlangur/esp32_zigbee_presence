@@ -78,6 +78,15 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
         | transform_error([&](CmdErr e){ return e.e; });
 }
 
+LD2412::ExpectedResult LD2412::UpdateDistanceRes()
+{
+    using namespace functional;
+    return OpenCommandMode()
+        | and_then([&]{ SetDefaultWait(duration_ms_t(2000)); m_dbg = true; return SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)); })
+        | and_then([&]{ return CloseCommandMode(); })
+        | transform_error([&](CmdErr e){ return e.e; });
+}
+
 LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
 {
     using namespace functional;
