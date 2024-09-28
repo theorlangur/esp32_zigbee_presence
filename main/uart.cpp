@@ -286,6 +286,7 @@ namespace uart
     Channel::ExpectedResult Channel::Flush()
     {
         CALL_ESP_EXPECTED("uart::Channel::Flush", uart_flush_input(m_Port));
+        m_HasPeekByte = false;
         return std::ref(*this);
     }
 
