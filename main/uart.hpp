@@ -117,6 +117,18 @@ namespace uart
         void SetEventCallback(EventCallback cb) { m_EventCallback = std::move(cb); }
 
         bool m_Dbg = false;
+
+        struct DbgNow
+        {
+            DbgNow(Channel *pC): m_Dbg(pC->m_Dbg), m_PrevDbg(pC->m_Dbg) { m_Dbg = true; }
+            ~DbgNow() { 
+                printf("\n");
+                m_Dbg = m_PrevDbg; 
+            }
+
+            bool &m_Dbg;
+            bool m_PrevDbg;
+        };
     private:
         static void uart_event_loop(Channel &c);
 

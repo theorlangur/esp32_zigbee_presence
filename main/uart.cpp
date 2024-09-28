@@ -2,6 +2,22 @@
 #include <utility>
 #include "functional/functional.hpp"
 
+#define DBG_SEND {\
+if (!m_DbgPrintSend) \
+{\
+    m_DbgPrintSend = true;\
+    printf("\nout: ");\
+}\
+}
+
+#define DBG_READ {\
+if (m_DbgPrintSend) \
+{\
+    m_DbgPrintSend = false;\
+    printf("\nin: ");\
+}\
+}
+
 namespace uart
 {
     Channel::Channel(Port p, int baud_rate, Parity parity):
@@ -203,18 +219,9 @@ namespace uart
 
     Channel::ExpectedResult Channel::Send(const uint8_t *pData, size_t len)
     {
-        //printf("Sending:");
-        //for(int i = 0; i < len; ++i)
-        //    printf(" %X", pData[i]);
-        //printf("\n");
-        //fflush(stdout);
         if (m_Dbg) 
         {
-            if (!m_DbgPrintSend) 
-            {
-                m_DbgPrintSend = true;
-                printf("\n");
-            }
+            DBG_SEND;
             for(int i = 0; i < len; ++i)
                 printf(" %X", pData[i]);
         }
@@ -230,11 +237,7 @@ namespace uart
     {
         if (m_Dbg) 
         {
-            if (!m_DbgPrintSend) 
-            {
-                m_DbgPrintSend = true;
-                printf("\n");
-            }
+            DBG_SEND;
             for(int i = 0; i < len; ++i)
                 printf(" %X", pData[i]);
         }
@@ -258,15 +261,6 @@ namespace uart
             m_HasPeekByte = false;
             --len;
             ++pBuf;
-            if (m_Dbg) 
-            {
-                if (m_DbgPrintSend) 
-                {
-                    m_DbgPrintSend = false;
-                    printf("\n");
-                }
-                printf(" (p)%X\n", pBuf[0]);
-            }
             if (!len) return RetVal<size_t>{*this, 1};
         }
 
@@ -276,11 +270,7 @@ namespace uart
 
         if (m_Dbg) 
         {
-            if (m_DbgPrintSend) 
-            {
-                m_DbgPrintSend = false;
-                printf("\n");
-            }
+            DBG_READ;
             for(int i = 0; i < (int(r) + int(addedPeek)); ++i)
                 printf(" %X", pBuf[i]);
         }
@@ -300,15 +290,6 @@ namespace uart
                         if (m_Dbg)
                             printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
-                    }
-                    if (m_Dbg) 
-                    {
-                        if (m_DbgPrintSend) 
-                        {
-                            m_DbgPrintSend = false;
-                            printf("\n");
-                        }
-                        printf(" %X", b);
                     }
                     return RetVal{std::ref(*this), b};
                 });

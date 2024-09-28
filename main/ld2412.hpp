@@ -426,6 +426,17 @@ private:
     uint8_t m_BluetoothMAC[6] = {0};
     DistanceRes m_DistanceRes = DistanceRes::_0_75;
 
+    struct DbgNow
+    {
+        DbgNow(LD2412 *pC): m_Dbg(pC->m_dbg), m_PrevDbg(pC->m_dbg) { m_Dbg = true; }
+        ~DbgNow() { 
+            printf("\n");
+            m_Dbg = m_PrevDbg; 
+        }
+
+        bool &m_Dbg;
+        bool m_PrevDbg;
+    };
     bool m_dbg = false;
 };
 
