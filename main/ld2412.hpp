@@ -363,8 +363,8 @@ private:
     {
         using namespace functional;
         static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
-        if (GetDefaultWait() < duration_ms_t(150))
-            SetDefaultWait(duration_ms_t(150));
+        if (GetDefaultWait() < kDefaultWait)
+            SetDefaultWait(kDefaultWait);
         uint16_t status;
         auto SendFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){
             return SendFrameV2(cmd, std::get<idx>(sendArgs)...);
