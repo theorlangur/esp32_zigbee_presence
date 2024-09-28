@@ -238,6 +238,8 @@ namespace uart
             m_HasPeekByte = false;
             --len;
             ++pBuf;
+            if (m_Dbg) 
+                printf("(p) %X\n", pBuf[0]);
             if (!len) return RetVal<size_t>{*this, 1};
         }
 
@@ -249,6 +251,11 @@ namespace uart
         //{
         //    printf("Read of 0. Not sent data: %d\n", int(m_TxBufferSize - GetReadyToWriteDataLen().value().v));
         //}
+        if (m_Dbg) 
+        {
+            for(int i = 0; i < (int(r) + int(addedPeek)); ++i)
+                printf(" %X\n", pBuf[i]);
+        }
 
         return RetVal<size_t>{*this, size_t(r) + size_t(addedPeek)};
     }
@@ -265,6 +272,7 @@ namespace uart
                         //printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte", ESP_OK});
                     }
+                    if (m_Dbg) printf(" %X", b);
                     return RetVal{std::ref(*this), b};
                 });
     }
