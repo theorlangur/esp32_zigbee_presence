@@ -120,6 +120,7 @@ namespace uart
     private:
         static void uart_event_loop(Channel &c);
 
+        bool m_DbgPrintSend = false;
         uart_port_t m_Port;
         uart_config_t m_Config;
         QueueHandle_t m_Handle = nullptr;

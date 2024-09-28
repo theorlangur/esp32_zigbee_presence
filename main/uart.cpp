@@ -208,6 +208,16 @@ namespace uart
         //    printf(" %X", pData[i]);
         //printf("\n");
         //fflush(stdout);
+        if (m_Dbg) 
+        {
+            if (!m_DbgPrintSend) 
+            {
+                m_DbgPrintSend = true;
+                printf("\n");
+            }
+            for(int i = 0; i < len; ++i)
+                printf(" %X", pData[i]);
+        }
         int r = uart_write_bytes(m_Port, pData, len);
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Send", ESP_ERR_INVALID_ARG});
@@ -218,6 +228,16 @@ namespace uart
 
     Channel::ExpectedResult Channel::SendWithBreak(const uint8_t *pData, size_t len, size_t breakLen)
     {
+        if (m_Dbg) 
+        {
+            if (!m_DbgPrintSend) 
+            {
+                m_DbgPrintSend = true;
+                printf("\n");
+            }
+            for(int i = 0; i < len; ++i)
+                printf(" %X", pData[i]);
+        }
         int r = uart_write_bytes_with_break(m_Port, pData, len, breakLen);
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Send", ESP_ERR_INVALID_ARG});
@@ -239,7 +259,14 @@ namespace uart
             --len;
             ++pBuf;
             if (m_Dbg) 
-                printf("(p) %X\n", pBuf[0]);
+            {
+                if (m_DbgPrintSend) 
+                {
+                    m_DbgPrintSend = false;
+                    printf("\n");
+                }
+                printf(" (p)%X\n", pBuf[0]);
+            }
             if (!len) return RetVal<size_t>{*this, 1};
         }
 
@@ -247,14 +274,15 @@ namespace uart
         if (r < 0)
             return std::unexpected(Err{"uart::Channel::Read", ESP_ERR_INVALID_ARG});
 
-        //if ((size_t(r) + size_t(addedPeek)) == 0)
-        //{
-        //    printf("Read of 0. Not sent data: %d\n", int(m_TxBufferSize - GetReadyToWriteDataLen().value().v));
-        //}
         if (m_Dbg) 
         {
+            if (m_DbgPrintSend) 
+            {
+                m_DbgPrintSend = false;
+                printf("\n");
+            }
             for(int i = 0; i < (int(r) + int(addedPeek)); ++i)
-                printf(" %X\n", pBuf[i]);
+                printf(" %X", pBuf[i]);
         }
 
         return RetVal<size_t>{*this, size_t(r) + size_t(addedPeek)};
@@ -269,10 +297,19 @@ namespace uart
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
                     {
-                        printf("Nothing to read. Wait: %d\n", wait.count());
+                        if (m_Dbg)
+                            printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
                     }
-                    if (m_Dbg) printf(" %X", b);
+                    if (m_Dbg) 
+                    {
+                        if (m_DbgPrintSend) 
+                        {
+                            m_DbgPrintSend = false;
+                            printf("\n");
+                        }
+                        printf(" %X", b);
+                    }
                     return RetVal{std::ref(*this), b};
                 });
     }
