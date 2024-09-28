@@ -35,9 +35,9 @@ void print_bytes(std::span<uint8_t> d)
 
 void test_ld2412()
 {
-    FMT_PRINT("2412: tests will start in 5 seconds\n");
+    FMT_PRINT("2412: tests will start in 2 seconds\n");
     fflush(stdout);
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     LD2412 d;
     if (auto te = d.Init(11, 10); !te)
     {
@@ -105,23 +105,23 @@ void test_ld2412()
 
     while(true)
     {
-        //if (auto te = d.TryReadFrame(); !te)
-        //{
-        //    FMT_PRINT("2412: reading frame failed: {}\n", te.error());
-        //}else
-        //{
-        //    auto p = d.GetPresence();
-        //    FMT_PRINT("2412: presence data: {}\n", p);
-        //    FMT_PRINT("2412: eng data:\n{}\n", d.GetEngeneeringData());
-        //}
-        if (auto te = d.UpdateDistanceRes(); !te)
+        if (auto te = d.TryReadFrame(); !te)
         {
-            FMT_PRINT("2412: updating distance res failed: {}\n", te.error());
+            FMT_PRINT("2412: reading frame failed: {}\n", te.error());
         }else
         {
-            FMT_PRINT("2412: distance res: {:x}\n", d.GetDistanceRes());
+            auto p = d.GetPresence();
+            FMT_PRINT("2412: presence data: {}\n", p);
+            FMT_PRINT("2412: eng data:\n{}\n", d.GetEngeneeringData());
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //if (auto te = d.UpdateDistanceRes(); !te)
+        //{
+        //    FMT_PRINT("2412: updating distance res failed: {}\n", te.error());
+        //}else
+        //{
+        //    FMT_PRINT("2412: distance res: {:x}\n", d.GetDistanceRes());
+        //}
+        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }
 
