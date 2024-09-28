@@ -28,6 +28,8 @@ const char* LD2412::err_to_str(ErrorCode e)
         case ErrorCode::FillBuffer_ReadFailure: return "FillBuffer_ReadFailure";
         case ErrorCode::MatchError: return "MatchError";
         case ErrorCode::RestartFailed: return "RestartFailed";
+        case ErrorCode::FactoryResetFailed: return "FactoryResetFailed";
+        case ErrorCode::BTFailed: return "BTFailed";
     }
     return "unknown";
 }
@@ -78,28 +80,28 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
 LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
 {
     using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
     return OpenCommandMode()
         | and_then([&]{ return SendCommandV2(Cmd::SwitchBluetooth, to_send(uint16_t(on)), to_recv()); })
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        //| and_then([&]{ vTaskDelay(2000 / portTICK_PERIOD_MS); })
-        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
-        //| and_then([&]{ FMT_PRINT("\nBT: Wait finished\n"); })
+        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::SwitchBluetooth", ErrorCode::BTFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
           /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
                 )
-        //| and_then([&]{ FMT_PRINT("\nBT: Before reload config\n"); })
         | and_then([&]{ return ReloadConfig(); });
 }
 
 LD2412::ExpectedResult LD2412::Restart()
 {
     using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
     return OpenCommandMode()
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ vTaskDelay(1000 / portTICK_PERIOD_MS); })
+        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
         | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
@@ -110,12 +112,13 @@ LD2412::ExpectedResult LD2412::Restart()
 LD2412::ExpectedResult LD2412::FactoryReset()
 {
     using namespace functional;
+    SetDefaultWait(duration_ms_t(150));
     return OpenCommandMode()
         | and_then([&]{ return SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()); })
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ vTaskDelay(1000 / portTICK_PERIOD_MS); })
-        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
+        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
+        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::FactoryResetFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
           /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
@@ -160,16 +163,14 @@ LD2412::ExpectedResult LD2412::ReadFrame()
 {
 //ReadFrame: Read bytes: f4 f3 f2 f1 0b 00 02 aa 02 00 00 00 a0 00 64 55 00 f8 f7 f6 f5 
     using namespace functional;
-    constexpr uint8_t header[] = {0xf4, 0xf3, 0xf2, 0xf1};
-    constexpr uint8_t footer[] = {0xf8, 0xf7, 0xf6, 0xf5};
     constexpr uint8_t report_begin[] = {0xaa};
     constexpr uint8_t report_end[] = {0x55};
     SystemMode mode;
     uint8_t check;
     uint16_t reportLen = 0;
     return start_sequence()
-        | uart::read_until(*this, header[0], duration_ms_t(1000), "Searching for header")
-        | uart::match_bytes(*this, header, "Matching header")
+        | uart::read_until(*this, kDataFrameHeader[0], duration_ms_t(1000), "Searching for header")
+        | uart::match_bytes(*this, kDataFrameHeader, "Matching header")
         | uart::read_into(*this, reportLen, "Reading report len")
         | uart::read_into(*this, mode, "Reading mode")
         | uart::match_bytes(*this, report_begin, "Matching rep begin")
@@ -184,7 +185,7 @@ LD2412::ExpectedResult LD2412::ReadFrame()
           )
         | uart::match_bytes(*this, report_end)
         | uart::read_into(*this, check)
-        | uart::match_bytes(*this, footer)
+        | uart::match_bytes(*this, kDataFrameFooter)
         | AdaptToResult("LD2412::ReadEnergyFrame", ErrorCode::EnergyData_Failure)
         ;
 }

@@ -40,6 +40,8 @@ public:
 
         MatchError,
         RestartFailed,
+        BTFailed,
+        FactoryResetFailed,
     };
     static const char* err_to_str(ErrorCode e);
 
@@ -290,6 +292,8 @@ private:
 
     constexpr static uint8_t kFrameHeader[] = {0xFD, 0xFC, 0xFB, 0xFA};
     constexpr static uint8_t kFrameFooter[] = {0x04, 0x03, 0x02, 0x01};
+    constexpr static uint8_t kDataFrameHeader[] = {0xf4, 0xf3, 0xf2, 0xf1};
+    constexpr static uint8_t kDataFrameFooter[] = {0xf8, 0xf7, 0xf6, 0xf5};
 
     auto AdaptToResult(const char *pLocation, ErrorCode ec)
     {
