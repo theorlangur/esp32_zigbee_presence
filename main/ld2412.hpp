@@ -10,6 +10,7 @@ class LD2412: protected uart::Channel
 {
 public:
     static const constexpr duration_ms_t kRestartTimeout{2000};
+    static const constexpr duration_ms_t kDefaultWait{250};
     static const constexpr bool kDebugFrame = false;
     static const constexpr bool kDebugCommands = false;
     enum class ErrorCode: uint8_t
@@ -333,11 +334,15 @@ private:
         using namespace functional;
         uint16_t len;
         constexpr const size_t arg_size = (uart::uart_sizeof<std::remove_cvref_t<T>>() + ...);
+        if (m_dbg) m_Dbg = true;
+        ScopeExit resetDbg = [&]{ if (m_dbg) m_Dbg = false; };
         return 
                 start_sequence()
                 | uart::match_bytes(*this, kFrameHeader)
+                | and_then([&]{ if (m_dbg) FMT_PRINT("RecvFrameV2: matched header\n"); })
                 | uart::read_into(*this, len)
                 | and_then([&]()->Channel::ExpectedResult{
+                        if (m_dbg) FMT_PRINT("RecvFrameV2: len: {}\n", len);
                         if (arg_size > len)
                             return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
                         return std::ref((Channel&)*this);
@@ -358,7 +363,8 @@ private:
     {
         using namespace functional;
         static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
-        SetDefaultWait(duration_ms_t(150));
+        if (GetDefaultWait() < duration_ms_t(150))
+            SetDefaultWait(duration_ms_t(150));
         uint16_t status;
         auto SendFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){
             return SendFrameV2(cmd, std::get<idx>(sendArgs)...);
@@ -368,6 +374,7 @@ private:
                 uart::match_t{uint16_t(cmd | 0x100)}, 
                 status, 
                 uart::callback_t{[&]()->Channel::ExpectedResult{
+                    if (m_dbg) FMT_PRINT("Recv frame resp. Status {}\n", status);
                     if (status != 0)
                         return std::unexpected(::Err{"SendCommandV2 status", status});
                     return std::ref((Channel&)*this);
@@ -376,9 +383,15 @@ private:
         };
         return Flush() 
                 | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed)
-                | and_then([&]{ return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
-                | and_then([&]{ return WaitAllSent() | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed); })
-                | and_then([&]{ return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
+                | and_then([&]{ 
+                        if (m_dbg) FMT_PRINT("Sent cmd {}\n", uint16_t(cmd));
+                        return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
+                | and_then([&]{ 
+                        if (m_dbg) FMT_PRINT("Wait all\n");
+                        return WaitAllSent() | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed); })
+                | and_then([&]{ 
+                        if (m_dbg) FMT_PRINT("Receiving {} args\n", sizeof...(ToRecv));
+                        return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
                 | AdaptToCmdResult();
     }
 

@@ -57,6 +57,7 @@ uart::Port LD2412::GetPort() const
 LD2412::ExpectedResult LD2412::Init(int txPin, int rxPin)
 {
     using namespace functional;
+    SetDefaultWait(kDefaultWait);
     return Configure() 
         | and_then([&]{ return SetPins(txPin, rxPin); })
         | and_then([&]{ return Open(); })
@@ -80,7 +81,7 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
 LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
 {
     using namespace functional;
-    SetDefaultWait(duration_ms_t(150));
+    SetDefaultWait(kDefaultWait);
     return OpenCommandMode()
         | and_then([&]{ return SendCommandV2(Cmd::SwitchBluetooth, to_send(uint16_t(on)), to_recv()); })
         | transform_error([&](CmdErr e){ return e.e; })
@@ -97,7 +98,7 @@ LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
 LD2412::ExpectedResult LD2412::Restart()
 {
     using namespace functional;
-    SetDefaultWait(duration_ms_t(150));
+    SetDefaultWait(kDefaultWait);
     return OpenCommandMode()
         | transform_error([&](CmdErr e){ return e.e; })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
@@ -112,17 +113,20 @@ LD2412::ExpectedResult LD2412::Restart()
 LD2412::ExpectedResult LD2412::FactoryReset()
 {
     using namespace functional;
-    SetDefaultWait(duration_ms_t(150));
+    SetDefaultWait(duration_ms_t(1000));
     return OpenCommandMode()
         | and_then([&]{ return SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()); })
         | transform_error([&](CmdErr e){ return e.e; })
+        | and_then([&]{ FMT_PRINT("Factory reset after cmd\n"); })
         | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
+        | and_then([&]{ FMT_PRINT("Restart sent\n"); })
+        | and_then([&]{ SetDefaultWait(kDefaultWait); std::this_thread::sleep_for(std::chrono::seconds(1)); })
         | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::FactoryResetFailed))
         | if_then(//after restart the default mode 'Simple'. We might want to switch
           /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
           /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
                 )
+        | and_then([&]{ FMT_PRINT("Reloading config\n"); })
         | and_then([&]{ return ReloadConfig(); });
     return std::ref(*this);
 }
