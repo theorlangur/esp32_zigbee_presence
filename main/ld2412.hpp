@@ -223,8 +223,6 @@ public:
 
     ConfigBlock ChangeConfiguration() { return {*this}; }
 
-    ExpectedResult UpdateMinMaxTimeoutConfig();
-    ExpectedResult UpdateSystemMode();
     ExpectedResult UpdateDistanceRes();
 
     ExpectedResult ReloadConfig();
