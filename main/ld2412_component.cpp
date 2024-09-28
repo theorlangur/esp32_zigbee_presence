@@ -56,13 +56,21 @@ namespace ld2412
                 bool changed() const
                 {
                     return m_ChangePresenceStill 
-                        && m_ChangePresenceMove 
-                        && m_ChangeEnergyMove 
-                        && m_ChangeEnergyStill
-                        && m_ChangeDistanceMove 
-                        && m_ChangeDistanceStill;
+                        || m_ChangePresenceMove 
+                        || m_ChangeEnergyMove 
+                        || m_ChangeEnergyStill
+                        || m_ChangeDistanceMove 
+                        || m_ChangeDistanceStill;
                 }
             }m_Presence;
+            struct{
+                uint16_t raw1;
+                uint16_t raw2;
+                uint8_t raw3;
+                uint8_t raw4;
+                uint8_t changedRaw;
+                uint8_t dummy;
+            }m_PresenceRaw;
             uint16_t m_Timeout;
             uint16_t m_Distance;
             LD2412::SystemMode m_Mode;
@@ -246,11 +254,12 @@ namespace ld2412
                     }
                     break;
                     case QueueMsg::Type::Presence: 
-                        FMT_PRINT("Msg presence\n");
+                        FMT_PRINT("Msg presence: {:x}\n", msg.m_PresenceRaw.changedRaw);
                         if (c.m_PresencePin != -1)
                             msg.m_Presence.m_ChangePresenceStill = msg.m_Presence.m_ChangePresenceMove = 0;
                         if (msg.m_Presence.changed())
                         {
+                            FMT_PRINT("Msg presence something changed\n");
                             lastPresence = msg.m_Presence.m_PresenceStill | msg.m_Presence.m_PresenceMove;
                             if (msg.m_Presence.m_PresenceStill && msg.m_Presence.m_PresenceMove)
                                 lastPresenceData.m_State = LD2412::TargetState::MoveAndStill;
