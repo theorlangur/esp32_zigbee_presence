@@ -535,4 +535,8 @@ struct tools::formatter_t<LD2412::Version>
     }
 };
 
+inline bool operator&(LD2412::TargetState s1, LD2412::TargetState s2)
+{
+    return (uint8_t(s1) & uint8_t(s2)) != 0;
+}
 #endif
