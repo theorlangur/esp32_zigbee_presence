@@ -4,6 +4,9 @@
 #include "functional/functional.hpp"
 #include "uart_functional.hpp"
 
+#define DBG_UART Channel::DbgNow _dbg_uart{this}; 
+#define DBG_ME DbgNow _dbg_me{this}; 
+
 const char* LD2412::err_to_str(ErrorCode e)
 {
     switch(e)
@@ -73,7 +76,7 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
         | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(), to_recv(m_Configuration.m_Base)); })
         | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)); })
         | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)); })
-        | and_then([&]{ Channel::DbgNow d{this}; return SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }
@@ -82,7 +85,7 @@ LD2412::ExpectedResult LD2412::UpdateDistanceRes()
 {
     using namespace functional;
     return OpenCommandMode()
-        | and_then([&]{ SetDefaultWait(duration_ms_t(2000)); m_dbg = true; return SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)); })
+        | and_then([&]{ return SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)); })
         | and_then([&]{ return CloseCommandMode(); })
         | transform_error([&](CmdErr e){ return e.e; });
 }
