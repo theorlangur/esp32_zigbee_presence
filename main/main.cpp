@@ -42,11 +42,11 @@ void test_ld2412()
         return;
     }
 
-    if (auto te = d.SwitchBluetooth(true); !te)
-    {
-        FMT_PRINT("2412: Turning off bluetooth failed: {}\n", te.error());
-        return;
-    }
+    //if (auto te = d.SwitchBluetooth(true); !te)
+    //{
+    //    FMT_PRINT("2412: Turning off bluetooth failed: {}\n", te.error());
+    //    return;
+    //}
 
     FMT_PRINT("\nInitial config:\n");
     FMT_PRINT("Version: {}\n", d.GetVersion());
