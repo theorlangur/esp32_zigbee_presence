@@ -12,10 +12,10 @@
 
 namespace zb
 {
-    constexpr uint8_t PRESENCE_EP = 1;
+    constexpr uint8_t PRESENCE_EP = 10;
 
-    static char g_Manufacturer[] = "Orlangur\0";
-    static char g_Model[] = "Presence\0";
+    static char g_Manufacturer[] = "\x08Orlangur\0";
+    static char g_Model[] = "\x08Presence\0";
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
     static ld2412::Component g_ld2412;
@@ -30,7 +30,7 @@ namespace zb
     static bool setup_sensor()
     {
         g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
-                uint8_t val = presence;
+                esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
                 {
                 APILock l;
                 esp_zb_zcl_set_attribute_val(PRESENCE_EP,
