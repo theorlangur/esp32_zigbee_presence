@@ -5,6 +5,7 @@
 #include <expected>
 #include "generic_function.hpp"
 #include "generic_helpers.hpp"
+#include "thread_helper.hpp"
 
 namespace uart
 {
@@ -151,7 +152,7 @@ namespace uart
         uint8_t m_PeekByte = 0;
         std::atomic<bool> m_DataReady={false};
         EventCallback m_EventCallback;
-        std::jthread m_QueueTask;
+        thread::TaskBase m_QueueTask;
     };
 }
 #endif

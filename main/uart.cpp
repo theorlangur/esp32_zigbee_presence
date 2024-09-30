@@ -190,7 +190,7 @@ namespace uart
         if (m_EventCallback)
         {
             CALL_ESP_EXPECTED("uart::Channel::Open", uart_driver_install(m_Port, m_RxBufferSize, m_TxBufferSize, m_QueueSize, &m_Handle, 0));
-            m_QueueTask = std::jthread(uart_event_loop, std::ref(*this));
+            m_QueueTask = thread::start_task({.pName = "uart::events", .stackSize=2048}, uart_event_loop, std::ref(*this));
         }
         else
             CALL_ESP_EXPECTED("uart::Channel::Open no events", uart_driver_install(m_Port, m_RxBufferSize, m_TxBufferSize, 0, nullptr, 0));
