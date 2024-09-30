@@ -72,8 +72,8 @@ namespace ld2412
         void HandleMessage(QueueMsg &msg);
 
         static void presence_pin_isr(void *param);
-        static void fast_loop(Component &c);
-        static void manage_loop(Component &c);
+        static void fast_loop(Component *pC);
+        static void manage_loop(Component *pC);
 
         bool m_Setup = false;
         LD2412 m_Sensor;
@@ -84,8 +84,8 @@ namespace ld2412
         QueueHandle_t m_FastQueue = 0;
         std::atomic<QueueHandle_t> m_ManagingQueue{0};
 
-        std::jthread m_FastTask;
-        std::jthread m_ManagingTask;
+        //std::jthread m_FastTask;
+        //std::jthread m_ManagingTask;
 
         EnergyReading m_MeasuredMinMax[14];
 

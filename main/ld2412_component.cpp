@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include "ld2412_component.hpp"
 #include "driver/gpio.h"
-#include <thread>
+#include "thread_helper.hpp"
 #include <format>
 
 namespace ld2412
@@ -229,13 +229,11 @@ namespace ld2412
         }
     }
 
-    void Component::fast_loop(Component &c)
+    void Component::fast_loop(Component *pC)
     {
-        printf("Entering level tracking loop\n");
-        fflush(stdout);
+        Component &c = *pC;
         bool lastPresence = false;
         LD2412::PresenceResult lastPresenceData;
-
         QueueMsg msg;
         while(true)
         {
@@ -288,8 +286,9 @@ namespace ld2412
         }
     }
 
-    void Component::manage_loop(Component &c)
+    void Component::manage_loop(Component *pC)
     {
+        Component &c = *pC;
         bool initial = true;
         LD2412::PresenceResult lastPresence;
         auto &d = c.m_Sensor;
@@ -563,12 +562,16 @@ namespace ld2412
             xQueueSend(m_ManagingQueue.load(std::memory_order_relaxed), &msg, 0);
         }
 
-        m_ManagingTask = std::jthread(&manage_loop, std::ref(*this));
-        m_FastTask = std::jthread(&fast_loop, std::ref(*this));
+        thread::start_task({.pName="LD2412_Manage", .stackSize = 4096}, &manage_loop, this).detach();
+        thread::start_task({.pName="LD2412_Fast", .stackSize = 4096}, &fast_loop, this).detach();
 
+        FMT_PRINT("ld2412 component: configuring isr\n");
+        fflush(stdout);
         ConfigurePresenceIsr();
 
         m_Setup = true;
+        FMT_PRINT("ld2412 component: setup done\n");
+        fflush(stdout);
         return true;
     }
 }
