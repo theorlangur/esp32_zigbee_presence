@@ -22,6 +22,7 @@
 #include "ld2420_component.hpp"
 #include "ld2412.hpp"
 #include "ld2412_component.hpp"
+#include "zigbee.hpp"
 
 void print_bytes(std::span<uint8_t> d)
 {
@@ -161,17 +162,22 @@ extern "C" void app_main(void)
     //    fflush(stdout);
     //    return;
     //}
-    ld2412::Component ld2412;
-    ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
-            FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
-    });
 
-    if (!ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
-    {
-        printf("Failed to configure ld2412\n");
-        fflush(stdout);
-        return;
-    }
+    //ld2412::Component ld2412;
+    //ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
+    //        FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
+    //});
+    //
+    //if (!ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
+    //{
+    //    printf("Failed to configure ld2412\n");
+    //    fflush(stdout);
+    //    return;
+    //}
+
+    FMT_PRINT("About to init ZB\n");
+    fflush(stdout);
+    zb::setup();
     fflush(stdout);
 
     while(true)

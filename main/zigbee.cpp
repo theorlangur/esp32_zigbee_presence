@@ -8,6 +8,7 @@
 #include "esp_zigbee_core.h"
 
 #include <thread>
+#include "ld2412_component.hpp"
 
 namespace zb
 {
@@ -17,11 +18,36 @@ namespace zb
     static char g_Model[] = "Presence\0";
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
+    static ld2412::Component g_ld2412;
+
+
     struct APILock
     {
         APILock() { esp_zb_lock_acquire(portMAX_DELAY); }
         ~APILock() { esp_zb_lock_release(); }
     };
+
+    static bool setup_sensor()
+    {
+        g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
+                uint8_t val = presence;
+                {
+                APILock l;
+                esp_zb_zcl_set_attribute_val(PRESENCE_EP,
+                        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, &val, false);
+                }
+                FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
+                });
+
+        if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
+        {
+            printf("Failed to configure ld2412\n");
+            fflush(stdout);
+            return false;
+        }
+        return true;
+    }
 
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
     {
@@ -38,7 +64,7 @@ namespace zb
             {                                                                                       
                 /*uint8_t*/  .occupancy = 0,                                                               /*!<  Bit 0 specifies the sensed occupancy as follows: 1 = occupied, 0 = unoccupied. */
                 /*uint32_t*/ .sensor_type = ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC, /*!<  The attribute specifies the type of the occupancy sensor */
-                /*uint8_t*/  .sensor_type_bitmap = 0                                                       /*!<  The attribute specifies the types of the occupancy sensor */
+                /*uint8_t*/  .sensor_type_bitmap = uint8_t(1) << ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC /*!<  The attribute specifies the types of the occupancy sensor */
             };                                                                                      
         esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
         esp_zb_attribute_list_t *basic_cluster = esp_zb_basic_cluster_create(&basic_cfg);
@@ -64,21 +90,21 @@ namespace zb
                             TAG, "Failed to start Zigbee bdb commissioning");
     }
 
-    void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
+    extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     {
         uint32_t *p_sg_p     = signal_struct->p_app_signal;
         esp_err_t err_status = signal_struct->esp_err_status;
         esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
         switch (sig_type) {
         case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
-            //ESP_LOGI(TAG, "Initialize Zigbee stack");
+            ESP_LOGI(TAG, "Initialize Zigbee stack");
             esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
             break;
         case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
-                //ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
-                //init ld2412 and other sensors
+                bool sensor_init_ok = setup_sensor();
+                ESP_LOGI(TAG, "Deferred sensor initialization %s", !sensor_init_ok ? "failed" : "successful");
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
                     ESP_LOGI(TAG, "Start network steering");
@@ -111,8 +137,10 @@ namespace zb
         }
     }
 
-    void zigbee_main()
+    void zigbee_main(void *)
     {
+        ESP_LOGI(TAG, "ZB main");
+        fflush(stdout);
         esp_zb_cfg_t zb_nwk_cfg = {                                                               
             .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
             .install_code_policy = false,           
@@ -124,13 +152,19 @@ namespace zb
             },                                                          
         };
         esp_zb_init(&zb_nwk_cfg);
+        ESP_LOGI(TAG, "ZB after init");
+        fflush(stdout);
 
         //config clusters here
         esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
         create_presence_ep(ep_list, PRESENCE_EP);
+        ESP_LOGI(TAG, "ZB created ep");
+        fflush(stdout);
 
         /* Register the device */
         esp_zb_device_register(ep_list);
+        ESP_LOGI(TAG, "ZB registered device");
+        fflush(stdout);
 
         /* Config the reporting info  */
         esp_zb_zcl_reporting_info_t reporting_info = {
@@ -156,10 +190,15 @@ namespace zb
         };
 
         esp_zb_zcl_update_reporting_info(&reporting_info);
+        ESP_LOGI(TAG, "ZB updated attribute reporting");
+        fflush(stdout);
 
         esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK);
+        ESP_LOGI(TAG, "ZB set channel masks");
+        fflush(stdout);
 
         ESP_ERROR_CHECK(esp_zb_start(false));
+        ESP_LOGI(TAG, "ZB started, looping...");
         esp_zb_stack_main_loop();
     }
 
@@ -170,9 +209,10 @@ namespace zb
             .host_config = {.host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE, .host_uart_config = {}},
         };
         ESP_ERROR_CHECK(nvs_flash_init());
+        FMT_PRINT("nvs_flash_init done\n");
         ESP_ERROR_CHECK(esp_zb_platform_config(&config));
+        FMT_PRINT("esp_zb_platform_config done\n");
         
-        std::thread zigbeeTask(&zigbee_main);
-        zigbeeTask.detach();
+        xTaskCreate(zigbee_main, "Zigbee_main", 4096, NULL, 5, NULL);
     }
 }
