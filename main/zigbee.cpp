@@ -14,8 +14,26 @@ namespace zb
 {
     constexpr uint8_t PRESENCE_EP = 1;
 
-    static char g_Manufacturer[] = "\x08Orlangur\0";
-    static char g_Model[] = "\x08Presence\0";
+    template<size_t N>
+    struct ZigbeeStr
+    {
+        char name[N];
+        operator void*() { return name; }
+        size_t size() const { return N - 1; }
+        std::string_view sv() const { return {name + 1, N - 1}; }
+    };
+
+    template<size_t N>
+    constexpr ZigbeeStr<N+1> ZbStr(const char (&n)[N])
+    {
+        static_assert(N < 255, "String too long");
+        return [&]<size_t...idx>(std::index_sequence<idx...>){
+            return ZigbeeStr<N+1>{.name={N, n[idx]...}};
+        }(std::make_index_sequence<N>());
+    }
+
+    static auto g_Manufacturer = ZbStr("Orlangur");
+    static auto g_Model = ZbStr("Presence");
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
     static ld2412::Component g_ld2412;
