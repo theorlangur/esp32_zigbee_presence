@@ -12,7 +12,7 @@
 
 namespace zb
 {
-    constexpr uint8_t PRESENCE_EP = 10;
+    constexpr uint8_t PRESENCE_EP = 1;
 
     static char g_Manufacturer[] = "\x08Orlangur\0";
     static char g_Model[] = "\x08Presence\0";
@@ -32,10 +32,29 @@ namespace zb
         g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
                 esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
                 {
-                APILock l;
-                esp_zb_zcl_set_attribute_val(PRESENCE_EP,
-                        ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                        ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, &val, false);
+                    APILock l;
+                    auto status = esp_zb_zcl_set_attribute_val(PRESENCE_EP,
+                            ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                            ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, &val, false);
+
+                    if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
+                    {
+                        FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status);
+                    }
+
+                    if (false)
+                    {
+                        FMT_PRINT("Reporting Presence: {}\n", (int)presence);
+                        esp_zb_zcl_report_attr_cmd_t report_attr_cmd;
+                        report_attr_cmd.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+                        report_attr_cmd.zcl_basic_cmd.dst_addr_u.addr_short = 0x0;//coordinator
+                        report_attr_cmd.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+                        report_attr_cmd.zcl_basic_cmd.dst_endpoint = {};
+                        report_attr_cmd.attributeID = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID;
+                        report_attr_cmd.cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE;
+                        report_attr_cmd.clusterID = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING;
+                        ESP_ERROR_CHECK(esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd));
+                    }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
                 });
@@ -51,16 +70,16 @@ namespace zb
 
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
     {
-        esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
+        static esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
             {                                                                                       
                 .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,                          
                 .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DEFAULT_VALUE,                        
             };                                                                                      
-        esp_zb_identify_cluster_cfg_t identify_cfg =                                                                             
+        static esp_zb_identify_cluster_cfg_t identify_cfg =                                                                             
             {                                                                                       
                 .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,                   
             };                                                                                      
-        esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
+        static esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
             {                                                                                       
                 /*uint8_t*/  .occupancy = 0,                                                               /*!<  Bit 0 specifies the sensed occupancy as follows: 1 = occupied, 0 = unoccupied. */
                 /*uint32_t*/ .sensor_type = ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC, /*!<  The attribute specifies the type of the occupancy sensor */
@@ -168,7 +187,7 @@ namespace zb
 
         /* Config the reporting info  */
         esp_zb_zcl_reporting_info_t reporting_info = {
-            .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
+            .direction = ESP_ZB_ZCL_REPORT_DIRECTION_RECV,//ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
             .ep = PRESENCE_EP,
             .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
             .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
@@ -189,7 +208,7 @@ namespace zb
             .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
         };
 
-        esp_zb_zcl_update_reporting_info(&reporting_info);
+        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
         ESP_LOGI(TAG, "ZB updated attribute reporting");
         fflush(stdout);
 
