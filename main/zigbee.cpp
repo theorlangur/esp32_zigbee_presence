@@ -32,8 +32,8 @@ namespace zb
         }(std::make_index_sequence<N>());
     }
 
-    static auto g_Manufacturer = ZbStr("Orlangur");
-    static auto g_Model = ZbStr("Presence");
+    static auto g_Manufacturer = ZbStr("Ion");
+    static auto g_Model = ZbStr("Occup");
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
     static ld2412::Component g_ld2412;
