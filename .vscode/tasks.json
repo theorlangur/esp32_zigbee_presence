@@ -16,6 +16,11 @@
             "command": "idf.py flash"
         },
         {
+            "label": "Erase Flash",
+            "type": "shell",
+            "command": "idf.py erase-flash"
+        },
+        {
             "label": "Monitor",
             "type": "shell",
             "command": "idf.py monitor"
