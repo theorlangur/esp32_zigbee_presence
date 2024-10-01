@@ -110,7 +110,10 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_identify_cluster_create(&identify_cfg), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, esp_zb_occupancy_sensing_cluster_create(&presence_cfg), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
+        uint16_t delay = 10;
+        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
 
         esp_zb_endpoint_config_t endpoint_config = {
             .endpoint = ep_id,
@@ -141,6 +144,17 @@ namespace zb
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
                 bool sensor_init_ok = setup_sensor();
+
+                {
+                    uint16_t timeout = g_ld2412.GetTimeout();
+                    auto status = esp_zb_zcl_set_attribute_val(PRESENCE_EP,
+                            ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+                            ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &timeout, false);
+                    if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
+                    {
+                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status);
+                    }
+                }
                 ESP_LOGI(TAG, "Deferred sensor initialization %s", !sensor_init_ok ? "failed" : "successful");
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
@@ -174,9 +188,58 @@ namespace zb
         }
     }
 
+    static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message)
+    {
+        esp_err_t ret = ESP_OK;
+
+        ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
+        ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
+                            message->info.status);
+        ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
+                 message->attribute.id, message->attribute.data.size);
+        bool processed = false;
+        if (message->info.dst_endpoint == PRESENCE_EP) {
+            if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
+                if (message->attribute.id == ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16) {
+                    processed = true;
+                    if (message->attribute.data.value)
+                    {
+                        auto to = *(uint16_t *)message->attribute.data.value;
+                        FMT_PRINT("Changing timeout to {}\n");
+                        g_ld2412.ChangeTimeout(to);
+                    }else
+                    {
+                        FMT_PRINT("Try to change timeout but empty value\n");
+                    }
+                }
+            }
+        }
+        if (!processed)
+        {
+            FMT_PRINT("Got unhandled 'set attr' command for EP:{:x}; Cluster:{:x}; Attr:{:x}\n", message->info.dst_endpoint, message->info.cluster, message->attribute.id);
+        }
+        return ret;
+    }
+
+    static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
+    {
+        esp_err_t ret = ESP_OK;
+        switch (callback_id) {
+        case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
+            ret = zb_attribute_handler((esp_zb_zcl_set_attr_value_message_t *)message);
+            break;
+        default:
+            ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
+            break;
+        }
+        return ret;
+    }
+
+#define MEM_INFO(TAG) FMT_PRINT(TAG "{}\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT))
     void zigbee_main(void *)
     {
         ESP_LOGI(TAG, "ZB main");
+        MEM_INFO("ZB main mem: ");
         fflush(stdout);
         esp_zb_cfg_t zb_nwk_cfg = {                                                               
             .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
@@ -190,22 +253,27 @@ namespace zb
         };
         esp_zb_init(&zb_nwk_cfg);
         ESP_LOGI(TAG, "ZB after init");
+        MEM_INFO("Mem after init: ");
         fflush(stdout);
 
         //config clusters here
         esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
         create_presence_ep(ep_list, PRESENCE_EP);
+        MEM_INFO("Mem after create ep: ");
         ESP_LOGI(TAG, "ZB created ep");
         fflush(stdout);
 
         /* Register the device */
         esp_zb_device_register(ep_list);
+        MEM_INFO("Mem after register: ");
+        esp_zb_core_action_handler_register(zb_action_handler);
+        MEM_INFO("Mem after register handler: ");
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 
         /* Config the reporting info  */
         esp_zb_zcl_reporting_info_t reporting_info = {
-            .direction = ESP_ZB_ZCL_REPORT_DIRECTION_RECV,//ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
+            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
             .ep = PRESENCE_EP,
             .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
             .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
@@ -227,6 +295,32 @@ namespace zb
         };
 
         ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
+        MEM_INFO("Mem attr report update 1: ");
+
+        esp_zb_zcl_reporting_info_t reporting_info_delay = {
+            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
+            .ep = PRESENCE_EP,
+            .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+            .attr_id = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID,
+            .flags = {},
+            .run_time = {},
+            .u = {
+                .send_info = {
+                    .min_interval = 1,
+                    .max_interval = 0,
+                    .delta = {.u8 = 1},
+                    .reported_value = {.u16 = 10},//current value?
+                    .def_min_interval = 1,
+                    .def_max_interval = 0,
+                }
+            },
+            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
+            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        };
+        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info_delay));
+        MEM_INFO("Mem attr report update 2: ");
+
         ESP_LOGI(TAG, "ZB updated attribute reporting");
         fflush(stdout);
 
