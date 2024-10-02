@@ -6,11 +6,11 @@
 #include "functional/functional.hpp"
 #include "uart_functional.hpp"
 
-class LD2412: protected uart::Channel
+class LD2412: public uart::Channel
 {
 public:
     static const constexpr duration_ms_t kRestartTimeout{2000};
-    static const constexpr duration_ms_t kDefaultWait{250};
+    static const constexpr duration_ms_t kDefaultWait{350};
     static const constexpr bool kDebugFrame = false;
     static const constexpr bool kDebugCommands = false;
     enum class ErrorCode: uint8_t
@@ -423,7 +423,7 @@ private:
 
     uint8_t m_BluetoothMAC[6] = {0};
     DistanceRes m_DistanceRes = DistanceRes::_0_75;
-
+public:
     struct DbgNow
     {
         DbgNow(LD2412 *pC): m_Dbg(pC->m_dbg), m_PrevDbg(pC->m_dbg) { m_Dbg = true; }

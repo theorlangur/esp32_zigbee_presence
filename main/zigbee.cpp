@@ -60,7 +60,7 @@ namespace zb
                         FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status);
                     }
 
-                    if (false)
+                    if (true)
                     {
                         FMT_PRINT("Reporting Presence: {}\n", (int)presence);
                         esp_zb_zcl_report_attr_cmd_t report_attr_cmd;
@@ -130,6 +130,35 @@ namespace zb
                             TAG, "Failed to start Zigbee bdb commissioning");
     }
 
+    static void configure_reporting()
+    {
+        esp_zb_zcl_reset_all_reporting_info();
+        /* Config the reporting info  */
+        esp_zb_zcl_reporting_info_t reporting_info = {
+            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
+            .ep = PRESENCE_EP,
+            .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
+            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+            .attr_id = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
+            .flags = {},
+            .run_time = {},
+            .u = {
+                .send_info = {
+                    .min_interval = 1,
+                    .max_interval = 0,
+                    .delta = {.u8 = 1},
+                    .reported_value = {.u8 = 0},//current value?
+                    .def_min_interval = 1,
+                    .def_max_interval = 0,
+                }
+            },
+            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
+            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        };
+
+        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
+    }
+
     extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     {
         uint32_t *p_sg_p     = signal_struct->p_app_signal;
@@ -195,8 +224,8 @@ namespace zb
         ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
         ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
                             message->info.status);
-        ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d)", message->info.dst_endpoint, message->info.cluster,
-                 message->attribute.id, message->attribute.data.size);
+        ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d), data type(%d)", message->info.dst_endpoint, message->info.cluster,
+                 message->attribute.id, message->attribute.data.size, message->attribute.data.type);
         bool processed = false;
         if (message->info.dst_endpoint == PRESENCE_EP) {
             if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
@@ -205,14 +234,20 @@ namespace zb
                     if (message->attribute.data.value)
                     {
                         auto to = *(uint16_t *)message->attribute.data.value;
-                        FMT_PRINT("Changing timeout to {}\n");
+                        FMT_PRINT("Changing timeout to {}\n", to);
                         g_ld2412.ChangeTimeout(to);
                     }else
                     {
                         FMT_PRINT("Try to change timeout but empty value\n");
                     }
                 }
+            }else
+            {
+                FMT_PRINT("Unexpected attribute {:x} or type {:x}\n", message->attribute.id, (int)message->attribute.data.type);
             }
+        }else
+        {
+                FMT_PRINT("Unexpected endpoint {:x}\n", message->info.dst_endpoint);
         }
         if (!processed)
         {
@@ -235,7 +270,7 @@ namespace zb
         return ret;
     }
 
-#define MEM_INFO(TAG) FMT_PRINT(TAG "{}\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT))
+#define MEM_INFO(TAG) //FMT_PRINT(TAG "{}\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT))
     void zigbee_main(void *)
     {
         ESP_LOGI(TAG, "ZB main");
@@ -262,6 +297,7 @@ namespace zb
         MEM_INFO("Mem after create ep: ");
         ESP_LOGI(TAG, "ZB created ep");
         fflush(stdout);
+        ep_list->endpoint.rep_info_count = 8;
 
         /* Register the device */
         esp_zb_device_register(ep_list);
@@ -271,55 +307,7 @@ namespace zb
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 
-        /* Config the reporting info  */
-        esp_zb_zcl_reporting_info_t reporting_info = {
-            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
-            .ep = PRESENCE_EP,
-            .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-            .attr_id = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
-            .flags = {},
-            .run_time = {},
-            .u = {
-                .send_info = {
-                    .min_interval = 1,
-                    .max_interval = 0,
-                    .delta = {.u8 = 1},
-                    .reported_value = {.u8 = 0},//current value?
-                    .def_min_interval = 1,
-                    .def_max_interval = 0,
-                }
-            },
-            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
-            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        };
-
-        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
-        MEM_INFO("Mem attr report update 1: ");
-
-        esp_zb_zcl_reporting_info_t reporting_info_delay = {
-            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
-            .ep = PRESENCE_EP,
-            .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-            .attr_id = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID,
-            .flags = {},
-            .run_time = {},
-            .u = {
-                .send_info = {
-                    .min_interval = 1,
-                    .max_interval = 0,
-                    .delta = {.u8 = 1},
-                    .reported_value = {.u16 = 10},//current value?
-                    .def_min_interval = 1,
-                    .def_max_interval = 0,
-                }
-            },
-            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
-            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        };
-        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info_delay));
-        MEM_INFO("Mem attr report update 2: ");
+        configure_reporting();
 
         ESP_LOGI(TAG, "ZB updated attribute reporting");
         fflush(stdout);
