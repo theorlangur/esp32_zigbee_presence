@@ -169,7 +169,7 @@ namespace uart
             time_point_t start = clock_t::now();
 
             while((maxWait != kForever) 
-                    && std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - start) >= maxWait)
+                    && (std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - start) < maxWait))
             {
                 if (auto r = c.PeekByte(); !r)
                     return ExpectedResult(std::unexpected(r.error()));
@@ -210,7 +210,7 @@ namespace uart
         {
             using ExpectedResult = std::expected<Channel::Ref, ::Err>;
             ExpectedResult r{std::ref(c)};
-            (void)((bool)(r = c.Send((uint8_t const*)&args, sizeof(args))) ||...);
+            (void)((bool)(r = c.Send((uint8_t const*)&args, sizeof(args))) &&...);
             return r;
         }
 
@@ -310,7 +310,7 @@ namespace uart
         inline auto read_any(Channel &c, Args&&... args)
         {
             Channel::ExpectedResult r(std::ref(c));
-            (void)((bool)(r = uart::primitives::recv_for(c, args)) || ...);
+            (void)((bool)(r = uart::primitives::recv_for(c, args)) && ...);
             return r;
         }
 
@@ -318,7 +318,7 @@ namespace uart
         inline auto read_any_limited(Channel &c, Sz &limit, Args&&... args)
         {
             Channel::ExpectedResult r(std::ref(c));
-            (void)((bool)(r = uart::primitives::recv_for_checked(c, limit, args)) || ...);
+            (void)((bool)(r = uart::primitives::recv_for_checked(c, limit, args)) && ...);
             return r;
         }
     }

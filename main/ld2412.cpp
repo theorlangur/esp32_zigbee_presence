@@ -199,7 +199,7 @@ LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drai
         {
             if (auto r = ReadFrame(); !r)
             {
-                if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
+                if (i > 0)//if i is at least 2 that means that at least 1 iteration was successful 
                 {
                     break;
                 }
