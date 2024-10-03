@@ -45,33 +45,80 @@ namespace zb
         ~APILock() { esp_zb_lock_release(); }
     };
 
+    struct DestAddr
+    {
+        esp_zb_zcl_address_mode_t mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;         /*!< APS addressing mode constants refer to esp_zb_zcl_address_mode_t */
+        esp_zb_addr_u addr;
+
+        constexpr DestAddr() = default;
+        constexpr DestAddr(uint16_t shortAddr): 
+            mode(ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT)
+            , addr{.addr_short = shortAddr}
+        {}
+
+        DestAddr(esp_zb_ieee_addr_t ieeeAddr): 
+            mode(ESP_ZB_APS_ADDR_MODE_64_ENDP_PRESENT)
+        {
+            std::memcpy(addr.addr_long, ieeeAddr, sizeof(esp_zb_ieee_addr_t));
+        }
+    };
+    constexpr static DestAddr g_DestCoordinator{uint16_t(0)};
+
+    template<uint8_t EP, uint16_t ClusterID, uint8_t Role, uint16_t Attr, typename T>
+    struct ZclAttributeAccess
+    {
+        using ZCLResult = std::expected<esp_zb_zcl_status_t, esp_zb_zcl_status_t>;
+        using ESPResult = std::expected<esp_err_t, esp_err_t>;
+        ZCLResult Set(T &v)
+        {
+            auto status = esp_zb_zcl_set_attribute_val(EP, ClusterID, Role, Attr, &v, false);
+            if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
+                return std::unexpected(status);
+            return ESP_ZB_ZCL_STATUS_SUCCESS;
+        }
+
+        ESPResult Report(DestAddr addr = {})
+        {
+            esp_zb_zcl_report_attr_cmd_t report_attr_cmd;
+            report_attr_cmd.address_mode = addr.mode;
+            report_attr_cmd.zcl_basic_cmd.dst_addr_u = addr.addr; //coordinator
+            report_attr_cmd.zcl_basic_cmd.src_endpoint = EP;
+            report_attr_cmd.zcl_basic_cmd.dst_endpoint = {};
+            report_attr_cmd.attributeID = Attr;
+            report_attr_cmd.cluster_role = Role;
+            report_attr_cmd.clusterID = ClusterID;
+            if (auto r = esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd); r != ESP_OK)
+                return std::unexpected(r);
+            return ESP_OK;
+        }
+
+    };
+
+    static ZclAttributeAccess<
+        PRESENCE_EP
+        , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
+        , esp_zb_zcl_occupancy_sensing_occupancy_t> g_OccupancyState;
+
     static bool setup_sensor()
     {
         g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
                 esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
                 {
                     APILock l;
-                    auto status = esp_zb_zcl_set_attribute_val(PRESENCE_EP,
-                            ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                            ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, &val, false);
-
-                    if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
+                    if (auto status = g_OccupancyState.Set(val); !status)
                     {
-                        FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status);
+                        FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status.error());
                     }
 
                     if (true)
                     {
                         FMT_PRINT("Reporting Presence: {}\n", (int)presence);
-                        esp_zb_zcl_report_attr_cmd_t report_attr_cmd;
-                        report_attr_cmd.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-                        report_attr_cmd.zcl_basic_cmd.dst_addr_u.addr_short = 0x0;//coordinator
-                        report_attr_cmd.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-                        report_attr_cmd.zcl_basic_cmd.dst_endpoint = {};
-                        report_attr_cmd.attributeID = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID;
-                        report_attr_cmd.cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE;
-                        report_attr_cmd.clusterID = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING;
-                        ESP_ERROR_CHECK(esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd));
+                        if (auto r = g_OccupancyState.Report(g_DestCoordinator); !r)
+                        {
+                            FMT_PRINT("Failed to report attribute with error {:x}\n", r.error());
+                        }
                     }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
