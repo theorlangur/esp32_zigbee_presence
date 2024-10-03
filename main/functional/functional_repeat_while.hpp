@@ -10,6 +10,12 @@ namespace functional
     {
         template<class F, class Ctx>
             concept can_call_with_ctx = requires(F &&f, Ctx &ctx) { f(ctx); };
+
+        template<class F, class Ctx>
+            concept can_call_with_ctx_and_it = requires(F &&f, Ctx &ctx, int n) { f(ctx, n); };
+
+        template<class F>
+            concept can_call_with_it = requires(F &&f, int n) { f(n); };
     }
 
     template<class Err>
@@ -32,17 +38,20 @@ namespace functional
                 using namespace internals;
                 using ret_type_t = ret_type_continuation_lval_t<ExpVal, decltype(*this), decltype(ctx)>;
 
-                alignas(ret_type_t) uint8_t resMem[sizeof(ret_type_t)];
-                ret_type_t *pRes = nullptr;
+                int iterations = 0;
                 auto while_condition = [](auto &d){
                     if constexpr (can_call_with_ctx<While,Ctx>)
                         return d.w(d.ctx);
                     else
                         return d.w();
                 };
-                auto invoke_default = [](auto &d){
-                    if constexpr (can_call_with_ctx<Default,Ctx>)
+                auto invoke_default = [&](auto &d){
+                    if constexpr (can_call_with_ctx_and_it<Default,Ctx>)
+                        return d.d(d.ctx, iterations);
+                    else if constexpr (can_call_with_ctx<Default,Ctx>)
                         return d.d(d.ctx);
+                    else if constexpr (can_call_with_it<Default>)
+                        return d.d(iterations);
                     else
                         return d.d();
                 };
@@ -61,17 +70,12 @@ namespace functional
                         if constexpr (kPrintContextOnError)
                             printf("repeat_while(%s) iteration returned an error\n", pContext);
                         return te;
-                    }
-                    else
+                    }else
                     {
-                        if (!pRes) pRes = new (resMem) ret_type_t(std::move(te));
-                        else *pRes = std::move(te);
+                        ++iterations;
                     }
                 }
-                if (!pRes)
-                    return invoke_default(*this);
-
-                return *pRes;
+                return invoke_default(*this);
             }
         };
 

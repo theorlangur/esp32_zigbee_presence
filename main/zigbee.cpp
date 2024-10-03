@@ -332,6 +332,6 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_platform_config(&config));
         FMT_PRINT("esp_zb_platform_config done\n");
         
-        xTaskCreate(zigbee_main, "Zigbee_main", 4096, NULL, 5, NULL);
+        xTaskCreate(zigbee_main, "Zigbee_main", 2*4096, NULL, 5, NULL);
     }
 }

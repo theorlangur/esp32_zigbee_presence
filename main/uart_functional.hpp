@@ -62,7 +62,7 @@ namespace uart
                                         return std::ref(ctx.c);
                                   });
                             },
-                /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
+                /*default  */[](ctx_t &ctx, int i)->ExpectedResult{ if (i) return std::ref(ctx.c); else return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, bytes}
                     ,pCtx
                 );
@@ -111,7 +111,7 @@ namespace uart
                                         return MatchAnyResult{std::ref(ctx.c), ctx.match};
                                   });
                             },
-                /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
+                /*default  */[](ctx_t &ctx, int n)->ExpectedResult{ if (n) return MatchAnyResult{std::ref(ctx.c), ctx.match}; else return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, {bytes...}}
                         ,"match_any_bytes"
                 );
@@ -143,7 +143,7 @@ namespace uart
                                         return std::ref(ctx.c);
                                   });
                             },
-                /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_bytes", ESP_OK}); },
+                /*default  */[](ctx_t &ctx, int n)->ExpectedResult{ if (n) return std::ref(ctx.c); else return std::unexpected(::Err{"match_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, pBytes, terminator}
                         , pCtx
                 );
@@ -211,7 +211,7 @@ namespace uart
                                         return MatchAnyResult{std::ref(ctx.c), ctx.match};
                                   });
                             },
-                /*default  */[]()->ExpectedResult{ return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
+                /*default  */[](ctx_t &ctx, int n)->ExpectedResult{ if (n) return MatchAnyResult{std::ref(ctx.c), ctx.match}; else return std::unexpected(::Err{"match_any_bytes", ESP_OK}); },
                 /*context  */ctx_t{c, term, {(const uint8_t*)bytes...}}
                     ,"match_any_bytes_term"
                 );

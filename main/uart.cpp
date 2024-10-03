@@ -283,10 +283,12 @@ namespace uart
         using namespace functional;
         if (wait == kDefaultWait) wait = m_DefaultWait;
         uint8_t b;
+        CHECK_STACK(3500);
         return Read(&b, 1, wait)
             | and_then([&](size_t l)->ExpectedValue<uint8_t>{
                     if (!l)
                     {
+                        CHECK_STACK(100);
                         if (m_Dbg)
                             printf("Nothing to read. Wait: %d\n", wait.count());
                         return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
