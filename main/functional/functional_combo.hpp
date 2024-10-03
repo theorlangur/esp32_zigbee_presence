@@ -29,7 +29,7 @@ namespace functional
         auto operator|(Block1 &&b1, Block2 &&b2)
         {
             return combo_t{[b1=std::move(b1), b2=std::move(b2)]<class E>(E &&e) {
-                if constexpr (internals::is_expected_type_v<E>)
+                if constexpr (is_expected_type_v<E>)
                     return std::move(e) | b1 | b2;
                 else
                     return b1(std::forward<E>(e)) | b2;

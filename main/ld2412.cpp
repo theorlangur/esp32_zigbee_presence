@@ -1,8 +1,6 @@
 #include <cstring>
 #include "ld2412.hpp"
 #include "generic_helpers.hpp"
-#include "functional/functional.hpp"
-#include "uart_functional.hpp"
 
 #define DBG_UART Channel::DbgNow _dbg_uart{this}; 
 #define DBG_ME DbgNow _dbg_me{this}; 
@@ -192,45 +190,46 @@ LD2412::ExpectedResult LD2412::ReadFrame()
 
 LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drain)
 {
-    using namespace functional;
     if (drain != Drain::No)
     {
-        using ExpectedCondition = std::expected<bool, ::Err>;
         //printf("TryReadFRame: draining first\n");
         SetDefaultWait(duration_ms_t(0));
-        int i = 0, maxIterations = 100;
-        auto r = start_sequence(std::ref(*this)) 
-            | repeat_while(
-                     [&]()->ExpectedCondition{ return i < maxIterations; }
-                    ,[&]{ ++i; return ReadFrame(); }
-                    ,[&]()->ExpectedResult{ return std::ref(*this); }
-                    );
-        if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
+        int i = 0;
+        for(; i < 100; ++i)
         {
-            //FMT_PRINT("TryReadFrame: {} iterations\n", i);
-            return std::ref(*this);
-        }
-        else if (drain == Drain::Try)
-        {
-            //FMT_PRINT("TryReadFrame: no iterations; Trying to wait for read\n");
-            return TryReadFrame(attempts, flush, Drain::No);
-        }
-        else
-        {
-            //FMT_PRINT("TryReadFrame: result\n");
-            return r;
+            if (auto r = ReadFrame(); !r)
+            {
+                if (i > 1)//if i is at least 2 that means that at least 1 iteration was successful 
+                {
+                    break;
+                }
+                else if (drain == Drain::Try)
+                {
+                    //FMT_PRINT("TryReadFrame: no iterations; Trying to wait for read\n");
+                    return TryReadFrame(attempts, flush, Drain::No);
+                }else
+                    return r;
+            }
         }
     }else
     {
         //FMT_PRINT("TryReadFrame: no drain\n");
         SetDefaultWait(duration_ms_t(150));
-        return start_sequence(std::ref(*this)) 
-            | if_then(
-                    [&]{ return flush; }
-                    ,[&]{ return Flush() | AdaptToResult("LD2412::TryReadFrame", (m_Mode == SystemMode::Energy) ? ErrorCode::EnergyData_Failure : ErrorCode::SimpleData_Failure); }
-              )
-            | retry_on_fail(attempts, [&]{ return ReadFrame(); });
+        auto ec = (m_Mode == SystemMode::Energy) ? ErrorCode::EnergyData_Failure : ErrorCode::SimpleData_Failure;
+        if (flush)
+            TRY_UART_COMM(Flush(), "LD2412::TryReadFrame", ec);
+
+        for(int i = 0; i < attempts; ++i)
+        {
+            if (auto r = ReadFrame(); !r)
+            {
+                if ((i + 1) == attempts)
+                    return to_result(std::move(r), "LD2412::TryReadFrame", ec);
+            }else
+                return std::ref(*this);
+        }
     }
+    return std::ref(*this);
 }
 
 /**********************************************************************/
@@ -304,36 +303,30 @@ LD2412::ConfigBlock& LD2412::ConfigBlock::SetStillThreshold(uint8_t gate, uint8_
 
 LD2412::ExpectedResult LD2412::ConfigBlock::EndChange()
 {
-    using namespace functional;
     if (!m_Changes)
         return std::ref(d);
     ScopeExit clearChanges = [&]{ m_Changes = 0; };
-    return d.OpenCommandMode()
-        | if_then([&]()->bool{ return m_Changed.Mode; }
-                    , [&]{ d.m_Mode = m_NewMode; return d.SetSystemModeInternal(d.m_Mode); })
-        | if_then([&]()->bool{ return m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout || m_Changed.OutPin; }, 
-                    [&]{ 
-                            d.m_Configuration.m_Base = m_Configuration.m_Base;
-                            return d.SendCommandV2(Cmd::WriteBaseParams
-                                    ,to_send(d.m_Configuration.m_Base)
-                                    ,to_recv());
-                       })
-        | if_then(
-                [&]()->bool{ return m_Changed.MoveThreshold; }, 
-                [&]{ 
-                        std::ranges::copy(m_Configuration.m_MoveThreshold, d.m_Configuration.m_MoveThreshold);
-                        return d.SendCommandV2(Cmd::SetMoveSensitivity
-                                ,to_send(d.m_Configuration.m_MoveThreshold)
-                                ,to_recv());
-                   })
-        | if_then(
-                [&]()->bool{ return m_Changed.StillThreshold; }, 
-                [&]{ 
-                        std::ranges::copy(m_Configuration.m_StillThreshold, d.m_Configuration.m_StillThreshold);
-                        return d.SendCommandV2(Cmd::SetStillSensitivity
-                                ,to_send(d.m_Configuration.m_StillThreshold)
-                                ,to_recv());
-                   })
-        | and_then([&]{ return d.CloseCommandMode(); })
-        | transform_error([&](CmdErr e){ return e.e; });
+    TRY_UART_COMM(d.OpenCommandMode(), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    if (m_Changed.Mode)
+    {
+        d.m_Mode = m_NewMode; 
+        TRY_UART_COMM(d.SetSystemModeInternal(d.m_Mode), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    }
+    if (m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout || m_Changed.OutPin)
+    {
+        d.m_Configuration.m_Base = m_Configuration.m_Base;
+        TRY_UART_COMM(d.SendCommandV2(Cmd::WriteBaseParams ,to_send(d.m_Configuration.m_Base) ,to_recv()), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    }
+    if (m_Changed.MoveThreshold)
+    {
+        std::ranges::copy(m_Configuration.m_MoveThreshold, d.m_Configuration.m_MoveThreshold);
+        TRY_UART_COMM(d.SendCommandV2(Cmd::SetMoveSensitivity ,to_send(d.m_Configuration.m_MoveThreshold) ,to_recv()), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    }
+    if (m_Changed.StillThreshold)
+    {
+        std::ranges::copy(m_Configuration.m_StillThreshold, d.m_Configuration.m_StillThreshold);
+        TRY_UART_COMM(d.SendCommandV2(Cmd::SetStillSensitivity ,to_send(d.m_Configuration.m_StillThreshold) ,to_recv()), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    }
+    TRY_UART_COMM(d.CloseCommandMode(), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    return std::ref(d);
 }

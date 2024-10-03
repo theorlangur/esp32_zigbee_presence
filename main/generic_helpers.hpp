@@ -160,6 +160,20 @@ namespace std{
     }
 };
 
+template<class C>
+struct is_expected_type
+{
+    static constexpr const bool value = false;
+};
+
+template<class V, class E>
+struct is_expected_type<std::expected<V,E>>
+{
+    static constexpr const bool value = true;
+};
+
+template<class C>
+constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::value;
 
 #define CALL_ESP_EXPECTED(location, f) \
     if (auto err = f; err != ESP_OK) \

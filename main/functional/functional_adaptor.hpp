@@ -23,7 +23,7 @@ namespace functional
         template<class ExpVal>
         NewExpected operator()(ExpVal &&v) const
         {
-            if constexpr (internals::is_expected_type_v<std::remove_cvref_t<ExpVal>>)
+            if constexpr (is_expected_type_v<std::remove_cvref_t<ExpVal>>)
             {
                 if (!!v)
                 {

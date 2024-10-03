@@ -155,21 +155,6 @@ namespace functional
 
         template<class Val, class Cont, class... Args>
             using ret_type_continuation_lval_t = decltype(invoke_continuation_lval(std::declval<Val&>(), std::declval<Cont&>(), std::declval<Args>()...));
-
-        template<class C>
-        struct is_expected_type
-        {
-            static constexpr const bool value = false;
-        };
-
-        template<class V, class E>
-        struct is_expected_type<std::expected<V,E>>
-        {
-            static constexpr const bool value = true;
-        };
-
-        template<class C>
-        constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::value;
     }
 
     struct dummy_t 

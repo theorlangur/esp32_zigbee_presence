@@ -512,8 +512,10 @@ namespace ld2412
                     break;
                 }
             });
-            auto e = m_Sensor.Init(args.txPin, args.rxPin) 
-                | functional::and_then([&]{ return m_Sensor.ReloadConfig(); });
+
+            auto e = m_Sensor.Init(args.txPin, args.rxPin);
+            if (!!e)
+                e = m_Sensor.ReloadConfig();
 
             if (!e)
             {

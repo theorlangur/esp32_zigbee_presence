@@ -3,8 +3,6 @@
 
 #include "uart.hpp"
 #include <span>
-#include "functional/functional.hpp"
-#include "uart_functional.hpp"
 #include "uart_primitives.hpp"
 
 class LD2412: public uart::Channel
@@ -306,19 +304,11 @@ private:
     constexpr static uint8_t kDataFrameHeader[] = {0xf4, 0xf3, 0xf2, 0xf1};
     constexpr static uint8_t kDataFrameFooter[] = {0xf8, 0xf7, 0xf6, 0xf5};
 
-    auto AdaptToResult(const char *pLocation, ErrorCode ec)
-    {
-        return functional::adapt_to<ExpectedResult>(
-                      [this](auto &c){ return std::ref(*this); }
-                    , [&,pLocation,ec](::Err e){ return Err{e, pLocation, ec}; }
-                );
-    }
-
     template<class E>
     static ExpectedResult to_result(E &&e, const char* pLocation, ErrorCode ec)
     {
         using PureE = std::remove_cvref_t<E>;
-        if constexpr(functional::internals::is_expected_type_v<PureE>)
+        if constexpr(is_expected_type_v<PureE>)
         {
             if constexpr (std::is_same_v<PureE, ExpectedResult>)
                 return std::move(e);
@@ -341,7 +331,7 @@ private:
     static ExpectedGenericCmdResult to_cmd_result(E &&e, const char* pLocation, ErrorCode ec)
     {
         using PureE = std::remove_cvref_t<E>;
-        if constexpr(functional::internals::is_expected_type_v<PureE>)
+        if constexpr(is_expected_type_v<PureE>)
         {
             if constexpr (std::is_same_v<PureE, ExpectedGenericCmdResult>)
                 return std::move(e);
@@ -359,16 +349,6 @@ private:
             return ExpectedGenericCmdResult(std::unexpected(CmdErr{}));
         }
     }
-
-    auto AdaptToCmdResult()
-    {
-        return functional::adapt_to<ExpectedGenericCmdResult>(
-                      [&](auto &c){ return std::ref(*this); }
-                    , [&](Err e){ return CmdErr{e, 0}; }
-                );
-    }
-
-    static auto AdaptError(const char *pLocation, ErrorCode ec) { return functional::transform_error([pLocation,ec](::Err e){ return Err{e, pLocation, ec}; }); }
 
 #define TRY_UART_COMM(f, location, ec) \
     if (auto r = f; !r) \
@@ -402,7 +382,7 @@ private:
     template<class...T>
     ExpectedResult RecvFrameV2(T&&... args)
     {
-        constexpr const size_t arg_size = (uart::uart_sizeof<std::remove_cvref_t<T>>() + ...);
+        constexpr const size_t arg_size = (uart::primitives::uart_sizeof<std::remove_cvref_t<T>>() + ...);
         if (m_dbg) m_Dbg = true;
         ScopeExit resetDbg = [&]{ if (m_dbg) m_Dbg = false; };
         TRY_UART_COMM(uart::primitives::match_bytes(*this, kFrameHeader), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
