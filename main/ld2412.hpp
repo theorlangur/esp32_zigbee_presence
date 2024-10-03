@@ -313,6 +313,12 @@ private:
                 );
     }
 
+
+    auto ChannelResultToThisResult(auto &err, const char *pLocation, ErrorCode ec)
+    {
+        return ExpectedResult(std::unexpected(Err{err, pLocation, ec}));
+    }
+
     auto AdaptToCmdResult()
     {
         return functional::adapt_to<ExpectedGenericCmdResult>(
@@ -326,15 +332,25 @@ private:
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
-        using namespace functional;
-        return Send(kFrameHeader, sizeof(kFrameHeader))
-            | and_then([&]{ 
-                    uint16_t len = (sizeof(args) + ...);
-                    return Send((uint8_t const*)&len, sizeof(len)); 
-            })
-            | uart::write_any(*this, std::forward<T>(args)...)
-            | and_then([&]{ return Send(kFrameFooter, sizeof(kFrameFooter)); })
-            | AdaptToResult("SendFrameV2", ErrorCode::SendFrame);
+        //1. header
+        if (auto r = Send(kFrameHeader, sizeof(kFrameHeader)); !r)
+            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+
+        //2. length
+        {
+            uint16_t len = (sizeof(args) + ...);
+            if (auto r = Send((uint8_t const*)&len, sizeof(len)); !r) 
+                return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+        }
+        //3. data
+        if (auto r = SendAny(std::forward<T>(args)...); !r)
+            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+
+        //4. footer
+        if (auto r = Send(kFrameFooter, sizeof(kFrameFooter)); !r)
+            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+
+        return std::ref(*this);
     }
 
     template<class...T>
