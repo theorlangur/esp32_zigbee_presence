@@ -83,6 +83,7 @@ namespace zb
             fflush(stdout);
             return false;
         }
+        ESP_LOGI(TAG, "Sensor setup done");
         return true;
     }
 
@@ -270,40 +271,36 @@ namespace zb
         return ret;
     }
 
-#define MEM_INFO(TAG) //FMT_PRINT(TAG "{}\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT))
     void zigbee_main(void *)
     {
         ESP_LOGI(TAG, "ZB main");
-        MEM_INFO("ZB main mem: ");
         fflush(stdout);
-        esp_zb_cfg_t zb_nwk_cfg = {                                                               
-            .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
-            .install_code_policy = false,           
-            .nwk_cfg = {
-                .zed_cfg = {                                        
-                    .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_16MIN,                         
-                    .keep_alive = 3000,                            
-                }
-            },                                                          
-        };
-        esp_zb_init(&zb_nwk_cfg);
+        {
+            esp_zb_cfg_t zb_nwk_cfg = {                                                               
+                .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
+                .install_code_policy = false,           
+                .nwk_cfg = {
+                    .zed_cfg = {                                        
+                        .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_16MIN,                         
+                        .keep_alive = 3000,                            
+                    }
+                },                                                          
+            };
+            esp_zb_init(&zb_nwk_cfg);
+        }
         ESP_LOGI(TAG, "ZB after init");
-        MEM_INFO("Mem after init: ");
         fflush(stdout);
 
         //config clusters here
         esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
         create_presence_ep(ep_list, PRESENCE_EP);
-        MEM_INFO("Mem after create ep: ");
         ESP_LOGI(TAG, "ZB created ep");
         fflush(stdout);
         ep_list->endpoint.rep_info_count = 8;
 
         /* Register the device */
         esp_zb_device_register(ep_list);
-        MEM_INFO("Mem after register: ");
         esp_zb_core_action_handler_register(zb_action_handler);
-        MEM_INFO("Mem after register handler: ");
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 

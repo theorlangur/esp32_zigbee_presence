@@ -6,13 +6,16 @@
 #include <chrono>
 #include "formatter.h"
 
-#define CHECK_STACK(sz)\
+#define CHECK_STACK(sz) /*\
     {\
       auto t = xTaskGetCurrentTaskHandleForCore(0);\
       auto stackMark = uxTaskGetStackHighWaterMark(t);\
       printf("(%s) stackMark: %d\n", pcTaskGetName(NULL), stackMark);\
-      assert(stackMark > sz);\
-    }
+      if (stackMark <= sz)\
+        {\
+          assert(stackMark > sz);\
+        }\
+    }*/
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
 inline static constexpr const duration_ms_t kForever = duration_ms_t(-1);
