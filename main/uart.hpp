@@ -114,6 +114,14 @@ namespace uart
         ExpectedValue<uint8_t> ReadByte(duration_ms_t wait=kDefaultWait);
         ExpectedValue<uint8_t> PeekByte(duration_ms_t wait=kDefaultWait);
 
+        template<class... Args>
+        auto SendAny(Args&&... args)
+        {
+            ExpectedResult r{std::ref(*this)};
+            (void)((bool)(r = Send((uint8_t const*)&args, sizeof(args))) ||...);
+            return r;
+        }
+
         using EventCallback = GenericCallback<void(uart_event_type_t)>;
         void SetEventCallback(EventCallback cb) { m_EventCallback = std::move(cb); }
 
