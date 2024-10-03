@@ -5,6 +5,7 @@
 #include <span>
 #include "functional/functional.hpp"
 #include "uart_functional.hpp"
+#include "uart_primitives.hpp"
 
 class LD2412: public uart::Channel
 {
@@ -313,10 +314,50 @@ private:
                 );
     }
 
-
-    auto ChannelResultToThisResult(auto &err, const char *pLocation, ErrorCode ec)
+    template<class E>
+    static ExpectedResult to_result(E &&e, const char* pLocation, ErrorCode ec)
     {
-        return ExpectedResult(std::unexpected(Err{err, pLocation, ec}));
+        using PureE = std::remove_cvref_t<E>;
+        if constexpr(functional::internals::is_expected_type_v<PureE>)
+        {
+            if constexpr (std::is_same_v<PureE, ExpectedResult>)
+                return std::move(e);
+            else
+                return to_result(e.error(), pLocation, ec);
+        }else if constexpr (std::is_same_v<PureE,::Err>)
+            return ExpectedResult(std::unexpected(Err{e, pLocation, ec}));
+        else if constexpr (std::is_same_v<PureE,Err>)
+            return ExpectedResult(std::unexpected(e));
+        else if constexpr (std::is_same_v<PureE,CmdErr>)
+            return ExpectedResult(std::unexpected(e.e));
+        else
+        {
+            static_assert(std::is_same_v<PureE,Err>, "Don't know how to convert passed type");
+            return ExpectedResult(std::unexpected(Err{}));
+        }
+    }
+
+    template<class E>
+    static ExpectedGenericCmdResult to_cmd_result(E &&e, const char* pLocation, ErrorCode ec)
+    {
+        using PureE = std::remove_cvref_t<E>;
+        if constexpr(functional::internals::is_expected_type_v<PureE>)
+        {
+            if constexpr (std::is_same_v<PureE, ExpectedGenericCmdResult>)
+                return std::move(e);
+            else
+                return to_cmd_result(e.error(), pLocation, ec);
+        }else if constexpr (std::is_same_v<PureE,::Err>)
+            return ExpectedGenericCmdResult(std::unexpected(CmdErr{Err{e, pLocation, ec}, 0}));
+        else if constexpr (std::is_same_v<PureE,Err>)
+            return ExpectedGenericCmdResult(std::unexpected(CmdErr{e, 0}));
+        else if constexpr (std::is_same_v<PureE,CmdErr>)
+            return ExpectedGenericCmdResult(std::unexpected(e));
+        else
+        {
+            static_assert(std::is_same_v<PureE,Err>, "Don't know how to convert passed type");
+            return ExpectedGenericCmdResult(std::unexpected(CmdErr{}));
+        }
     }
 
     auto AdaptToCmdResult()
@@ -329,26 +370,31 @@ private:
 
     static auto AdaptError(const char *pLocation, ErrorCode ec) { return functional::transform_error([pLocation,ec](::Err e){ return Err{e, pLocation, ec}; }); }
 
+#define TRY_UART_COMM(f, location, ec) \
+    if (auto r = f; !r) \
+        return to_result(std::move(r), location, ec)
+
+#define TRY_UART_COMM_CMD(f, location, ec) \
+    if (auto r = f; !r) \
+        return to_cmd_result(std::move(r), location, ec)
+
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
+        using namespace uart::primitives;
         //1. header
-        if (auto r = Send(kFrameHeader, sizeof(kFrameHeader)); !r)
-            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+        TRY_UART_COMM(Send(kFrameHeader, sizeof(kFrameHeader)), "SendFrameV2", ErrorCode::SendFrame);
 
         //2. length
         {
             uint16_t len = (sizeof(args) + ...);
-            if (auto r = Send((uint8_t const*)&len, sizeof(len)); !r) 
-                return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+            TRY_UART_COMM(Send((uint8_t const*)&len, sizeof(len)), "SendFrameV2", ErrorCode::SendFrame);
         }
         //3. data
-        if (auto r = SendAny(std::forward<T>(args)...); !r)
-            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+        TRY_UART_COMM(uart::primitives::write_any(*this, std::forward<T>(args)...), "SendFrameV2", ErrorCode::SendFrame);
 
         //4. footer
-        if (auto r = Send(kFrameFooter, sizeof(kFrameFooter)); !r)
-            return ChannelResultToThisResult(r.error(), "SendFrameV2", ErrorCode::SendFrame);
+        TRY_UART_COMM(Send(kFrameFooter, sizeof(kFrameFooter)), "SendFrameV2", ErrorCode::SendFrame);
 
         return std::ref(*this);
     }
@@ -356,28 +402,24 @@ private:
     template<class...T>
     ExpectedResult RecvFrameV2(T&&... args)
     {
-        using namespace functional;
-        uint16_t len;
         constexpr const size_t arg_size = (uart::uart_sizeof<std::remove_cvref_t<T>>() + ...);
         if (m_dbg) m_Dbg = true;
         ScopeExit resetDbg = [&]{ if (m_dbg) m_Dbg = false; };
-        return 
-                start_sequence()
-                | uart::match_bytes(*this, kFrameHeader)
-                | and_then([&]{ if (m_dbg) FMT_PRINT("RecvFrameV2: matched header\n"); })
-                | uart::read_into(*this, len)
-                | and_then([&]()->Channel::ExpectedResult{
-                        if (m_dbg) FMT_PRINT("RecvFrameV2: len: {}\n", len);
-                        if (arg_size > len)
-                            return std::unexpected(::Err{"RecvFrameV2 len invalid", ESP_OK}); 
-                        return std::ref((Channel&)*this);
-                  })
-                | uart::read_any_limited(*this, len, std::forward<T>(args)...)
-                | if_then(
-                  /*if*/   [&]{ return len; }
-                  /*then*/,[&]{ return start_sequence() | uart::skip_bytes(*this, len); })
-                | uart::match_bytes(*this, kFrameFooter)
-                | AdaptToResult("RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        TRY_UART_COMM(uart::primitives::match_bytes(*this, kFrameHeader), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        if (m_dbg) FMT_PRINT("RecvFrameV2: matched header\n"); 
+        uint16_t len;
+        TRY_UART_COMM(uart::primitives::read_into(*this, len), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        if (m_dbg) FMT_PRINT("RecvFrameV2: len: {}\n", len);
+        if (arg_size > len)
+            return std::unexpected(Err{{}, "RecvFrameV2 len invalid", ErrorCode::RecvFrame_Malformed}); 
+
+        TRY_UART_COMM(uart::primitives::read_any_limited(*this, len, std::forward<T>(args)...), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        if (len)
+        {
+            TRY_UART_COMM(uart::primitives::skip_bytes(*this, len), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        }
+        TRY_UART_COMM(uart::primitives::match_bytes(*this, kFrameFooter), "RecvFrameV2", ErrorCode::RecvFrame_Malformed);
+        return std::ref(*this);
     }
 
     template<class... ToSend> static auto to_send(ToSend&&...args) { return std::forward_as_tuple(std::forward<ToSend>(args)...); }
@@ -386,7 +428,6 @@ private:
     template<class CmdT, class... ToSend, class... ToRecv>
     ExpectedGenericCmdResult SendCommandV2(CmdT cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
     {
-        using namespace functional;
         static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
         if (GetDefaultWait() < kDefaultWait)
             SetDefaultWait(kDefaultWait);
@@ -396,9 +437,9 @@ private:
         };
         auto RecvFrameExpandArgs = [&]<size_t...idx>(std::index_sequence<idx...>){ 
             return RecvFrameV2(
-                uart::match_t{uint16_t(cmd | 0x100)}, 
+                uart::primitives::match_t{uint16_t(cmd | 0x100)}, 
                 status, 
-                uart::callback_t{[&]()->Channel::ExpectedResult{
+                uart::primitives::callback_t{[&]()->Channel::ExpectedResult{
                     if (m_dbg) FMT_PRINT("Recv frame resp. Status {}\n", status);
                     if (status != 0)
                         return std::unexpected(::Err{"SendCommandV2 status", status});
@@ -406,18 +447,15 @@ private:
                 }},
                 std::get<idx>(recvArgs)...);
         };
-        return Flush() 
-                | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed)
-                | and_then([&]{ 
-                        if (m_dbg) FMT_PRINT("Sent cmd {}\n", uint16_t(cmd));
-                        return SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()); })
-                | and_then([&]{ 
-                        if (m_dbg) FMT_PRINT("Wait all\n");
-                        return WaitAllSent() | AdaptError("SendCommandV2", ErrorCode::SendCommand_Failed); })
-                | and_then([&]{ 
-                        if (m_dbg) FMT_PRINT("Receiving {} args\n", sizeof...(ToRecv));
-                        return RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()); })
-                | AdaptToCmdResult();
+
+        TRY_UART_COMM_CMD(Flush(), "SendCommandV2", ErrorCode::SendCommand_Failed);
+        if (m_dbg) FMT_PRINT("Sent cmd {}\n", uint16_t(cmd));
+        TRY_UART_COMM_CMD(SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
+        if (m_dbg) FMT_PRINT("Wait all\n");
+        TRY_UART_COMM_CMD(WaitAllSent(), "SendCommandV2", ErrorCode::SendCommand_Failed);
+        if (m_dbg) FMT_PRINT("Receiving {} args\n", sizeof...(ToRecv));
+        TRY_UART_COMM_CMD(RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
+        return std::ref(*this);
     }
 
     ExpectedOpenCmdModeResult OpenCommandMode();

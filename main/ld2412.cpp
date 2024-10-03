@@ -59,107 +59,97 @@ uart::Port LD2412::GetPort() const
 
 LD2412::ExpectedResult LD2412::Init(int txPin, int rxPin)
 {
-    using namespace functional;
     SetDefaultWait(kDefaultWait);
-    return Configure() 
-        | and_then([&]{ return SetPins(txPin, rxPin); })
-        | and_then([&]{ return Open(); })
-        | AdaptToResult("LD2412::Init", ErrorCode::Init)
-        | and_then([&]{ return ReloadConfig(); });
+    TRY_UART_COMM(Configure(), "Init", ErrorCode::Init);
+    SetPins(txPin, rxPin);
+    TRY_UART_COMM(Open(), "Init", ErrorCode::Init);
+    return ReloadConfig();
 }
 
 LD2412::ExpectedResult LD2412::ReloadConfig()
 {
-    using namespace functional;
-    return OpenCommandMode()
-        | and_then([&]{ return UpdateVersion(); })
-        | and_then([&]{ return SendCommandV2(Cmd::ReadBaseParams, to_send(), to_recv(m_Configuration.m_Base)); })
-        | and_then([&]{ return SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)); })
-        | and_then([&]{ return SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)); })
-        | and_then([&]{ return SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)); })
-        | and_then([&]{ return CloseCommandMode(); })
-        | transform_error([&](CmdErr e){ return e.e; });
+    TRY_UART_COMM(OpenCommandMode(), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(UpdateVersion(), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::ReadBaseParams, to_send(), to_recv(m_Configuration.m_Base)), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(CloseCommandMode(), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    return std::ref(*this);
 }
 
 LD2412::ExpectedResult LD2412::UpdateDistanceRes()
 {
-    using namespace functional;
-    return OpenCommandMode()
-        | and_then([&]{ return SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)); })
-        | and_then([&]{ return CloseCommandMode(); })
-        | transform_error([&](CmdErr e){ return e.e; });
+    TRY_UART_COMM(OpenCommandMode(), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(CloseCommandMode(), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
+    return std::ref(*this);
 }
 
 LD2412::ExpectedResult LD2412::SwitchBluetooth(bool on)
 {
-    using namespace functional;
     SetDefaultWait(kDefaultWait);
-    return OpenCommandMode()
-        | and_then([&]{ return SendCommandV2(Cmd::SwitchBluetooth, to_send(uint16_t(on)), to_recv()); })
-        | transform_error([&](CmdErr e){ return e.e; })
-        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
-        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::SwitchBluetooth", ErrorCode::BTFailed))
-        | if_then(//after restart the default mode 'Simple'. We might want to switch
-          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
-          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
-                )
-        | and_then([&]{ return ReloadConfig(); });
+    TRY_UART_COMM(OpenCommandMode(), "SwitchBluetooth", ErrorCode::BTFailed);
+    TRY_UART_COMM(SendCommandV2(Cmd::SwitchBluetooth, to_send(uint16_t(on)), to_recv()), "SwitchBluetooth", ErrorCode::BTFailed);
+    TRY_UART_COMM(SendFrameV2(Cmd::Restart), "SwitchBluetooth", ErrorCode::BTFailed);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); 
+    TRY_UART_COMM(uart::primitives::flush_and_wait(*this, kRestartTimeout), "SwitchBluetooth", ErrorCode::BTFailed);
+    if (m_Mode != SystemMode::Simple)
+    {
+        auto rs = ChangeConfiguration().SetSystemMode(m_Mode).EndChange();
+        TRY_UART_COMM(rs, "SwitchBluetooth", ErrorCode::BTFailed);
+    }
+    return ReloadConfig();
 }
 
 LD2412::ExpectedResult LD2412::Restart()
 {
-    using namespace functional;
     SetDefaultWait(kDefaultWait);
-    return OpenCommandMode()
-        | transform_error([&](CmdErr e){ return e.e; })
-        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ std::this_thread::sleep_for(std::chrono::seconds(1)); })
-        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::RestartFailed))
-        | if_then(//after restart the default mode 'Simple'. We might want to switch
-          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
-          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
-                );
+    TRY_UART_COMM(OpenCommandMode(), "Restart", ErrorCode::RestartFailed);
+    TRY_UART_COMM(SendFrameV2(Cmd::Restart), "Restart", ErrorCode::RestartFailed);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); 
+    TRY_UART_COMM(uart::primitives::flush_and_wait(*this, kRestartTimeout), "Restart", ErrorCode::RestartFailed);
+    if (m_Mode != SystemMode::Simple)
+    {
+        auto rs = ChangeConfiguration().SetSystemMode(m_Mode).EndChange();
+        TRY_UART_COMM(rs, "SwitchBluetooth", ErrorCode::BTFailed);
+    }
+    return std::ref(*this);
 }
 
 LD2412::ExpectedResult LD2412::FactoryReset()
 {
-    using namespace functional;
     SetDefaultWait(duration_ms_t(1000));
-    return OpenCommandMode()
-        | and_then([&]{ return SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()); })
-        | transform_error([&](CmdErr e){ return e.e; })
-        | and_then([&]{ FMT_PRINT("Factory reset after cmd\n"); })
-        | and_then([&]{ return SendFrameV2(Cmd::Restart); })
-        | and_then([&]{ FMT_PRINT("Restart sent\n"); })
-        | and_then([&]{ SetDefaultWait(kDefaultWait); std::this_thread::sleep_for(std::chrono::seconds(1)); })
-        | uart::flush_and_wait(*this, kRestartTimeout, AdaptToResult("LD2412::Restart", ErrorCode::FactoryResetFailed))
-        | if_then(//after restart the default mode 'Simple'. We might want to switch
-          /*if*/    [&]{ return m_Mode != SystemMode::Simple; },
-          /*then*/  [&]{ return ChangeConfiguration().SetSystemMode(m_Mode).EndChange(); }
-                )
-        | and_then([&]{ FMT_PRINT("Reloading config\n"); })
-        | and_then([&]{ return ReloadConfig(); });
-    return std::ref(*this);
+    TRY_UART_COMM(OpenCommandMode(), "FactoryReset", ErrorCode::FactoryResetFailed);
+    TRY_UART_COMM(SendCommandV2(Cmd::FactoryReset, to_send(), to_recv()), "FactoryReset", ErrorCode::FactoryResetFailed);
+    TRY_UART_COMM(SendFrameV2(Cmd::Restart), "FactoryReset", ErrorCode::FactoryResetFailed);
+    std::this_thread::sleep_for(std::chrono::seconds(1)); 
+    TRY_UART_COMM(uart::primitives::flush_and_wait(*this, kRestartTimeout), "FactoryReset", ErrorCode::FactoryResetFailed);
+    if (m_Mode != SystemMode::Simple)
+    {
+        auto rs = ChangeConfiguration().SetSystemMode(m_Mode).EndChange();
+        TRY_UART_COMM(rs, "FactoryReset", ErrorCode::FactoryResetFailed);
+    }
+    return ReloadConfig();
 }
 
 LD2412::ExpectedOpenCmdModeResult LD2412::OpenCommandMode()
 {
-    using namespace functional;
     uint16_t protocol_version = 1;
     OpenCmdModeResponse r;
-    return SendFrameV2(Cmd::OpenCmd, protocol_version)
-        | and_then([&]{ std::this_thread::sleep_for(duration_ms_t(100)); })
-        | transform_error([](Err e){ return CmdErr{e, 0}; })
-        | and_then([&]{ return SendCommandV2(Cmd::OpenCmd, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); })
-        | and_then([&]()->ExpectedOpenCmdModeResult{ return OpenCmdModeRetVal{std::ref(*this), r}; });
+    if (auto r = SendFrameV2(Cmd::OpenCmd, protocol_version); !r)
+        return std::unexpected(CmdErr{r.error(), 0});
+    std::this_thread::sleep_for(duration_ms_t(100)); 
+
+    if (auto rs = SendCommandV2(Cmd::OpenCmd, to_send(protocol_version), to_recv(r.protocol_version, r.buffer_size)); !rs)
+        return std::unexpected(rs.error());
+
+    return OpenCmdModeRetVal{std::ref(*this), r};
 }
 
 LD2412::ExpectedGenericCmdResult LD2412::CloseCommandMode()
 {
-    using namespace functional;
-    return SendCommandV2(Cmd::CloseCmd, to_send(), to_recv())
-            | and_then([&]()->ExpectedGenericCmdResult{ return std::ref(*this); });
+    return SendCommandV2(Cmd::CloseCmd, to_send(), to_recv());
 }
 
 LD2412::ExpectedGenericCmdResult LD2412::SetSystemModeInternal(SystemMode mode)
@@ -172,38 +162,32 @@ LD2412::ExpectedGenericCmdResult LD2412::SetSystemModeInternal(SystemMode mode)
 LD2412::ExpectedGenericCmdResult LD2412::UpdateVersion()
 {
     constexpr uint16_t kVersionBegin = 0x2412;
-    return SendCommandV2(Cmd::ReadVer, to_send(), to_recv(uart::match_t{kVersionBegin}, m_Version));
+    return SendCommandV2(Cmd::ReadVer, to_send(), to_recv(uart::primitives::match_t{kVersionBegin}, m_Version));
 }
 
 LD2412::ExpectedResult LD2412::ReadFrame()
 {
 //ReadFrame: Read bytes: f4 f3 f2 f1 0b 00 02 aa 02 00 00 00 a0 00 64 55 00 f8 f7 f6 f5 
-    using namespace functional;
     constexpr uint8_t report_begin[] = {0xaa};
     constexpr uint8_t report_end[] = {0x55};
     SystemMode mode;
     uint8_t check;
     uint16_t reportLen = 0;
-    return start_sequence()
-        | uart::read_until(*this, kDataFrameHeader[0], duration_ms_t(1000), "Searching for header")
-        | uart::match_bytes(*this, kDataFrameHeader, "Matching header")
-        | uart::read_into(*this, reportLen, "Reading report len")
-        | uart::read_into(*this, mode, "Reading mode")
-        | uart::match_bytes(*this, report_begin, "Matching rep begin")
-        | uart::read_into(*this, m_Presence) //simple Part of the detection is always there
-        | if_then(
-                [&]{ return mode == SystemMode::Energy; }
-                ,[&]{ 
-                    if ((reportLen - 4 - sizeof(m_Presence)) != sizeof(m_Engeneering))
-                        return uart::Channel::ExpectedResult{std::unexpected(::Err{"Wrong engeneering size"})};
-                    return  start_sequence() | uart::read_into(*this, m_Engeneering);
-                }
-          )
-        | uart::match_bytes(*this, report_end)
-        | uart::read_into(*this, check)
-        | uart::match_bytes(*this, kDataFrameFooter)
-        | AdaptToResult("LD2412::ReadEnergyFrame", ErrorCode::EnergyData_Failure)
-        ;
+    TRY_UART_COMM(uart::primitives::read_until(*this, kDataFrameHeader[0], duration_ms_t(1000), "Searching for header"), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    TRY_UART_COMM(uart::primitives::match_bytes(*this, kDataFrameHeader, "Matching header"), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    TRY_UART_COMM(uart::primitives::read_any(*this, reportLen, mode), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    TRY_UART_COMM(uart::primitives::match_bytes(*this, report_begin, "Matching rep begin"), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    TRY_UART_COMM(uart::primitives::read_into(*this, m_Presence), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);//simple Part of the detection is always there
+    if (mode == SystemMode::Energy)
+    {
+        if ((reportLen - 4 - sizeof(m_Presence)) != sizeof(m_Engeneering))
+            return std::unexpected(Err{{"Wrong engeneering size"}, "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed});
+        TRY_UART_COMM(uart::primitives::read_into(*this, m_Engeneering), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    }
+    TRY_UART_COMM(uart::primitives::match_bytes(*this, report_end, "Matching rep end"), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    TRY_UART_COMM(uart::primitives::read_into(*this, check), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);//simple Part of the detection is always there
+    TRY_UART_COMM(uart::primitives::match_bytes(*this, kDataFrameFooter, "Matching footer"), "ReadFrameReadFrame", ErrorCode::SimpleData_Malformed);
+    return std::ref(*this);
 }
 
 LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drain)
