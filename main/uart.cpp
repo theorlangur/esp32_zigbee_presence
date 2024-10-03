@@ -284,17 +284,16 @@ namespace uart
         if (wait == kDefaultWait) wait = m_DefaultWait;
         uint8_t b;
         CHECK_STACK(3500);
-        return Read(&b, 1, wait)
-            | and_then([&](size_t l)->ExpectedValue<uint8_t>{
-                    if (!l)
-                    {
-                        CHECK_STACK(100);
-                        if (m_Dbg)
-                            printf("Nothing to read. Wait: %d\n", wait.count());
-                        return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
-                    }
-                    return RetVal{std::ref(*this), b};
-                });
+        if (auto e = Read(&b, 1, wait); !e)
+            return std::unexpected(e.error());
+        else if (auto l = e.value().v; !l)
+        {
+            CHECK_STACK(100);
+            if (m_Dbg)
+                printf("Nothing to read. Wait: %d\n", wait.count());
+            return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
+        }else
+            return RetVal{std::ref(*this), b};
     }
 
     Channel::ExpectedValue<uint8_t> Channel::PeekByte(duration_ms_t wait)
@@ -303,12 +302,12 @@ namespace uart
         if (m_HasPeekByte)
             return RetVal{std::ref(*this), m_PeekByte};
         if (wait == kDefaultWait) wait = m_DefaultWait;
-        return ReadByte(wait)
-            | and_then([&](uint8_t b)->ExpectedValue<uint8_t>{
-                    m_HasPeekByte = true;
-                    m_PeekByte = b;
-                    return RetVal{std::ref(*this), b};
-              });
+        if (auto e = ReadByte(wait); !e) return e;
+        else{
+            m_HasPeekByte = true;
+            m_PeekByte = e.value().v;
+            return RetVal{std::ref(*this), m_PeekByte};
+        }
     }
 
     Channel::ExpectedResult Channel::Flush()
