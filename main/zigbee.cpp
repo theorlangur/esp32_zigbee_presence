@@ -10,6 +10,7 @@
 #include "zb_helpers.hpp"
 
 #include <thread>
+#include <bitset>
 #include "ld2412_component.hpp"
 
 namespace zb
@@ -36,6 +37,17 @@ namespace zb
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
         , uint16_t> g_OccupiedToUnoccupiedTimeout;
 
+    esp_zb_ieee_addr_t g_CoordinatorIeee;
+
+    struct EpCluster
+    {
+        uint8_t ep;
+        uint16_t cluster_id;
+    };
+
+    static EpCluster g_OwnClusters[] = {
+        {PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING}
+    };
 
     static bool setup_sensor()
     {
@@ -48,7 +60,7 @@ namespace zb
                         FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status.error());
                     }
 
-                    if (true)
+                    if (false)
                     {
                         FMT_PRINT("Reporting Presence: {}\n", (int)presence);
                         if (auto r = g_OccupancyState.Report(g_DestCoordinator); !r)
@@ -77,20 +89,74 @@ namespace zb
         }
     }
 
-    static void bind_to_coordinator(uint16_t cluster_id)
+    static void bind_to_coordinator(EpCluster cluster)
     {
         esp_zb_zdo_bind_req_param_t bind_req;
-        esp_zb_ieee_addr_t coordinator_ieee;
-        esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), coordinator_ieee);
+        esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
         esp_zb_get_long_address(bind_req.src_address);
-        bind_req.src_endp = PRESENCE_EP;
-        bind_req.cluster_id = cluster_id;
+        bind_req.src_endp = cluster.ep;
+        bind_req.cluster_id = cluster.cluster_id;
         bind_req.dst_addr_mode = ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED;
-        memcpy(bind_req.dst_address_u.addr_long, coordinator_ieee, sizeof(esp_zb_ieee_addr_t));
+        memcpy(bind_req.dst_address_u.addr_long, g_CoordinatorIeee, sizeof(esp_zb_ieee_addr_t));
         bind_req.dst_endp = PRESENCE_EP;
         bind_req.req_dst_addr = esp_zb_get_short_address(); /* TODO: Send bind request to self */
         ESP_LOGI(TAG, "Try to bind Occupancy");
         esp_zb_zdo_device_bind_req(&bind_req, bind_cb, nullptr);
+    }
+
+    static void check_own_binds()
+    {
+        esp_zb_zdo_mgmt_bind_param_t cmd_req;
+        cmd_req.dst_addr = esp_zb_get_short_address();
+        cmd_req.start_index = 0;
+        ESP_LOGI(TAG, "Sending request to self to get our current binds");
+        esp_zb_zdo_binding_table_req(&cmd_req, 
+            [](const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
+            {
+                ESP_LOGI(TAG, "Got a response with %d entries", table_info->count);
+                std::bitset<std::size(g_OwnClusters)> unboundClusters;
+                unboundClusters.reset();
+                auto *pRec = table_info->record;
+                bool coordinatorBindsMissing = true;
+                while(pRec)
+                {
+                    if (pRec->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
+                    {
+                        if (std::memcmp(pRec->dst_address.addr_long, g_CoordinatorIeee, sizeof(esp_zb_ieee_addr_t)) == 0)
+                        {
+                            for(int i = 0; i < std::size(g_OwnClusters); ++i)
+                            {
+                                if (g_OwnClusters[i].ep == pRec->src_endp && g_OwnClusters[i].cluster_id == pRec->cluster_id)
+                                {
+                                    unboundClusters.set(i);
+                                    break;
+                                }
+                            }
+
+                            if (unboundClusters.all())
+                            {
+                                ESP_LOGI(TAG, "Coordinator is completely bound");
+                                coordinatorBindsMissing = false;
+                                break;
+                            }
+                        }
+                    }
+                    pRec = pRec->next;
+                }
+                if (coordinatorBindsMissing)
+                {
+                    ESP_LOGI(TAG, "Coordinator is not fully bound. Binding...");
+                    for(int i = 0; i < std::size(g_OwnClusters); ++i)
+                    {
+                        if (!unboundClusters.test(i))
+                        {
+                            ESP_LOGI(TAG, "EP %X; Cluster ID: %X;", g_OwnClusters[i].ep, g_OwnClusters[i].cluster_id);
+                            bind_to_coordinator(g_OwnClusters[i]);
+                        }
+                    }
+                }
+            }
+            , nullptr);
     }
 
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
@@ -195,6 +261,8 @@ namespace zb
                     esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
                 } else {
                     ESP_LOGI(TAG, "Device rebooted");
+                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+                    check_own_binds();
                 }
             } else {
                 /* commissioning failed */
@@ -210,7 +278,8 @@ namespace zb
                          extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
                          esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
 
-                bind_to_coordinator(ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING);
+                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+                check_own_binds();
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
