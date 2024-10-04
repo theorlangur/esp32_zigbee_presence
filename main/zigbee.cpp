@@ -29,6 +29,14 @@ namespace zb
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
         , esp_zb_zcl_occupancy_sensing_occupancy_t> g_OccupancyState;
 
+    static ZclAttributeAccess<
+        PRESENCE_EP
+        , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
+        , uint16_t> g_OccupiedToUnoccupiedTimeout;
+
+
     static bool setup_sensor()
     {
         g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
@@ -60,6 +68,29 @@ namespace zb
         }
         ESP_LOGI(TAG, "Sensor setup done");
         return true;
+    }
+
+    static void bind_cb(esp_zb_zdp_status_t zdo_status, void *user_ctx)
+    {
+        if (zdo_status == ESP_ZB_ZDP_STATUS_SUCCESS) {
+            ESP_LOGI(TAG, "Bound to coordinator successfully!");
+        }
+    }
+
+    static void bind_to_coordinator(uint16_t cluster_id)
+    {
+        esp_zb_zdo_bind_req_param_t bind_req;
+        esp_zb_ieee_addr_t coordinator_ieee;
+        esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), coordinator_ieee);
+        esp_zb_get_long_address(bind_req.src_address);
+        bind_req.src_endp = PRESENCE_EP;
+        bind_req.cluster_id = cluster_id;
+        bind_req.dst_addr_mode = ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED;
+        memcpy(bind_req.dst_address_u.addr_long, coordinator_ieee, sizeof(esp_zb_ieee_addr_t));
+        bind_req.dst_endp = PRESENCE_EP;
+        bind_req.req_dst_addr = esp_zb_get_short_address(); /* TODO: Send bind request to self */
+        ESP_LOGI(TAG, "Try to bind Occupancy");
+        esp_zb_zdo_device_bind_req(&bind_req, bind_cb, nullptr);
     }
 
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
@@ -152,12 +183,9 @@ namespace zb
 
                 {
                     uint16_t timeout = g_ld2412.GetTimeout();
-                    auto status = esp_zb_zcl_set_attribute_val(PRESENCE_EP,
-                            ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                            ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &timeout, false);
-                    if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
+                    if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
                     {
-                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status);
+                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
                     }
                 }
                 ESP_LOGI(TAG, "Deferred sensor initialization %s", !sensor_init_ok ? "failed" : "successful");
@@ -181,6 +209,8 @@ namespace zb
                          extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
                          extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
                          esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
+
+                bind_to_coordinator(ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING);
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
