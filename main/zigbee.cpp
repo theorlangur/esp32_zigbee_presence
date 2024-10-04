@@ -98,8 +98,8 @@ namespace zb
         bind_req.cluster_id = cluster.cluster_id;
         bind_req.dst_addr_mode = ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED;
         memcpy(bind_req.dst_address_u.addr_long, g_CoordinatorIeee, sizeof(esp_zb_ieee_addr_t));
-        bind_req.dst_endp = PRESENCE_EP;
-        bind_req.req_dst_addr = esp_zb_get_short_address(); /* TODO: Send bind request to self */
+        bind_req.dst_endp = cluster.ep;//it this right?
+        bind_req.req_dst_addr = esp_zb_get_short_address();
         ESP_LOGI(TAG, "Try to bind Occupancy");
         esp_zb_zdo_device_bind_req(&bind_req, bind_cb, nullptr);
     }
