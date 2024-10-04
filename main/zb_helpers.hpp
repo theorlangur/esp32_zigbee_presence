@@ -18,12 +18,12 @@ namespace zb
     };
 
     template<size_t N>
-    constexpr ZigbeeStr<N+1> ZbStr(const char (&n)[N])
+    constexpr ZigbeeStr<N> ZbStr(const char (&n)[N])
     {
         static_assert(N < 255, "String too long");
         return [&]<size_t...idx>(std::index_sequence<idx...>){
-            return ZigbeeStr<N+1>{.name={N, n[idx]...}};
-        }(std::make_index_sequence<N>());
+            return ZigbeeStr<N>{.name={N, n[idx]...}};
+        }(std::make_index_sequence<N-1>());
     }
 
     struct APILock
