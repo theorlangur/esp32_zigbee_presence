@@ -22,7 +22,7 @@ namespace zb
     {
         static_assert(N < 255, "String too long");
         return [&]<size_t...idx>(std::index_sequence<idx...>){
-            return ZigbeeStr<N>{.name={N, n[idx]...}};
+            return ZigbeeStr<N>{.name={N-1, n[idx]...}};
         }(std::make_index_sequence<N-1>());
     }
 
