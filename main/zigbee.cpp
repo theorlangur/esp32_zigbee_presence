@@ -17,7 +17,7 @@ namespace zb
 {
     constexpr uint8_t PRESENCE_EP = 1;
 
-    static auto g_Manufacturer = ZbStr("Ion");
+    static auto g_Manufacturer = ZbStr("Ionx");
     static auto g_Model = ZbStr("Occup");
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
@@ -34,7 +34,7 @@ namespace zb
         PRESENCE_EP
         , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
+        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID
         , uint16_t> g_OccupiedToUnoccupiedTimeout;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
@@ -159,6 +159,11 @@ namespace zb
             , nullptr);
     }
 
+    static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
+    {
+        //TODO: here
+    }
+
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
     {
         static esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
@@ -185,7 +190,7 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
         esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
         uint16_t delay = 10;
-        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
+        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, &delay));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
 
         esp_zb_endpoint_config_t endpoint_config = {
@@ -304,7 +309,7 @@ namespace zb
         bool processed = false;
         if (message->info.dst_endpoint == PRESENCE_EP) {
             if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
-                if (message->attribute.id == ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16) {
+                if (message->attribute.id == ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16) {
                     processed = true;
                     if (message->attribute.data.value)
                     {
