@@ -5,9 +5,14 @@
 #include <cstring>
 #include <string_view>
 #include <expected>
+#include "generic_helpers.hpp"
 
 namespace zb
 {
+    inline constexpr const uint8_t kAnyEP = 0xff;
+    inline constexpr const uint16_t kAnyCluster = 0xffff;
+    inline constexpr const uint16_t kAnyAttribute = 0xffff;
+
     template<size_t N>
     struct ZigbeeStr
     {
@@ -55,6 +60,11 @@ namespace zb
     template<uint8_t EP, uint16_t ClusterID, uint8_t Role, uint16_t Attr, typename T>
     struct ZclAttributeAccess
     {
+        constexpr static const auto MY_EP = EP;
+        constexpr static const auto MY_CLUSTER_ID = ClusterID;
+        constexpr static const auto MY_ATTRIBUTE_ID = Attr;
+        using AttrType = T;
+
         using ZCLResult = std::expected<esp_zb_zcl_status_t, esp_zb_zcl_status_t>;
         using ESPResult = std::expected<esp_err_t, esp_err_t>;
         ZCLResult Set(T &v)
@@ -81,5 +91,77 @@ namespace zb
         }
 
     };
+
+    template<class AttrType>
+    using typed_set_attribute_handler = esp_err_t(*)(AttrType const& value, const esp_zb_zcl_set_attr_value_message_t *message);
+
+    using typeless_set_attribute_handler = esp_err_t (*)(const esp_zb_zcl_set_attr_value_message_t *message);
+
+    template<class AttrValueType, typed_set_attribute_handler<AttrValueType> TypedHandler>
+    esp_err_t generic_zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message)
+    {
+        return TypedHandler(*(AttrValueType*)message->attribute.data.value, message);
+    }
+
+    template<class ZclAttrType, typed_set_attribute_handler<typename ZclAttrType::AttrType> h>
+    struct AttrDescr{};
+
+    struct SetAttributeHandler
+    {
+        template<class ZclAttrType, typed_set_attribute_handler<typename ZclAttrType::AttrType> h>
+        SetAttributeHandler(AttrDescr<ZclAttrType, h>): 
+            ep(ZclAttrType::MY_EP)
+            , cluster_id(ZclAttrType::MY_CLUSTER_ID)
+            , attribute_id(ZclAttrType::MY_ATTRIBUTE_ID)
+            , handler(&generic_zb_attribute_handler<typename ZclAttrType::AttrType, h>)
+        {}
+        SetAttributeHandler(uint8_t ep, uint16_t cluster_id, uint16_t attr_id, auto h): 
+            ep(ep)
+            , cluster_id(cluster_id)
+            , attribute_id(attr_id)
+            , handler(h)
+        {}
+        SetAttributeHandler() = default;
+
+        uint8_t ep;
+        uint16_t cluster_id;
+        uint16_t attribute_id;
+        typeless_set_attribute_handler handler = nullptr;
+    };
+
+    struct SetAttributesHandlingDesc
+    {
+        const typeless_set_attribute_handler defaultHandler = nullptr;
+        SetAttributeHandler const * const pHandlers = nullptr;
+    };
+
+    template<SetAttributesHandlingDesc const * const pAttributeHandlers>
+    esp_err_t generic_zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
+    {
+        switch (callback_id) {
+        case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
+            if constexpr (pAttributeHandlers)
+            {
+                auto *pSetAttr = (esp_zb_zcl_set_attr_value_message_t *)message;
+                auto *pFirst = pAttributeHandlers->pHandlers;
+                while(pFirst && pFirst->handler)
+                {
+                    if ((pFirst->ep == kAnyEP || pSetAttr->info.dst_endpoint == pFirst->ep)
+                     && (pFirst->cluster_id == kAnyCluster || pSetAttr->info.cluster == pFirst->cluster_id)
+                     && (pFirst->attribute_id == kAnyAttribute || pSetAttr->attribute.id == pFirst->attribute_id)
+                       )
+                        return pFirst->handler(pSetAttr);
+                    ++pFirst;
+                }
+                if (pAttributeHandlers->defaultHandler)
+                    return pAttributeHandlers->defaultHandler(pSetAttr);
+            }
+            break;
+        default:
+            //ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
+            break;
+        }
+        return ESP_OK;
+    }
 }
 #endif

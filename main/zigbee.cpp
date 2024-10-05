@@ -30,12 +30,13 @@ namespace zb
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
         , esp_zb_zcl_occupancy_sensing_occupancy_t> g_OccupancyState;
 
-    static ZclAttributeAccess<
+    using ZclAttributeOccupiedToUnoccupiedTimeout_t = ZclAttributeAccess<
         PRESENCE_EP
         , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID
-        , uint16_t> g_OccupiedToUnoccupiedTimeout;
+        , uint16_t>;
+    ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -297,58 +298,32 @@ namespace zb
         }
     }
 
-    static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message)
-    {
-        esp_err_t ret = ESP_OK;
-
-        ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
-        ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
-                            message->info.status);
-        ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d), data type(%d)", message->info.dst_endpoint, message->info.cluster,
-                 message->attribute.id, message->attribute.data.size, message->attribute.data.type);
-        bool processed = false;
-        if (message->info.dst_endpoint == PRESENCE_EP) {
-            if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING) {
-                if (message->attribute.id == ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16) {
-                    processed = true;
-                    if (message->attribute.data.value)
-                    {
-                        auto to = *(uint16_t *)message->attribute.data.value;
-                        FMT_PRINT("Changing timeout to {}\n", to);
-                        g_ld2412.ChangeTimeout(to);
-                    }else
-                    {
-                        FMT_PRINT("Try to change timeout but empty value\n");
-                    }
-                }
-            }else
+    static SetAttributeHandler g_AttributeHandlers[] = {
+        AttrDescr<ZclAttributeOccupiedToUnoccupiedTimeout_t, 
+            [](auto const& to, const auto *message)->esp_err_t
             {
-                FMT_PRINT("Unexpected attribute {:x} or type {:x}\n", message->attribute.id, (int)message->attribute.data.type);
+                FMT_PRINT("Changing timeout to {}\n", to);
+                g_ld2412.ChangeTimeout(to);
+                return ESP_OK;
             }
-        }else
-        {
-                FMT_PRINT("Unexpected endpoint {:x}\n", message->info.dst_endpoint);
-        }
-        if (!processed)
-        {
-            FMT_PRINT("Got unhandled 'set attr' command for EP:{:x}; Cluster:{:x}; Attr:{:x}\n", message->info.dst_endpoint, message->info.cluster, message->attribute.id);
-        }
-        return ret;
-    }
+        >{}
 
-    static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
-    {
-        esp_err_t ret = ESP_OK;
-        switch (callback_id) {
-        case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
-            ret = zb_attribute_handler((esp_zb_zcl_set_attr_value_message_t *)message);
-            break;
-        default:
-            ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
-            break;
+        ,{}//last one
+    };
+    static SetAttributesHandlingDesc g_AttributeHandlingDesc = {
+        /*default*/[](const esp_zb_zcl_set_attr_value_message_t *message)->esp_err_t
+        {
+            esp_err_t ret = ESP_OK;
+
+            ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
+            ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
+                                message->info.status);
+            ESP_LOGI(TAG, "Received message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d), data type(%d)", message->info.dst_endpoint, message->info.cluster,
+                     message->attribute.id, message->attribute.data.size, message->attribute.data.type);
+            return ret;
         }
-        return ret;
-    }
+        ,g_AttributeHandlers
+    };
 
     void zigbee_main(void *)
     {
@@ -379,7 +354,7 @@ namespace zb
 
         /* Register the device */
         esp_zb_device_register(ep_list);
-        esp_zb_core_action_handler_register(zb_action_handler);
+        esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc>);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 
