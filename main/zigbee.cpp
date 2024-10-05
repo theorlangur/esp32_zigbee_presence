@@ -169,7 +169,7 @@ namespace zb
         static esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
             {                                                                                       
                 .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,                          
-                .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DEFAULT_VALUE,                        
+                .power_source = 0x1,//mains                        
             };                                                                                      
         static esp_zb_identify_cluster_cfg_t identify_cfg =                                                                             
             {                                                                                       
