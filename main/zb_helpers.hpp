@@ -13,6 +13,32 @@ namespace zb
     inline constexpr const uint16_t kAnyCluster = 0xffff;
     inline constexpr const uint16_t kAnyAttribute = 0xffff;
 
+    inline constexpr const uint16_t kManufactureSpecificCluster = 0xfc00;
+
+    struct ZigbeeStrView
+    {
+        char *pStr;
+
+        operator void*() { return pStr; }
+        uint8_t size() const { return pStr[0]; }
+        std::string_view sv() const { return {pStr + 1, pStr[0]}; }
+    };
+
+    struct ZigbeeStrRef
+    {
+        char sz;
+
+        operator void*() { return this; }
+        uint8_t size() const { return sz; }
+        std::string_view sv() const { return {&sz + 1, sz}; }
+    };
+
+    template<size_t N>
+    struct ZigbeeStrBuf: public ZigbeeStrRef
+    {
+        char data[N];
+    };
+
     template<size_t N>
     struct ZigbeeStr
     {
@@ -20,7 +46,10 @@ namespace zb
         operator void*() { return name; }
         size_t size() const { return N - 1; }
         std::string_view sv() const { return {name + 1, N - 1}; }
+        ZigbeeStrView zsv() const { return {name}; }
+        ZigbeeStrRef& zsv_ref() { return *(ZigbeeStrRef*)name; }
     };
+
 
     template<size_t N>
     constexpr ZigbeeStr<N> ZbStr(const char (&n)[N])
@@ -67,8 +96,23 @@ namespace zb
 
         using ZCLResult = std::expected<esp_zb_zcl_status_t, esp_zb_zcl_status_t>;
         using ESPResult = std::expected<esp_err_t, esp_err_t>;
-        ZCLResult Set(T &v)
+        ZCLResult Set(T &v, bool dbg = false)
         {
+            if (dbg)
+            {
+                FMT_PRINT("Setting EP:{:x} Cluster:{:x} Attr:{:x} Val ptr:{:x}\n", EP, ClusterID, Attr, (size_t)&v);
+                if constexpr (std::is_convertible_v<T&, ZigbeeStrRef&>)
+                {
+                    uint8_t sz = *(uint8_t*)&v;
+                    FMT_PRINT("Str: sz:{:x}\n", *(uint8_t*)&v);
+                    char *pStr = (char*)&v + 1;
+                    for(uint8_t i = 0; i < sz; ++i)
+                    {
+                        FMT_PRINT("{} ", pStr[i]);
+                    }
+                    FMT_PRINT("\n");
+                }
+            }
             auto status = esp_zb_zcl_set_attribute_val(EP, ClusterID, Role, Attr, &v, false);
             if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
                 return std::unexpected(status);

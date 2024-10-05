@@ -17,6 +17,7 @@ namespace ld2412
         struct QueueMsg;
     public:
         using MovementCallback = GenericCallback<void(bool detected, LD2412::PresenceResult const& p)>;
+        using ConfigUpdateCallback = GenericCallback<void()>;
         struct EnergyMinMax
         {
             uint16_t min;
@@ -67,6 +68,7 @@ namespace ld2412
         uint16_t GetTimeout() const;
                                                          //
         void SetCallbackOnMovement(MovementCallback cb) { m_MovementCallback = std::move(cb); }
+        void SetCallbackOnConfigUpdate(ConfigUpdateCallback cb) { m_ConfigUpdateCallback = std::move(cb); }
     private:
         void ConfigurePresenceIsr();
         void HandleMessage(QueueMsg &msg);
@@ -80,6 +82,7 @@ namespace ld2412
         int m_PresencePin = -1;
 
         MovementCallback m_MovementCallback;
+        ConfigUpdateCallback m_ConfigUpdateCallback;
 
         QueueHandle_t m_FastQueue = 0;
         std::atomic<QueueHandle_t> m_ManagingQueue{0};

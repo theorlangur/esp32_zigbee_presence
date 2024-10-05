@@ -23,12 +23,21 @@ namespace zb
 
     static ld2412::Component g_ld2412;
 
-    static ZclAttributeAccess<
+    static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
+    static constexpr const uint16_t LD2412_ATTRIB_MOVE_SENSITIVITY = 0;
+    static constexpr const uint16_t LD2412_ATTRIB_STILL_SENSITIVITY = 1;
+    static constexpr const uint16_t LD2412_ATTRIB_MOVE_ENERGY = 2;
+    static constexpr const uint16_t LD2412_ATTRIB_STILL_ENERGY = 3;
+    static constexpr const uint16_t LD2412_ATTRIB_MOVE_DISTANCE = 4;
+    static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 4;
+    static constexpr const uint16_t LD2412_ATTRIB_STATE = 5;
+
+    using ZclAttributeOccupancy_t = ZclAttributeAccess<
         PRESENCE_EP
         , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
-        , esp_zb_zcl_occupancy_sensing_occupancy_t> g_OccupancyState;
+        , esp_zb_zcl_occupancy_sensing_occupancy_t>;
 
     using ZclAttributeOccupiedToUnoccupiedTimeout_t = ZclAttributeAccess<
         PRESENCE_EP
@@ -36,7 +45,17 @@ namespace zb
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID
         , uint16_t>;
-    ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
+
+    using ZclAttributeLD2412MoveSensetivity_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MOVE_SENSITIVITY
+        , ZigbeeStrRef>;
+
+    static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
+    static ZclAttributeOccupancy_t g_OccupancyState;
+    static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -48,7 +67,30 @@ namespace zb
 
     static EpCluster g_OwnClusters[] = {
         {PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING}
+        ,{PRESENCE_EP, CLUSTER_ID_LD2412}
     };
+
+    static void publish_move_sensitivity()
+    {
+        ZigbeeStrBuf<3*14+13+10> buf; 
+        tools::BufferFormatter fmtOut(buf.data);
+        tools::format_to(fmtOut, "{}", g_ld2412.GetMoveThreshold(0));
+        for(uint8_t i = 1; i < 14; ++i)
+        {
+            tools::format_to(fmtOut, ",{}", g_ld2412.GetMoveThreshold(i));
+        }
+        buf.sz = fmtOut.dst - buf.data;
+
+        auto sv = buf.sv();
+        FMT_PRINT("Setting move sensitivity attribute with {}\n", sv);
+        {
+            APILock l;
+            if (auto status = g_LD2412MoveSensitivity.Set(buf); !status)
+            {
+                FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+            }
+        }
+    }
 
     static bool setup_sensor()
     {
@@ -71,7 +113,29 @@ namespace zb
                     }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
+                publish_move_sensitivity();
                 });
+
+        g_ld2412.SetCallbackOnConfigUpdate([&](){
+                ZigbeeStrBuf<3*14+13+10> buf; 
+                tools::BufferFormatter fmtOut(buf.data);
+                tools::format_to(fmtOut, "{}", g_ld2412.GetMoveThreshold(0));
+                for(uint8_t i = 1; i < 14; ++i)
+                {
+                    tools::format_to(fmtOut, ",{}", g_ld2412.GetMoveThreshold(i));
+                }
+                buf.sz = fmtOut.dst - buf.data;
+
+                auto sv = buf.sv();
+                FMT_PRINT("Setting move sensitivity attribute with {}\n", sv);
+                {
+                    APILock l;
+                    if (auto status = g_LD2412MoveSensitivity.Set(buf); !status)
+                    {
+                        FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+                    }
+                }
+        });
 
         if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
         {
@@ -138,6 +202,7 @@ namespace zb
                             {
                                 ESP_LOGI(TAG, "Coordinator is completely bound");
                                 coordinatorBindsMissing = false;
+                                publish_move_sensitivity();
                                 break;
                             }
                         }
@@ -162,7 +227,12 @@ namespace zb
 
     static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
     {
-        //TODO: here
+        esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
+        auto moveSense = ZbStr("test");
+        ESP_ERROR_CHECK(esp_zb_custom_cluster_add_custom_attr(custom_cluster, LD2412_ATTRIB_MOVE_SENSITIVITY, ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
+                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, moveSense));
+
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
 
     static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
@@ -193,6 +263,28 @@ namespace zb
         uint16_t delay = 10;
         ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, &delay));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        create_presence_config_custom_cluster(cluster_list);
+
+        {
+            FMT_PRINT("Cluster summary to create:\n");
+            auto *pNext = cluster_list;
+            while(pNext)
+            {
+                auto id = pNext->cluster.cluster_id;
+                auto cnt = pNext->cluster.attr_count;
+                FMT_PRINT("Cluster {:x}; Attributes: {}\n", id, cnt);
+                auto *pNextAttr = pNext->cluster.attr_list;
+                while(pNextAttr)
+                {
+                    auto a_id = pNextAttr->attribute.id;
+                    auto a_type = pNextAttr->attribute.type;
+                    auto a_access = pNextAttr->attribute.access;
+                    FMT_PRINT("   Attribute: {:x}; Type:{:x} Access:{:x}\n", a_id, a_type, a_access);
+                    pNextAttr = pNextAttr->next;
+                }
+                pNext = pNext->next;
+            }
+        }
 
         esp_zb_endpoint_config_t endpoint_config = {
             .endpoint = ep_id,
@@ -236,6 +328,30 @@ namespace zb
         };
 
         ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
+
+        esp_zb_zcl_reporting_info_t reporting_info2 = {
+            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
+            .ep = PRESENCE_EP,
+            .cluster_id = CLUSTER_ID_LD2412,
+            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+            .attr_id = LD2412_ATTRIB_MOVE_SENSITIVITY,
+            .flags = {},
+            .run_time = {},
+            .u = {
+                .send_info = {
+                    .min_interval = 1,
+                    .max_interval = 0,
+                    .delta = {.u8 = 1},
+                    .reported_value = {.u8 = 0},//current value?
+                    .def_min_interval = 1,
+                    .def_max_interval = 0,
+                }
+            },
+            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
+            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+        };
+
+        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info2));
     }
 
     extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
@@ -307,6 +423,13 @@ namespace zb
                 return ESP_OK;
             }
         >{}
+        ,AttrDescr<ZclAttributeLD2412MoveSensetivity_t, 
+            [](ZigbeeStrRef const& to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Would change move sensitivity to {}\n", to.sv());
+                return ESP_OK;
+            }
+        >{}
 
         ,{}//last one
     };
@@ -329,6 +452,7 @@ namespace zb
     {
         ESP_LOGI(TAG, "ZB main");
         fflush(stdout);
+        esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_CRITICAL, 0);
         {
             esp_zb_cfg_t zb_nwk_cfg = {                                                               
                 .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       

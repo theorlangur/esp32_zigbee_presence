@@ -111,7 +111,11 @@ namespace ld2412
                 {
                     auto te = d.FactoryReset();
                     if (!te)
+                    {
                         FMT_PRINT("Factory resetting has failed: {}\n", te.error());
+                    }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
                 }
                 break;
             case QueueMsg::Type::ResetEnergyStat:
@@ -171,6 +175,8 @@ namespace ld2412
                         {
                             FMT_PRINT("Applying calibration and setting mode has failed: {}\n", te.error());
                         }
+                        else if (m_ConfigUpdateCallback)
+                            m_ConfigUpdateCallback();
                     }else
                     {
                         FMT_PRINT("Calibration was not running. Nothing to stop\n");
@@ -186,7 +192,8 @@ namespace ld2412
                     if (!te)
                     {
                         FMT_PRINT("Setting mode has failed: {}\n", te.error());
-                    }
+                    } else if (m_ConfigUpdateCallback)
+                            m_ConfigUpdateCallback();
                 }
                 break;
             case QueueMsg::Type::SetTimeout:
@@ -209,6 +216,8 @@ namespace ld2412
                     {
                         FMT_PRINT("Setting min distance has failed: {}\n", te.error());
                     }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
                 }
                 break;
             case QueueMsg::Type::SetMaxDistance:
@@ -220,6 +229,8 @@ namespace ld2412
                     {
                         FMT_PRINT("Setting max distance has failed: {}\n", te.error());
                     }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
                 }
                 break;
             default:
@@ -574,6 +585,8 @@ namespace ld2412
         m_Setup = true;
         FMT_PRINT("ld2412 component: setup done\n");
         fflush(stdout);
+        if (m_ConfigUpdateCallback)
+            m_ConfigUpdateCallback();
         return true;
     }
 }
