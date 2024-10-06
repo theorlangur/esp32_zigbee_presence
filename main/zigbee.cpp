@@ -43,7 +43,7 @@ namespace zb
         PRESENCE_EP
         , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID
+        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
         , uint16_t>;
 
     using ZclAttributeLD2412MoveSensetivity_t = ZclAttributeAccess<
@@ -67,7 +67,7 @@ namespace zb
 
     static EpCluster g_OwnClusters[] = {
         {PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING}
-        ,{PRESENCE_EP, CLUSTER_ID_LD2412}
+        //,{PRESENCE_EP, CLUSTER_ID_LD2412}
     };
 
     static void publish_move_sensitivity()
@@ -82,10 +82,10 @@ namespace zb
         buf.sz = fmtOut.dst - buf.data;
 
         auto sv = buf.sv();
-        FMT_PRINT("Setting move sensitivity attribute with {}\n", sv);
+        FMT_PRINT("Setting move sensitivity attribute with (size={}) {}\n", sv.size(), sv);
         {
             APILock l;
-            if (auto status = g_LD2412MoveSensitivity.Set(buf); !status)
+            if (auto status = g_LD2412MoveSensitivity.Set(buf, true); !status)
             {
                 FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
             }
@@ -228,9 +228,11 @@ namespace zb
     static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
     {
         esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
-        auto moveSense = ZbStr("test");
+        uint8_t dummyStr [14*3+13 + 1] = {0};
+        dummyStr[0] = sizeof(dummyStr) - 1;
+        //auto moveSense = ZbStr("test");
         ESP_ERROR_CHECK(esp_zb_custom_cluster_add_custom_attr(custom_cluster, LD2412_ATTRIB_MOVE_SENSITIVITY, ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING,
-                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, moveSense));
+                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, dummyStr));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
@@ -261,7 +263,7 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
         esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
         uint16_t delay = 10;
-        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_PIR_OCC_TO_UNOCC_DELAY_ID, &delay));
+        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         create_presence_config_custom_cluster(cluster_list);
 
