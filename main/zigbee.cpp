@@ -29,8 +29,8 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_ENERGY = 2;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_ENERGY = 3;
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_DISTANCE = 4;
-    static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 4;
-    static constexpr const uint16_t LD2412_ATTRIB_STATE = 5;
+    static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 5;
+    static constexpr const uint16_t LD2412_ATTRIB_STATE = 6;
 
     using ZclAttributeOccupancy_t = ZclAttributeAccess<
         PRESENCE_EP
