@@ -90,7 +90,15 @@ namespace zb
                     APILock l;
                     if (auto status = g_OccupancyState.Set(val); !status)
                     {
-                        FMT_PRINT("Failed to set attribute with error {:x}\n", (int)status.error());
+                        FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412MoveDistance.Set(p.m_MoveDistance); !status)
+                    {
+                        FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
+                    {
+                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
                     }
 
                     if (false)
