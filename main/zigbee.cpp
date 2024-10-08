@@ -46,16 +46,33 @@ namespace zb
         , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
         , uint16_t>;
 
+    struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     using ZclAttributeLD2412MoveSensetivity_t = ZclAttributeAccess<
         PRESENCE_EP
         , CLUSTER_ID_LD2412
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
         , LD2412_ATTRIB_MOVE_SENSITIVITY
-        , ZigbeeStrRef>;
+        , SensitivityBufType>;
+
+    using ZclAttributeStillDistance_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_STILL_DISTANCE
+        , uint16_t>;
+
+    using ZclAttributeMoveDistance_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MOVE_DISTANCE
+        , uint16_t>;
 
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
     static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
+    static ZclAttributeStillDistance_t g_LD2412StillDistance;
+    static ZclAttributeMoveDistance_t g_LD2412MoveDistance;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -64,33 +81,6 @@ namespace zb
         uint8_t ep;
         uint16_t cluster_id;
     };
-
-    static EpCluster g_OwnClusters[] = {
-        {PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING}
-        //,{PRESENCE_EP, CLUSTER_ID_LD2412}
-    };
-
-    static void publish_move_sensitivity()
-    {
-        ZigbeeStrBuf<3*14+13+10> buf; 
-        tools::BufferFormatter fmtOut(buf.data);
-        tools::format_to(fmtOut, "{}", g_ld2412.GetMoveThreshold(0));
-        for(uint8_t i = 1; i < 14; ++i)
-        {
-            tools::format_to(fmtOut, ",{}", g_ld2412.GetMoveThreshold(i));
-        }
-        buf.sz = fmtOut.dst - buf.data;
-
-        auto sv = buf.sv();
-        FMT_PRINT("Setting move sensitivity attribute with (size={}) {}\n", sv.size(), sv);
-        {
-            APILock l;
-            if (auto status = g_LD2412MoveSensitivity.Set(buf, true); !status)
-            {
-                FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
-            }
-        }
-    }
 
     static bool setup_sensor()
     {
@@ -113,18 +103,12 @@ namespace zb
                     }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
-                publish_move_sensitivity();
                 });
 
         g_ld2412.SetCallbackOnConfigUpdate([&](){
-                ZigbeeStrBuf<3*14+13+10> buf; 
-                tools::BufferFormatter fmtOut(buf.data);
-                tools::format_to(fmtOut, "{}", g_ld2412.GetMoveThreshold(0));
-                for(uint8_t i = 1; i < 14; ++i)
-                {
-                    tools::format_to(fmtOut, ",{}", g_ld2412.GetMoveThreshold(i));
-                }
-                buf.sz = fmtOut.dst - buf.data;
+                SensitivityBufType buf;
+                for(uint8_t i = 0; i < 14; ++i)
+                    buf.data[i] = g_ld2412.GetMoveThreshold(i);
 
                 auto sv = buf.sv();
                 FMT_PRINT("Setting move sensitivity attribute with {}\n", sv);
