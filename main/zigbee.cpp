@@ -139,13 +139,6 @@ namespace zb
         return true;
     }
 
-    static void bind_cb(esp_zb_zdp_status_t zdo_status, void *user_ctx)
-    {
-        if (zdo_status == ESP_ZB_ZDP_STATUS_SUCCESS) {
-            ESP_LOGI(TAG, "Bound to coordinator successfully!");
-        }
-    }
-
     static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
     {
         esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
@@ -274,7 +267,6 @@ namespace zb
                          esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
 
                 esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
-                check_own_binds();
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
