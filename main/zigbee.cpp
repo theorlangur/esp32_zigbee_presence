@@ -54,6 +54,13 @@ namespace zb
         , LD2412_ATTRIB_MOVE_SENSITIVITY
         , SensitivityBufType>;
 
+    using ZclAttributeLD2412StillSensetivity_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_STILL_SENSITIVITY
+        , SensitivityBufType>;
+
     using ZclAttributeStillDistance_t = ZclAttributeAccess<
         PRESENCE_EP
         , CLUSTER_ID_LD2412
@@ -71,6 +78,7 @@ namespace zb
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
     static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
+    static ZclAttributeLD2412StillSensetivity_t g_LD2412StillSensitivity;
     static ZclAttributeStillDistance_t g_LD2412StillDistance;
     static ZclAttributeMoveDistance_t g_LD2412MoveDistance;
 
@@ -142,15 +150,12 @@ namespace zb
     static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
     {
         esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
-        SensitivityBufType dummy;
-        dummy.sz = sizeof(SensitivityBufType) - 1;
-        uint16_t dist = 0;
-        ESP_ERROR_CHECK(esp_zb_custom_cluster_add_custom_attr(custom_cluster, LD2412_ATTRIB_MOVE_SENSITIVITY, ESP_ZB_ZCL_ATTR_TYPE_OCTET_STRING,
-                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, dummy));
-        ESP_ERROR_CHECK(esp_zb_custom_cluster_add_custom_attr(custom_cluster, LD2412_ATTRIB_MOVE_DISTANCE, ESP_ZB_ZCL_ATTR_TYPE_U16,
-                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, &dist));
-        ESP_ERROR_CHECK(esp_zb_custom_cluster_add_custom_attr(custom_cluster, LD2412_ATTRIB_STILL_DISTANCE, ESP_ZB_ZCL_ATTR_TYPE_U16,
-                                              ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, &dist));
+
+        ESP_ERROR_CHECK(g_LD2412MoveSensitivity.AddToCluster(custom_cluster, Access::RWP));
+        ESP_ERROR_CHECK(g_LD2412StillSensitivity.AddToCluster(custom_cluster, Access::RWP));
+
+        ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412StillDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }

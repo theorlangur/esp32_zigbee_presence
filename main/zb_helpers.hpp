@@ -6,6 +6,7 @@
 #include <string_view>
 #include <span>
 #include <expected>
+#include <utility>
 #include "generic_helpers.hpp"
 
 namespace zb
@@ -101,8 +102,63 @@ namespace zb
     };
     constexpr static DestAddr g_DestCoordinator{uint16_t(0)};
 
+    template<typename T>
+    struct TypeDescr;
 
-    template<uint8_t EP, uint16_t ClusterID, uint8_t Role, uint16_t Attr, typename T>
+    template<> struct TypeDescr<uint8_t>  { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U8; };
+    template<> struct TypeDescr<uint16_t> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U16; };
+    template<> struct TypeDescr<uint32_t> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U32; };
+    template<> struct TypeDescr<uint64_t> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U64; };
+    template<> struct TypeDescr<int8_t>   { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_S8; };
+    template<> struct TypeDescr<int16_t>  { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_S16; };
+    template<> struct TypeDescr<int32_t>  { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_S32; };
+    template<> struct TypeDescr<int64_t>  { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_S64; };
+    template<> struct TypeDescr<float>    { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_SINGLE; };
+    template<> struct TypeDescr<double>   { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_DOUBLE; };
+
+    template<class Str> requires std::is_base_of_v<ZigbeeStrRef, Str>
+    struct TypeDescr<Str> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING; };
+    template<class Data>  requires std::is_base_of_v<ZigbeeOctetRef, Data>
+    struct TypeDescr<Data> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_OCTET_STRING; };
+
+    template<typename T>
+    struct TypeInitDefault { 
+        static T default_value() { return {}; } 
+        static void* to_void(T&v) { return &v; } 
+    };
+
+    template<typename T> requires std::is_same_v<T, ZigbeeStrRef> || std::is_same_v<T, ZigbeeOctetRef>
+    struct TypeInitDefault<T> 
+    { 
+        template<class dummy=void>
+        static ZigbeeStrRef default_value() { static_assert(std::is_same_v<dummy,void>, "Cannot use ZigbeeStr/OctetRef directly. Must be a limit"); return {}; } 
+        static void* to_void(ZigbeeStrRef&v) { return v; } 
+    };
+
+    template<size_t N>
+    struct MaxDefaultForStr { 
+        static ZigbeeStrBuf<N> default_value() { return {N, {0}}; } 
+        static void* to_void(ZigbeeStrRef&v) { return v; } 
+    };
+
+    template<size_t N>
+    struct MaxDefaultForOctet { 
+        static ZigbeeOctetBuf<N> default_value() { return {N, {0}}; } 
+        static void* to_void(ZigbeeOctetRef&v) { return v; } 
+    };
+
+    enum class Access: std::underlying_type_t<esp_zb_zcl_attr_access_t>
+    {
+        Read = ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY,
+        Write = ESP_ZB_ZCL_ATTR_ACCESS_WRITE_ONLY,
+        Report = ESP_ZB_ZCL_ATTR_ACCESS_REPORTING,
+        RW = Read | Write,
+        RWP = Read | Write | Report,
+    };
+
+    inline Access operator|(Access a1, Access a2) { return Access(std::to_underlying(a1) | std::to_underlying(a2)); }
+
+    template<uint8_t EP, uint16_t ClusterID, uint8_t Role, uint16_t Attr, typename T, typename Default = TypeInitDefault<T>>
     struct ZclAttributeAccess
     {
         constexpr static const auto MY_EP = EP;
@@ -150,6 +206,12 @@ namespace zb
             return ESP_OK;
         }
 
+        static auto AddToCluster(esp_zb_attribute_list_t *custom_cluster, Access a)
+        {
+            constexpr static const auto MY_TYPE_ID = TypeDescr<T>::kID;
+            auto def = Default::default_value();
+            return esp_zb_custom_cluster_add_custom_attr(custom_cluster, MY_ATTRIBUTE_ID, MY_TYPE_ID, std::to_underlying(a), Default::to_void(def));
+        }
     };
 
     template<class AttrType>
