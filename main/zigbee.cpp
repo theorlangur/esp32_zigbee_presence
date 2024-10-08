@@ -289,7 +289,7 @@ namespace zb
             }
         >{}
         ,AttrDescr<ZclAttributeLD2412MoveSensetivity_t, 
-            [](ZigbeeStrRef const& to, const auto *message)->esp_err_t
+            [](SensitivityBufType const& to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Would change move sensitivity to {}\n", to.sv());
                 return ESP_OK;
