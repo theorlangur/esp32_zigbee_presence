@@ -4,6 +4,7 @@
 #include "esp_zigbee_core.h"
 #include <cstring>
 #include <string_view>
+#include <span>
 #include <expected>
 #include "generic_helpers.hpp"
 
@@ -37,6 +38,21 @@ namespace zb
     struct ZigbeeStrBuf: public ZigbeeStrRef
     {
         char data[N];
+    };
+
+    struct ZigbeeOctetRef
+    {
+        uint8_t sz;
+
+        operator void*() { return this; }
+        uint8_t size() const { return sz; }
+        std::span<const uint8_t> sv() const { return {&sz + 1, sz}; }
+    };
+
+    template<size_t N>
+    struct ZigbeeOctetBuf: public ZigbeeOctetRef
+    {
+        uint8_t data[N];
     };
 
     template<size_t N>
@@ -96,7 +112,7 @@ namespace zb
 
         using ZCLResult = std::expected<esp_zb_zcl_status_t, esp_zb_zcl_status_t>;
         using ESPResult = std::expected<esp_err_t, esp_err_t>;
-        ZCLResult Set(T &v, bool dbg = false)
+        ZCLResult Set(const T &v, bool dbg = false)
         {
             if (dbg)
             {
@@ -113,7 +129,7 @@ namespace zb
                     FMT_PRINT("\n");
                 }
             }
-            auto status = esp_zb_zcl_set_attribute_val(EP, ClusterID, Role, Attr, &v, false);
+            auto status = esp_zb_zcl_set_attribute_val(EP, ClusterID, Role, Attr, (void*)&v, false);
             if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
                 return std::unexpected(status);
             return ESP_ZB_ZCL_STATUS_SUCCESS;
