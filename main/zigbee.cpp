@@ -228,59 +228,6 @@ namespace zb
                             TAG, "Failed to start Zigbee bdb commissioning");
     }
 
-    static void configure_reporting()
-    {
-        esp_zb_zcl_reset_all_reporting_info();
-        /* Config the reporting info  */
-        esp_zb_zcl_reporting_info_t reporting_info = {
-            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
-            .ep = PRESENCE_EP,
-            .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING,
-            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-            .attr_id = ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
-            .flags = {},
-            .run_time = {},
-            .u = {
-                .send_info = {
-                    .min_interval = 1,
-                    .max_interval = 0,
-                    .delta = {.u8 = 1},
-                    .reported_value = {.u8 = 0},//current value?
-                    .def_min_interval = 1,
-                    .def_max_interval = 0,
-                }
-            },
-            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
-            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        };
-
-        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info));
-
-        esp_zb_zcl_reporting_info_t reporting_info2 = {
-            .direction = /*ESP_ZB_ZCL_REPORT_DIRECTION_RECV,*/ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
-            .ep = PRESENCE_EP,
-            .cluster_id = CLUSTER_ID_LD2412,
-            .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-            .attr_id = LD2412_ATTRIB_MOVE_SENSITIVITY,
-            .flags = {},
-            .run_time = {},
-            .u = {
-                .send_info = {
-                    .min_interval = 1,
-                    .max_interval = 0,
-                    .delta = {.u8 = 1},
-                    .reported_value = {.u8 = 0},//current value?
-                    .def_min_interval = 1,
-                    .def_max_interval = 0,
-                }
-            },
-            .dst = { .short_addr = {}, .endpoint = {}, .profile_id = ESP_ZB_AF_HA_PROFILE_ID},
-            .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
-        };
-
-        ESP_ERROR_CHECK(esp_zb_zcl_update_reporting_info(&reporting_info2));
-    }
-
     extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     {
         uint32_t *p_sg_p     = signal_struct->p_app_signal;
@@ -407,8 +354,6 @@ namespace zb
         esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc>);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
-
-        configure_reporting();
 
         ESP_LOGI(TAG, "ZB updated attribute reporting");
         fflush(stdout);
