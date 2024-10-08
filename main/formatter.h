@@ -1,6 +1,7 @@
 #ifndef FORMATTER_H_
 #define FORMATTER_H_
 #include <string_view>
+#include <span>
 #include <expected>
 #include <cstring>
 #include <span>
@@ -295,6 +296,30 @@ namespace tools
     {
         template<FormatDestination Dest>
         static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, std::span<uint8_t> const &v)
+        {
+            for(uint8_t b : v)
+            {
+                uint8_t hi = (b >> 4) & 0x0f;
+                uint8_t lo = b & 0x0f;
+                if (hi < 10)
+                    dst('0' + hi);
+                else
+                    dst('a' + hi - 10);
+                if (lo < 10)
+                    dst('0' + lo);
+                else
+                    dst('a' + lo - 10);
+                dst(' ');
+            }
+            return v.size() * 3;
+        }
+    };
+
+    template<>
+    struct formatter_t<std::span<const uint8_t>>
+    {
+        template<FormatDestination Dest>
+        static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, std::span<const uint8_t> const &v)
         {
             for(uint8_t b : v)
             {
