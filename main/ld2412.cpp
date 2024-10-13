@@ -214,7 +214,7 @@ LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drai
     }else
     {
         //FMT_PRINT("TryReadFrame: no drain\n");
-        SetDefaultWait(duration_ms_t(150));
+        SetDefaultWait(duration_ms_t(kDefaultWait));
         auto ec = (m_Mode == SystemMode::Energy) ? ErrorCode::EnergyData_Failure : ErrorCode::SimpleData_Failure;
         if (flush)
             TRY_UART_COMM(Flush(), "LD2412::TryReadFrame", ec);
@@ -305,6 +305,8 @@ LD2412::ExpectedResult LD2412::ConfigBlock::EndChange()
 {
     if (!m_Changes)
         return std::ref(d);
+    //Channel::DbgNow _dbg(&d);
+    //DbgNow _dbg2(&d);
     ScopeExit clearChanges = [&]{ m_Changes = 0; };
     TRY_UART_COMM(d.OpenCommandMode(), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
     if (m_Changed.Mode)

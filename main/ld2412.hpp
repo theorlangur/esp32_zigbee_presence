@@ -358,6 +358,17 @@ private:
     if (auto r = f; !r) \
         return to_cmd_result(std::move(r), location, ec)
 
+#define TRY_UART_COMM_CMD_WITH_RETRY(f, location, ec) \
+    if (auto r = f; !r) \
+    {\
+        if (retry) \
+        {\
+            FMT_PRINT("Failed on " #f);\
+            continue;\
+        }\
+        return to_cmd_result(std::move(r), location, ec);\
+    }
+
     template<class...T>
     ExpectedResult SendFrameV2(T&&... args)
     {
@@ -428,13 +439,23 @@ private:
                 std::get<idx>(recvArgs)...);
         };
 
-        TRY_UART_COMM_CMD(Flush(), "SendCommandV2", ErrorCode::SendCommand_Failed);
-        if (m_dbg) FMT_PRINT("Sent cmd {}\n", uint16_t(cmd));
-        TRY_UART_COMM_CMD(SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
-        if (m_dbg) FMT_PRINT("Wait all\n");
-        TRY_UART_COMM_CMD(WaitAllSent(), "SendCommandV2", ErrorCode::SendCommand_Failed);
-        if (m_dbg) FMT_PRINT("Receiving {} args\n", sizeof...(ToRecv));
-        TRY_UART_COMM_CMD(RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
+        constexpr int kMaxRetry = 1;
+        for(int retry=kMaxRetry; retry >= 0; --retry)
+        {
+            if (retry != kMaxRetry)
+            {
+                /*if (m_dbg)*/ FMT_PRINT("Sending command {:x} retry: {}\n", uint16_t(cmd), (kMaxRetry - retry));
+                std::this_thread::sleep_for(kDefaultWait); 
+            }
+            TRY_UART_COMM_CMD_WITH_RETRY(Flush(), "SendCommandV2", ErrorCode::SendCommand_Failed);
+            if (m_dbg) FMT_PRINT("Sent cmd {}\n", uint16_t(cmd));
+            TRY_UART_COMM_CMD_WITH_RETRY(SendFrameExpandArgs(std::make_index_sequence<sizeof...(ToSend)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
+            if (m_dbg) FMT_PRINT("Wait all\n");
+            TRY_UART_COMM_CMD_WITH_RETRY(WaitAllSent(), "SendCommandV2", ErrorCode::SendCommand_Failed);
+            if (m_dbg) FMT_PRINT("Receiving {} args\n", sizeof...(ToRecv));
+            TRY_UART_COMM_CMD_WITH_RETRY(RecvFrameExpandArgs(std::make_index_sequence<sizeof...(ToRecv)>()), "SendCommandV2", ErrorCode::SendCommand_Failed);
+            break;
+        }
         return std::ref(*this);
     }
 
