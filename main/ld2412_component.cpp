@@ -205,6 +205,8 @@ namespace ld2412
                     {
                         FMT_PRINT("Setting timeout has failed: {}\n", te.error());
                     }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
                 }
                 break;
             case QueueMsg::Type::SetMinDistance:
