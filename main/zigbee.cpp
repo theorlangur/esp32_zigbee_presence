@@ -17,8 +17,9 @@ namespace zb
 {
     constexpr uint8_t PRESENCE_EP = 1;
 
-    static auto g_Manufacturer = ZbStr("Ionx");
-    static auto g_Model = ZbStr("Occup");
+    static auto g_Manufacturer = ZbStr("Orlangur");
+    static auto g_Model = ZbStr("P-NextGen");
+    static uint8_t g_AppVersion = 1;
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
     static ld2412::Component g_ld2412;
@@ -75,12 +76,36 @@ namespace zb
         , LD2412_ATTRIB_MOVE_DISTANCE
         , uint16_t>;
 
+    using ZclAttributeMoveEnergy_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MOVE_ENERGY
+        , uint8_t>;
+
+    using ZclAttributeStillEnergy_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_STILL_ENERGY
+        , uint8_t>;
+
+    using ZclAttributeState_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_STATE
+        , LD2412::TargetState>;
+
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
     static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
     static ZclAttributeLD2412StillSensetivity_t g_LD2412StillSensitivity;
     static ZclAttributeStillDistance_t g_LD2412StillDistance;
     static ZclAttributeMoveDistance_t g_LD2412MoveDistance;
+    static ZclAttributeStillEnergy_t g_LD2412StillEnergy;
+    static ZclAttributeMoveEnergy_t g_LD2412MoveEnergy;
+    static ZclAttributeState_t g_LD2412State;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -92,7 +117,7 @@ namespace zb
 
     static bool setup_sensor()
     {
-        g_ld2412.SetCallbackOnMovement([&](bool presence, LD2412::PresenceResult const& p){
+        g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p){
                 esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
                 {
                     APILock l;
@@ -105,6 +130,18 @@ namespace zb
                         FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
                     }
                     if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
+                    {
+                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412MoveEnergy.Set(p.m_MoveEnergy); !status)
+                    {
+                        FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412StillEnergy.Set(p.m_StillEnergy); !status)
+                    {
+                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412State.Set(p.m_State); !status)
                     {
                         FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
                     }
@@ -121,16 +158,23 @@ namespace zb
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
                 });
 
-        g_ld2412.SetCallbackOnConfigUpdate([&](){
-                SensitivityBufType buf;
+        g_ld2412.SetCallbackOnConfigUpdate([](){
+                SensitivityBufType moveBuf, stillBuf;
                 for(uint8_t i = 0; i < 14; ++i)
-                    buf.data[i] = g_ld2412.GetMoveThreshold(i);
+                {
+                    moveBuf.data[i] = g_ld2412.GetMoveThreshold(i);
+                    stillBuf.data[i] = g_ld2412.GetStillThreshold(i);
+                }
 
-                auto sv = buf.sv();
-                FMT_PRINT("Setting move sensitivity attribute with {}\n", sv);
+                FMT_PRINT("Setting move sensitivity attribute with {}\n", moveBuf.sv());
+                FMT_PRINT("Setting still sensitivity attribute with {}\n", stillBuf.sv());
                 {
                     APILock l;
-                    if (auto status = g_LD2412MoveSensitivity.Set(buf); !status)
+                    if (auto status = g_LD2412MoveSensitivity.Set(moveBuf); !status)
+                    {
+                        FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412StillSensitivity.Set(stillBuf); !status)
                     {
                         FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
                     }
@@ -151,11 +195,14 @@ namespace zb
     {
         esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
 
-        ESP_ERROR_CHECK(g_LD2412MoveSensitivity.AddToCluster(custom_cluster, Access::RWP));
-        ESP_ERROR_CHECK(g_LD2412StillSensitivity.AddToCluster(custom_cluster, Access::RWP));
+        ESP_ERROR_CHECK(g_LD2412MoveSensitivity.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412StillSensitivity.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412StillDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412MoveEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412StillEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412State.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
@@ -181,6 +228,8 @@ namespace zb
         esp_zb_attribute_list_t *basic_cluster = esp_zb_basic_cluster_create(&basic_cfg);
         ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, g_Manufacturer));
         ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, g_Model));
+        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_APPLICATION_VERSION_ID, &g_AppVersion));
+
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_identify_cluster_create(&identify_cfg), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
