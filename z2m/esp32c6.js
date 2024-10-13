@@ -1,4 +1,5 @@
 const { Buffer } = require('node:buffer');
+const util = require('node:util');
 const {Zcl} = require('zigbee-herdsman');
 const {enumLookup,numeric,deviceAddCustomCluster} = require('zigbee-herdsman-converters/lib/modernExtend');
 const fz = require('zigbee-herdsman-converters/converters/fromZigbee');
@@ -102,21 +103,27 @@ const orlangurOccupactionExtended = {
             {
                 key: [attr],
                 convertSet: async (entity, key, value, meta) => {
+                    logger.debug(`${attr} sensitivity tZ: got data=${value}`, NS);
                     const payloadValue = [];
-                    payloadValue[0] = 14;
+                    //payloadValue[0] = 14;
                     for(var i = 0; i < 14; ++i)
                     {
-                        payloadValue[1 + i] = value['gate'+i]
+                        payloadValue[i] = value['gate'+i]
+                        logger.debug(`${attr} sensitivity tZ: gate${i}=${payloadValue[i]}`, NS);
                     }
                     const payload = {[attr]: {value: payloadValue, type: Zcl.DataType.OCTET_STR}};
                     await entity.write('customOccupationConfig', payload);
                     return {state: {[key]: value}};
                 },
                 convertGet: async (entity, key, meta) => {
+                    logger.debug(`${attr} sensitivity tZ: get key=${key}`, NS);
                     await entity.read('customOccupationConfig', [attr]);
                 },
             },
         ];
+
+        logger.debug("tZ: " + util.inspect(toZigbee), NS)
+        logger.debug("fZ: " + util.inspect(fromZigbee), NS)
 
 
         return {
@@ -131,6 +138,7 @@ const orlangurOccupactionExtended = {
 const definition = {
     zigbeeModel: ['P-NextGen'],
     model: 'P-NextGen',
+    fingerprint: [{modelID: 'P-NextGen', applicationVersion: 1, priority: -1},],
     vendor: 'Orlangur',
     description: 'ESP32C6 Occupancy Test',
     fromZigbee: [fz.occupancy],
@@ -147,20 +155,23 @@ const definition = {
                 moveDistance: {ID: 0x0004, type: Zcl.DataType.UINT16},
                 stillDistance: {ID: 0x0005, type: Zcl.DataType.UINT16},
                 state: {ID: 0x0006, type: Zcl.DataType.ENUM8},
+                p_timeout: {ID: 0x0007, type: Zcl.DataType.UINT16},
             },
             commands: {},
             commandsResponse: {},
         }),
         numeric({
             name: 'presence_timeout',
-            cluster: 0x0406,
-            attribute: {ID: 'ultrasonicOToUDelay', type: 0x21},
+            cluster: 'msOccupancySensing',
+            attribute: 'ultrasonicOToUDelay',
             description: 'Occupied to unoccupied delay',
             valueMin: 2,
             valueMax: 120,
+            access: 'ALL',
         }),
         enumLookup({
             name: 'presence_state',
+            access: 'STATE',
             cluster: 'customOccupationConfig',
             attribute: 'state',
             description: 'Presence state',
@@ -174,8 +185,9 @@ const definition = {
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
         await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig']);
+        await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
-        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity']);
+        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
         await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         await endpoint.configureReporting('msOccupancySensing', [
             {
