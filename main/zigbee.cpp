@@ -165,9 +165,11 @@ namespace zb
                     moveBuf.data[i] = g_ld2412.GetMoveThreshold(i);
                     stillBuf.data[i] = g_ld2412.GetStillThreshold(i);
                 }
+                auto timeout = g_ld2412.GetTimeout();
 
                 FMT_PRINT("Setting move sensitivity attribute with {}\n", moveBuf.sv());
                 FMT_PRINT("Setting still sensitivity attribute with {}\n", stillBuf.sv());
+                FMT_PRINT("Setting timeout attribute with {}\n", timeout);
                 {
                     APILock l;
                     if (auto status = g_LD2412MoveSensitivity.Set(moveBuf); !status)
@@ -177,6 +179,10 @@ namespace zb
                     if (auto status = g_LD2412StillSensitivity.Set(stillBuf); !status)
                     {
                         FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
+                    {
+                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
                     }
                 }
         });
