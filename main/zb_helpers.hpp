@@ -105,6 +105,12 @@ namespace zb
     template<typename T>
     struct TypeDescr;
 
+    template<typename T> requires std::is_enum_v<T>
+    struct TypeDescr<T>  
+    { 
+        static_assert(sizeof(T) <= 2, "Only 8/16 bits enums are supported");
+        static constexpr const esp_zb_zcl_attr_type_t kID = sizeof(T) == 1 ? ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM : ESP_ZB_ZCL_ATTR_TYPE_16BIT_ENUM; 
+    };
     template<> struct TypeDescr<uint8_t>  { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U8; };
     template<> struct TypeDescr<uint16_t> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U16; };
     template<> struct TypeDescr<uint32_t> { static constexpr const esp_zb_zcl_attr_type_t kID = ESP_ZB_ZCL_ATTR_TYPE_U32; };
