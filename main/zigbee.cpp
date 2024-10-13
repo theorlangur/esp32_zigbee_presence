@@ -309,6 +309,7 @@ namespace zb
             } else {
                 /* commissioning failed */
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
+                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
@@ -337,12 +338,15 @@ namespace zb
         AttrDescr<ZclAttributeOccupiedToUnoccupiedTimeout_t, 
             [](auto const& to, const auto *message)->esp_err_t
             {
+                FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
+                uint8_t *pData = (uint8_t *)message->attribute.data.value;
+                FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
                 FMT_PRINT("Changing timeout to {}\n", to);
                 g_ld2412.ChangeTimeout(to);
                 return ESP_OK;
             }
-        >{}
-        ,AttrDescr<ZclAttributeLD2412MoveSensetivity_t, 
+        >{},
+        AttrDescr<ZclAttributeLD2412MoveSensetivity_t, 
             [](SensitivityBufType const& to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Would change move sensitivity to {}\n", to.sv());
