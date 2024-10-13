@@ -271,6 +271,15 @@ namespace zb
             if constexpr (pAttributeHandlers)
             {
                 auto *pSetAttr = (esp_zb_zcl_set_attr_value_message_t *)message;
+                //{
+                //    auto sz = pSetAttr->attribute.data.size;
+                //    FMT_PRINT("Set Attr: type: {:x}; size: {}\n", (int)pSetAttr->attribute.data.type, sz);
+                //    uint8_t *pData = (uint8_t *)pSetAttr->attribute.data.value;
+                //    for(int i = 0; i < pSetAttr->attribute.data.size; ++i)
+                //        FMT_PRINT(" {:x}", pData[i]);
+                //    FMT_PRINT("\n");
+                //}
+
                 auto *pFirst = pAttributeHandlers->pHandlers;
                 while(pFirst && pFirst->handler)
                 {
