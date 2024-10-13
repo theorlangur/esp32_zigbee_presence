@@ -1,6 +1,6 @@
 const { Buffer } = require('node:buffer');
 const {Zcl} = require('zigbee-herdsman');
-const {numeric,deviceAddCustomCluster} = require('zigbee-herdsman-converters/lib/modernExtend');
+const {enumLookup,numeric,deviceAddCustomCluster} = require('zigbee-herdsman-converters/lib/modernExtend');
 const fz = require('zigbee-herdsman-converters/converters/fromZigbee');
 const tz = require('zigbee-herdsman-converters/converters/toZigbee');
 const exposes = require('zigbee-herdsman-converters/lib/exposes');
@@ -146,7 +146,7 @@ const definition = {
                 stillEnergy: {ID: 0x0003, type: Zcl.DataType.UINT8},
                 moveDistance: {ID: 0x0004, type: Zcl.DataType.UINT16},
                 stillDistance: {ID: 0x0005, type: Zcl.DataType.UINT16},
-                //state: {ID: 0x0006, type: Zcl.DataType.UINT16},
+                state: {ID: 0x0006, type: Zcl.DataType.ENUM8},
             },
             commands: {},
             commandsResponse: {},
@@ -158,6 +158,13 @@ const definition = {
             description: 'Occupied to unoccupied delay',
             valueMin: 2,
             valueMax: 120,
+        }),
+        enumLookup({
+            name: 'presence_state',
+            cluster: 'customOccupationConfig',
+            attribute: 'state',
+            description: 'Presence state',
+            lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3},
         }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
