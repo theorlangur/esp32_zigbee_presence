@@ -24,6 +24,14 @@
             "label": "Monitor",
             "type": "shell",
             "command": "idf.py monitor"
+        },
+        {
+            "label": "Kill Monitor",
+            "type": "shell",
+            "options": {
+                "detached": true
+            },
+            "command": "kill $(ps -faux | grep 'idf.py monitor' | head -1 | awk '{print $2}')"
         }
     ]
 }
