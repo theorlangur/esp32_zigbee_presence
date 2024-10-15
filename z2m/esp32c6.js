@@ -33,20 +33,20 @@ const orlangurOccupactionExtended = {
                 convert: (model, msg, publish, options, meta) => {
                     const result = {};
                     const data = msg.data;
-                    logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${data}`, NS);
+                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${data}`, NS);
                     if (data[attrDistance] !== undefined) 
                     {
-                        logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: got distance: ${data[attrDistance]}`, NS);
+                        //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: got distance: ${data[attrDistance]}`, NS);
                         result[attrDistance] = data[attrDistance];
                     }
                     else if (data[attrEnergy] !== undefined) 
                     {
-                        logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: got energy: ${data[attrEnergy]}`, NS);
+                        //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: got energy: ${data[attrEnergy]}`, NS);
                         result[attrEnergy] = data[attrEnergy];
                     }
                     else 
                     {
-                        logger.debug(`presenceInfo fZ nothing to process`, NS);
+                        //logger.debug(`presenceInfo fZ nothing to process`, NS);
                         return;
                     }
                     return result;
@@ -65,11 +65,14 @@ const orlangurOccupactionExtended = {
     },
     sensitivity: (prefix, descr) => {
         const attr = prefix + 'Sensitivity'
-        const exposes = e.composite(attr, attr, ea.STATE_SET)
+        const exp_entity = prefix + '_sensitivity'
+        const exposes = e.composite(attr, exp_entity, ea.STATE_SET)
                             .withLabel(prefix + ' Sensitivity')
                             .withDescription('Configure sensitivity for ' + descr);
         for(var i = 0; i < 14; ++i)
             exposes.withFeature(e.numeric('gate'+i, ea.STATE_SET).withValueMin(0).withValueMax(100));
+
+        //logger.debug(`${attr} sensitivity exposes: ${util.inspect(exposes)};`, NS);
 
         const fromZigbee = [{
                 cluster: 'customOccupationConfig',
@@ -77,7 +80,12 @@ const orlangurOccupactionExtended = {
                 convert: (model, msg, publish, options, meta) => {
                     const result = {};
                     const data = msg.data;
-                    logger.debug(`${attr} sensitivity fZ: ${data};`, NS);
+                    //logger.debug(`${attr} sensitivity fZ: ${util.inspect(msg.data)};`, NS);
+                    //{
+                    //    const obj = {}; 
+                    //    Error.captureStackTrace(obj); 
+                    //    logger.debug("called from:\n" + obj.stack); 
+                    //}
                     if (attr in data) 
                     {
                         const buffer = Buffer.from(data[attr]);
@@ -86,44 +94,44 @@ const orlangurOccupactionExtended = {
                             res = {}
                             for(var i = 0; i < 14; ++i)
                                 res['gate'+i] = buffer[i]
-                            result[attr] = res
-                            logger.debug(`${attr} sensitivity fZ: got data=${res}`, NS);
+                            result[exp_entity] = res
+                            //logger.debug(`${exp_entity} sensitivity fZ: got data=${res}`, NS);
+                            //logger.debug(`${exp_entity} fZ: ` + util.inspect(result), NS)
                             return result;
                         }else
                         {
-                            logger.debug(`${attr} sensitivity fZ: buf size: ${buffer.length}`, NS);
+                            //logger.debug(`${exp_entity} sensitivity fZ: buf size: ${buffer.length}`, NS);
                         }
                     }
-                    logger.debug(`${attr} sensitivity fZ: no data`, NS);
+                    //logger.debug(`${exp_entity} sensitivity fZ: no data`, NS);
                 }
             }
         ];
 
         const toZigbee = [
             {
-                key: [attr],
+                key: [exp_entity],
                 convertSet: async (entity, key, value, meta) => {
-                    logger.debug(`${attr} sensitivity tZ: got data=${value}`, NS);
+                    //logger.debug(`${exp_entity} sensitivity tZ: got data=` + util.inspect(value), NS);
                     const payloadValue = [];
-                    //payloadValue[0] = 14;
                     for(var i = 0; i < 14; ++i)
                     {
                         payloadValue[i] = value['gate'+i]
-                        logger.debug(`${attr} sensitivity tZ: gate${i}=${payloadValue[i]}`, NS);
+                        //logger.debug(`${exp_entity} sensitivity tZ: gate${i}=${payloadValue[i]}`, NS);
                     }
-                    const payload = {[attr]: {value: payloadValue, type: Zcl.DataType.OCTET_STR}};
+                    const payload = {[attr]: payloadValue}
                     await entity.write('customOccupationConfig', payload);
                     return {state: {[key]: value}};
                 },
                 convertGet: async (entity, key, meta) => {
-                    logger.debug(`${attr} sensitivity tZ: get key=${key}`, NS);
+                    //logger.debug(`${exp_entity} sensitivity tZ: get key=${key}`, NS);
                     await entity.read('customOccupationConfig', [attr]);
                 },
             },
         ];
 
-        logger.debug("tZ: " + util.inspect(toZigbee), NS)
-        logger.debug("fZ: " + util.inspect(fromZigbee), NS)
+        //logger.debug("tZ: " + util.inspect(toZigbee), NS)
+        //logger.debug("fZ: " + util.inspect(fromZigbee), NS)
 
 
         return {
