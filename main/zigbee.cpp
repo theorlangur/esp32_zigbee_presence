@@ -33,6 +33,9 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 5;
     static constexpr const uint16_t LD2412_ATTRIB_STATE = 6;
 
+    static constexpr const uint8_t LD2412_CMD_RESTART = 0;
+    static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
+
     using ZclAttributeOccupancy_t = ZclAttributeAccess<
         PRESENCE_EP
         , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
@@ -340,7 +343,46 @@ namespace zb
         }
     }
 
-    static SetAttributeHandler g_AttributeHandlers[] = {
+    esp_err_t ld2412_cmd_restart()
+    {
+        FMT_PRINT("Got restart command\n");
+        return ESP_OK;
+    }
+
+    esp_err_t ld2412_cmd_factory_reset()
+    {
+        FMT_PRINT("Got factory reset command\n");
+        return ESP_OK;
+    }
+
+
+    /**********************************************************************/
+    /* Commands                                                           */
+    /**********************************************************************/
+    static const ZbCmdHandler g_Commands[] = {
+        CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESTART, &ld2412_cmd_restart>{},
+        CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_FACTORY_RESET, &ld2412_cmd_factory_reset>{},
+    };
+
+    static const ZbCmdHandlingDesc g_CommandsDesc{
+        /*default*/[](const esp_zb_zcl_custom_cluster_command_message_t *message)->esp_err_t
+        {
+            FMT_PRINT("Unknown command: ep {:x}; cluster {:x}; cmd {:x}; data size {:x}\n",
+                    message->info.dst_endpoint,
+                    message->info.cluster,
+                    message->info.command.id,
+                    message->data.size
+                    );
+            return ESP_OK;
+        },
+        g_Commands
+    };
+
+
+    /**********************************************************************/
+    /* Attributes                                                         */
+    /**********************************************************************/
+    static const SetAttributeHandler g_AttributeHandlers[] = {
         AttrDescr<ZclAttributeOccupiedToUnoccupiedTimeout_t, 
             [](auto const& to, const auto *message)->esp_err_t
             {
@@ -362,7 +404,7 @@ namespace zb
 
         ,{}//last one
     };
-    static SetAttributesHandlingDesc g_AttributeHandlingDesc = {
+    static const SetAttributesHandlingDesc g_AttributeHandlingDesc = {
         /*default*/[](const esp_zb_zcl_set_attr_value_message_t *message)->esp_err_t
         {
             esp_err_t ret = ESP_OK;
@@ -407,7 +449,7 @@ namespace zb
 
         /* Register the device */
         esp_zb_device_register(ep_list);
-        esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc>);
+        esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc, &g_CommandsDesc>);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 
