@@ -31,6 +31,13 @@ const orlangurOccupactionExtended = {
                 key: ['restart','factory_reset'],
                 convertSet: async (entity, key, value, meta) => {
                     await entity.command('customOccupationConfig', key, {}, {});
+                    if (key == 'factory_reset')
+                    {
+                        await utils.sleep(5000);
+                        const endpoint = meta.device.getEndpoint(1);
+                        await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
+                        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
+                    }
                 },
             },
         ];
@@ -90,7 +97,7 @@ const orlangurOccupactionExtended = {
     sensitivity: (prefix, descr) => {
         const attr = prefix + 'Sensitivity'
         const exp_entity = prefix + '_sensitivity'
-        const exposes = e.composite(attr, exp_entity, ea.STATE_SET)
+        const exposes = e.composite(attr, exp_entity, ea.ALL)
                             .withLabel(prefix + ' Sensitivity')
                             .withDescription('Configure sensitivity for ' + descr);
         for(var i = 0; i < 14; ++i)
