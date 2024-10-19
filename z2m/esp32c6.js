@@ -37,10 +37,63 @@ const orlangurOccupactionExtended = {
                         const endpoint = meta.device.getEndpoint(1);
                         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
                         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
+                        await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
                     }
                 },
             },
         ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
+    distanceConfig: () => {
+        const exposes = [
+            e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
+            e.numeric('max_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    //logger.debug(`min/max distance info fZ: ${util.inspect(data)};`, NS);
+                    if (data['min_distance'] !== undefined) 
+                    {
+                        result['min_distance'] = data['min_distance'];
+                    }
+                    else if (data['max_distance'] !== undefined) 
+                    {
+                        result['max_distance'] = data['max_distance'];
+                    }
+                    else 
+                    {
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            {
+                key: ['min_distance', 'max_distance'],
+                convertSet: async (entity, key, value, meta) => {
+                    const payload = {[key]: value}
+                    await entity.write('customOccupationConfig', payload);
+                    return {state: {[key]: value}};
+                },
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', [key]);
+                },
+            }
+        ]
 
         return {
             exposes,
@@ -64,7 +117,7 @@ const orlangurOccupactionExtended = {
                 convert: (model, msg, publish, options, meta) => {
                     const result = {};
                     const data = msg.data;
-                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${data}`, NS);
+                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${util.inspect(data)};`, NS);
                     if (data[attrDistance] !== undefined) 
                     {
                         //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: got distance: ${data[attrDistance]}`, NS);
@@ -194,7 +247,8 @@ const definition = {
                 moveDistance: {ID: 0x0004, type: Zcl.DataType.UINT16},
                 stillDistance: {ID: 0x0005, type: Zcl.DataType.UINT16},
                 state: {ID: 0x0006, type: Zcl.DataType.ENUM8},
-                p_timeout: {ID: 0x0007, type: Zcl.DataType.UINT16},
+                min_distance: {ID: 0x0007, type: Zcl.DataType.UINT16},
+                max_distance: {ID: 0x0008, type: Zcl.DataType.UINT16},
             },
             commands: {
                 restart: {
@@ -208,6 +262,7 @@ const definition = {
             },
             commandsResponse: {},
         }),
+        orlangurOccupactionExtended.commands(),
         numeric({
             name: 'presence_timeout',
             cluster: 'msOccupancySensing',
@@ -227,15 +282,16 @@ const definition = {
         }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
+        orlangurOccupactionExtended.distanceConfig(),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
-        orlangurOccupactionExtended.commands(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
         await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig']);
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
+        await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
         await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         await endpoint.configureReporting('msOccupancySensing', [

@@ -30,6 +30,8 @@ namespace ld2412
             SetMinDistance,
             SetMaxDistance,
             SetMode,
+            SetMoveSensitivity,
+            SetStillSensitivity,
         };
 
         Type m_Type;
@@ -74,6 +76,7 @@ namespace ld2412
             uint16_t m_Timeout;
             uint16_t m_Distance;
             LD2412::SystemMode m_Mode;
+            uint8_t m_Sensitivity[14];
         };
     };
 
@@ -204,6 +207,34 @@ namespace ld2412
                     if (!te)
                     {
                         FMT_PRINT("Setting timeout has failed: {}\n", te.error());
+                    }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
+                }
+                break;
+            case QueueMsg::Type::SetMoveSensitivity:
+                {
+                    auto ch = d.ChangeConfiguration();
+                    for(int i = 0; i < 14; ++i)
+                        ch.SetMoveThreshold(i, msg.m_Sensitivity[i]);
+                    auto te = ch.EndChange();
+                    if (!te)
+                    {
+                        FMT_PRINT("Setting move sensitivity has failed: {}\n", te.error());
+                    }
+                    else if (m_ConfigUpdateCallback)
+                        m_ConfigUpdateCallback();
+                }
+                break;
+            case QueueMsg::Type::SetStillSensitivity:
+                {
+                    auto ch = d.ChangeConfiguration();
+                    for(int i = 0; i < 14; ++i)
+                        ch.SetStillThreshold(i, msg.m_Sensitivity[i]);
+                    auto te = ch.EndChange();
+                    if (!te)
+                    {
+                        FMT_PRINT("Setting still sensitivity has failed: {}\n", te.error());
                     }
                     else if (m_ConfigUpdateCallback)
                         m_ConfigUpdateCallback();
@@ -431,6 +462,22 @@ namespace ld2412
         QueueMsg msg{.m_Type = QueueMsg::Type::SetTimeout, .m_Timeout = to};
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
+
+    void Component::ChangeMoveSensitivity(const uint8_t (&sensitivity)[14])
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetMoveSensitivity};
+        static_assert(sizeof(sensitivity) == sizeof(msg.m_Sensitivity));
+        memcpy(msg.m_Sensitivity, sensitivity, sizeof(msg.m_Sensitivity));
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+    void Component::ChangeStillSensitivity(const uint8_t (&sensitivity)[14])
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetStillSensitivity};
+        static_assert(sizeof(sensitivity) == sizeof(msg.m_Sensitivity));
+        memcpy(msg.m_Sensitivity, sensitivity, sizeof(msg.m_Sensitivity));
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
     void Component::ChangeMinDistance(uint16_t d)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetMinDistance, .m_Distance = d};

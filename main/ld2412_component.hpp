@@ -44,6 +44,8 @@ namespace ld2412
         void ChangeTimeout(uint16_t to);
         void ChangeMinDistance(uint16_t d);
         void ChangeMaxDistance(uint16_t d);
+        void ChangeMoveSensitivity(const uint8_t (&sensitivity)[14]);
+        void ChangeStillSensitivity(const uint8_t (&sensitivity)[14]);
 
         void StartCalibration();
         void StopCalibration();

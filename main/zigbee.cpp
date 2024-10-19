@@ -32,6 +32,8 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_DISTANCE = 4;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 5;
     static constexpr const uint16_t LD2412_ATTRIB_STATE = 6;
+    static constexpr const uint16_t LD2412_ATTRIB_MIN_DISTANCE = 7;
+    static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
 
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
@@ -100,6 +102,20 @@ namespace zb
         , LD2412_ATTRIB_STATE
         , LD2412::TargetState>;
 
+    using ZclAttributeMaxDistance_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MAX_DISTANCE
+        , uint16_t>;
+
+    using ZclAttributeMinDistance_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MIN_DISTANCE
+        , uint16_t>;
+
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
     static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
@@ -109,6 +125,8 @@ namespace zb
     static ZclAttributeStillEnergy_t g_LD2412StillEnergy;
     static ZclAttributeMoveEnergy_t g_LD2412MoveEnergy;
     static ZclAttributeState_t g_LD2412State;
+    static ZclAttributeMaxDistance_t g_LD2412MaxDistance;
+    static ZclAttributeMinDistance_t g_LD2412MinDistance;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -148,15 +166,6 @@ namespace zb
                     {
                         FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
                     }
-
-                    if (false)
-                    {
-                        FMT_PRINT("Reporting Presence: {}\n", (int)presence);
-                        if (auto r = g_OccupancyState.Report(g_DestCoordinator); !r)
-                        {
-                            FMT_PRINT("Failed to report attribute with error {:x}\n", r.error());
-                        }
-                    }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
                 });
@@ -169,6 +178,8 @@ namespace zb
                     stillBuf.data[i] = g_ld2412.GetStillThreshold(i);
                 }
                 auto timeout = g_ld2412.GetTimeout();
+                auto minDistance = g_ld2412.GetMinDistance();
+                auto maxDistance = g_ld2412.GetMaxDistance();
 
                 FMT_PRINT("Setting move sensitivity attribute with {}\n", moveBuf.sv());
                 FMT_PRINT("Setting still sensitivity attribute with {}\n", stillBuf.sv());
@@ -186,6 +197,14 @@ namespace zb
                     if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
                     {
                         FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412MinDistance.Set(minDistance); !status)
+                    {
+                        FMT_PRINT("Failed to set min distance with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412MaxDistance.Set(maxDistance); !status)
+                    {
+                        FMT_PRINT("Failed to set max distance with error {:x}\n", (int)status.error());
                     }
                 }
         });
@@ -212,6 +231,8 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MoveEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412StillEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412State.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
@@ -388,9 +409,9 @@ namespace zb
         AttrDescr<ZclAttributeOccupiedToUnoccupiedTimeout_t, 
             [](auto const& to, const auto *message)->esp_err_t
             {
-                FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
-                uint8_t *pData = (uint8_t *)message->attribute.data.value;
-                FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
+                //FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
+                //uint8_t *pData = (uint8_t *)message->attribute.data.value;
+                //FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
                 FMT_PRINT("Changing timeout to {}\n", to);
                 g_ld2412.ChangeTimeout(to);
                 return ESP_OK;
@@ -399,12 +420,37 @@ namespace zb
         AttrDescr<ZclAttributeLD2412MoveSensetivity_t, 
             [](SensitivityBufType const& to, const auto *message)->esp_err_t
             {
-                FMT_PRINT("Would change move sensitivity to {}\n", to.sv());
+                FMT_PRINT("Changing move sensitivity to {}\n", to.sv());
+                g_ld2412.ChangeMoveSensitivity(to.data);
                 return ESP_OK;
             }
-        >{}
+        >{},
+        AttrDescr<ZclAttributeLD2412StillSensetivity_t, 
+            [](SensitivityBufType const& to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing still sensitivity to {}\n", to.sv());
+                g_ld2412.ChangeStillSensitivity(to.data);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeMaxDistance_t, 
+            [](const uint16_t &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing max distance to {}\n", to);
+                g_ld2412.ChangeMaxDistance(to);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeMinDistance_t, 
+            [](const uint16_t &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing min distance to {}\n", to);
+                g_ld2412.ChangeMinDistance(to);
+                return ESP_OK;
+            }
+        >{},
 
-        ,{}//last one
+        {}//last one
     };
     static const SetAttributesHandlingDesc g_AttributeHandlingDesc = {
         /*default*/[](const esp_zb_zcl_set_attr_value_message_t *message)->esp_err_t
