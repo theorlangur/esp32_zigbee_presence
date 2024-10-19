@@ -266,12 +266,13 @@ namespace ld2412
                     break;
                     case QueueMsg::Type::Presence: 
                         //FMT_PRINT("Msg presence: {:x}\n", msg.m_PresenceRaw.changedRaw);
-                        if (c.m_PresencePin != -1)
-                            msg.m_Presence.m_ChangePresenceStill = msg.m_Presence.m_ChangePresenceMove = 0;
+                        //if (c.m_PresencePin != -1)
+                        //    msg.m_Presence.m_ChangePresenceStill = msg.m_Presence.m_ChangePresenceMove = 0;
                         if (msg.m_Presence.changed())
                         {
                             //FMT_PRINT("Msg presence something changed\n");
-                            lastPresence = msg.m_Presence.m_PresenceStill | msg.m_Presence.m_PresenceMove;
+                            if (c.m_PresencePin == -1)//if a dedicated pin is configured - it dictates presence
+                                lastPresence = msg.m_Presence.m_PresenceStill | msg.m_Presence.m_PresenceMove;
                             if (msg.m_Presence.m_PresenceStill && msg.m_Presence.m_PresenceMove)
                                 lastPresenceData.m_State = LD2412::TargetState::MoveAndStill;
                             else if (msg.m_Presence.m_PresenceStill)
