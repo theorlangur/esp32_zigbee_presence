@@ -345,13 +345,15 @@ namespace zb
 
     esp_err_t ld2412_cmd_restart()
     {
-        FMT_PRINT("Got restart command\n");
+        FMT_PRINT("Restarting...\n");
+        g_ld2412.Restart();
         return ESP_OK;
     }
 
     esp_err_t ld2412_cmd_factory_reset()
     {
-        FMT_PRINT("Got factory reset command\n");
+        FMT_PRINT("Factory resetting...\n");
+        g_ld2412.FactoryReset();
         return ESP_OK;
     }
 
