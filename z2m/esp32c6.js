@@ -18,6 +18,30 @@ const ea = exposes.access;
 const NS = 'zhc:orlangur';
 
 const orlangurOccupactionExtended = {
+    commands: () => {
+        const exposes = [
+            e.enum('restart', ea.SET, ['Restart']).withLabel('Restart').withDescription('Restart LD2412 module'),
+            e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
+        ];
+
+        const fromZigbee = [];
+
+        const toZigbee = [
+            {
+                key: ['restart','factory_reset'],
+                convertSet: async (entity, key, value, meta) => {
+                    await entity.command('customOccupationConfig', key, {}, {});
+                },
+            },
+        ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     presenceInfo: (prefix) => {
         const attrDistance = prefix + 'Distance'
         const attrEnergy = prefix + 'Energy'
@@ -165,7 +189,16 @@ const definition = {
                 state: {ID: 0x0006, type: Zcl.DataType.ENUM8},
                 p_timeout: {ID: 0x0007, type: Zcl.DataType.UINT16},
             },
-            commands: {},
+            commands: {
+                restart: {
+                    ID: 0x0000,
+                    parameters: [],
+                },
+                factory_reset: {
+                    ID: 0x0001,
+                    parameters: [],
+                },
+            },
             commandsResponse: {},
         }),
         numeric({
@@ -189,6 +222,7 @@ const definition = {
         orlangurOccupactionExtended.presenceInfo('still'),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
+        orlangurOccupactionExtended.commands(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
