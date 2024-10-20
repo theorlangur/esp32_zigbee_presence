@@ -142,9 +142,27 @@ namespace zb
         uint16_t cluster_id;
     };
 
+    static void send_on_off(bool on)
+    {
+        FMT_PRINT("Sending command to binded: {};\n", (int)on);
+        esp_zb_zcl_on_off_cmd_t cmd_req;
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        if (on)
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+        else
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+        esp_zb_zcl_on_off_cmd_req(&cmd_req);
+    }
+
     static void setup_sensor()
     {
         g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p){
+                static bool g_FirstRun = true;
+                static bool g_LastPresence = false;
+                bool presence_changed = !g_FirstRun && (g_LastPresence != presence);
+                g_FirstRun = false;
+                g_LastPresence = presence;
                 esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
                 {
                     APILock l;
@@ -171,6 +189,10 @@ namespace zb
                     if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
                     {
                         FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (presence_changed)
+                    {
+                        send_on_off(presence);
                     }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
@@ -297,6 +319,11 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         create_presence_config_custom_cluster(cluster_list);
 
+        esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
+        esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+
+        if (false)
         {
             FMT_PRINT("Cluster summary to create:\n");
             auto *pNext = cluster_list;
