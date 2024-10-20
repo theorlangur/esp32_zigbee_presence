@@ -53,7 +53,7 @@ const orlangurOccupactionExtended = {
     distanceConfig: () => {
         const exposes = [
             e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
-            e.numeric('max_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
+            e.numeric('max_distance', ea.ALL).withLabel("Maximum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
         ];
 
         const fromZigbee = [
