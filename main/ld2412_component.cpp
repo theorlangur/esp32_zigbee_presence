@@ -541,7 +541,7 @@ namespace ld2412
 
         {
             printf("Init\n");
-            if (m_Sensor.HasEventCallback())
+            if (!m_Sensor.HasEventCallback())
             {
                 m_Sensor.SetEventCallback([this](uart_event_type_t e){
                         auto q = m_ManagingQueue.load(std::memory_order_relaxed);
