@@ -541,14 +541,16 @@ namespace ld2412
 
         {
             printf("Init\n");
-            m_Sensor.SetEventCallback([this](uart_event_type_t e){
-                auto q = m_ManagingQueue.load(std::memory_order_relaxed);
-                if (!q)
-                    return;//ignore, too early
-                switch (e) 
-                {
-                    case UART_DATA:
-                    {
+            if (m_Sensor.HasEventCallback())
+            {
+                m_Sensor.SetEventCallback([this](uart_event_type_t e){
+                        auto q = m_ManagingQueue.load(std::memory_order_relaxed);
+                        if (!q)
+                        return;//ignore, too early
+                        switch (e) 
+                        {
+                        case UART_DATA:
+                        {
                         //using clock_t = std::chrono::system_clock;
                         //using time_point_t = std::chrono::time_point<clock_t>;
                         //static time_point_t prev = clock_t::now();
@@ -559,20 +561,21 @@ namespace ld2412
                         //prev = now;
                         QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Dummy = true};
                         xQueueSend(q, &msg, 0);
-                    }
-                    break;
-                    case UART_BUFFER_FULL:
-                    case UART_FIFO_OVF:
-                    {
-                        FMT_PRINT("{}\n", e == UART_BUFFER_FULL ? "buffer full" : "fifo overflow");
-                        QueueMsg msg{.m_Type = QueueMsg::Type::Flush, .m_Dummy = true};
-                        xQueueSend(q, &msg, 0);
-                    }
-                    break;
-                    default:
-                    break;
-                }
-            });
+                        }
+                        break;
+                        case UART_BUFFER_FULL:
+                        case UART_FIFO_OVF:
+                        {
+                            FMT_PRINT("{}\n", e == UART_BUFFER_FULL ? "buffer full" : "fifo overflow");
+                            QueueMsg msg{.m_Type = QueueMsg::Type::Flush, .m_Dummy = true};
+                            xQueueSend(q, &msg, 0);
+                        }
+                        break;
+                        default:
+                        break;
+                        }
+                });
+            }
 
             auto e = m_Sensor.Init(args.txPin, args.rxPin);
             if (!!e)
@@ -591,7 +594,6 @@ namespace ld2412
             printf("Config\n");
             auto changeConfig = m_Sensor.ChangeConfiguration()
                 .SetSystemMode(LD2412::SystemMode::Simple)
-                .SetTimeout(5)
                 .EndChange();
             if (!changeConfig)
             {

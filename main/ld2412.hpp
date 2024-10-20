@@ -56,7 +56,7 @@ public:
         Clear,
         Move,
         Still,
-        MoveAndStill
+        MoveAndStill,
     };
 
     enum class DistanceRes: uint16_t

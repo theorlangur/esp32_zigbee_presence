@@ -95,12 +95,18 @@ namespace zb
         , LD2412_ATTRIB_STILL_ENERGY
         , uint8_t>;
 
+    enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
+    {
+        Configuring = 0x80,
+        Failed = 0x81,
+    };
+
     using ZclAttributeState_t = ZclAttributeAccess<
         PRESENCE_EP
         , CLUSTER_ID_LD2412
         , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
         , LD2412_ATTRIB_STATE
-        , LD2412::TargetState>;
+        , LD2412State>;
 
     using ZclAttributeMaxDistance_t = ZclAttributeAccess<
         PRESENCE_EP
@@ -136,7 +142,7 @@ namespace zb
         uint16_t cluster_id;
     };
 
-    static bool setup_sensor()
+    static void setup_sensor()
     {
         g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p){
                 esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
@@ -162,9 +168,9 @@ namespace zb
                     {
                         FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
                     }
-                    if (auto status = g_LD2412State.Set(p.m_State); !status)
+                    if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
                     {
-                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+                        FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
                     }
                 }
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
@@ -209,14 +215,36 @@ namespace zb
                 }
         });
 
-        if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
         {
-            printf("Failed to configure ld2412\n");
-            fflush(stdout);
-            return false;
+            APILock l;
+            if (auto status = g_LD2412State.Set(LD2412State::Configuring); !status)
+            {
+                FMT_PRINT("Failed to set initial state with error {:x}\n", (int)status.error());
+            }
+        }
+
+        constexpr int kMaxTries = 3;
+        for(int tries = 0; tries < kMaxTries; ++tries)
+        {
+            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=8}))
+            {
+                printf("Failed to configure ld2412 (attempt %d)\n", tries);
+                fflush(stdout);
+                if (tries == (kMaxTries - 1))
+                {
+                    APILock l;
+                    if (auto status = g_LD2412State.Set(LD2412State::Failed); !status)
+                    {
+                        FMT_PRINT("Failed to set initial state with error {:x}\n", (int)status.error());
+                    }
+                    return;
+                }
+            }else
+            {
+                break;
+            }
         }
         ESP_LOGI(TAG, "Sensor setup done");
-        return true;
     }
 
     static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
@@ -318,16 +346,9 @@ namespace zb
         case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
-                bool sensor_init_ok = setup_sensor();
+                //async setup
+                thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
 
-                {
-                    uint16_t timeout = g_ld2412.GetTimeout();
-                    if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
-                    {
-                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
-                    }
-                }
-                ESP_LOGI(TAG, "Deferred sensor initialization %s", !sensor_init_ok ? "failed" : "successful");
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
                     ESP_LOGI(TAG, "Start network steering");

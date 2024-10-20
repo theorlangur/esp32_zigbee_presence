@@ -116,6 +116,7 @@ namespace uart
 
         using EventCallback = GenericCallback<void(uart_event_type_t)>;
         void SetEventCallback(EventCallback cb) { m_EventCallback = std::move(cb); }
+        bool HasEventCallback() const { return (bool)m_EventCallback; }
 
         bool m_Dbg = false;
 

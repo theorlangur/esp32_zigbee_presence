@@ -66,6 +66,7 @@ namespace thread
         using args_t = std::tuple<Args...>;
         struct args_with_f_t: args_base_t
         {
+            args_with_f_t(F &&f, args_t &&args): f(std::move(f)), args(std::move(args)) {}
             F f;
             args_t args;
         };
@@ -78,7 +79,7 @@ namespace thread
         };
 
         TaskBase r;
-        r.args.reset(new args_with_f_t{ .f=std::move(f), .args=std::make_tuple(std::forward<Args>(args)...) });
+        r.args.reset(new args_with_f_t{std::move(f), std::make_tuple(std::forward<Args>(args)...) });
         xTaskCreate(_func, cfg.pName, cfg.stackSize, r.args.get(), 5, &r.h);
         return r;
     }
