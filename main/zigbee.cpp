@@ -348,6 +348,7 @@ namespace zb
             if (err_status == ESP_OK) {
                 //async setup
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
+                //setup_sensor();
 
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
