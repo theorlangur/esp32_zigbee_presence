@@ -74,7 +74,8 @@ namespace thread
         {
             args_with_f_t *pParams = (args_with_f_t *)_pParams;
             [&]<size_t...idx>(std::index_sequence<idx...>){ 
-                return (pParams->f)(std::get<idx>(pParams->args)...);
+                (pParams->f)(std::get<idx>(pParams->args)...);
+                vTaskDelete(nullptr);
             }(std::make_index_sequence<sizeof...(Args)>());
         };
 
