@@ -278,7 +278,7 @@ const definition = {
             cluster: 'customOccupationConfig',
             attribute: 'state',
             description: 'Presence state',
-            lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3},
+            lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
         }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
