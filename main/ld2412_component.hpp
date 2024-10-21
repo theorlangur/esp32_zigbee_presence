@@ -16,7 +16,13 @@ namespace ld2412
         static constexpr const uint16_t kEnergyReportChangeThreshold = 10;//10
         struct QueueMsg;
     public:
-        using MovementCallback = GenericCallback<void(bool detected, LD2412::PresenceResult const& p)>;
+        enum class ExtendedState
+        {
+            Normal,
+            RunningDynamicBackgroundAnalysis,
+            RunningCalibration
+        };
+        using MovementCallback = GenericCallback<void(bool detected, LD2412::PresenceResult const& p, ExtendedState exState)>;
         using ConfigUpdateCallback = GenericCallback<void()>;
         struct EnergyMinMax
         {
@@ -53,6 +59,7 @@ namespace ld2412
 
         void Restart();
         void FactoryReset();
+        void RunDynamicBackgroundAnalysis();
 
         LD2412::SystemMode GetMode() const;
 

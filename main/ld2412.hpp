@@ -242,6 +242,9 @@ public:
     using Channel::SetEventCallback;
     using Channel::Flush;
     using Channel::GetReadyToReadDataLen;
+
+    ExpectedResult RunDynamicBackgroundAnalysis();
+    bool IsDynamicBackgroundAnalysisRunning();
 private:
     enum class Cmd: uint16_t
     {
@@ -465,6 +468,8 @@ private:
     ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
     ExpectedGenericCmdResult UpdateVersion();
 
+    ExpectedResult QueryDynamicBackgroundAnalysisRunState();
+
     ExpectedResult ReadFrame();
     //data
     Version m_Version;
@@ -478,6 +483,8 @@ private:
 
     uint8_t m_BluetoothMAC[6] = {0};
     DistanceRes m_DistanceRes = DistanceRes::_0_75;
+
+    bool m_DynamicBackgroundAnalysis = false;
 public:
     struct DbgNow
     {

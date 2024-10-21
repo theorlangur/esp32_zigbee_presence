@@ -232,6 +232,34 @@ LD2412::ExpectedResult LD2412::TryReadFrame(int attempts, bool flush, Drain drai
     return std::ref(*this);
 }
 
+LD2412::ExpectedResult LD2412::RunDynamicBackgroundAnalysis()
+{
+    SetDefaultWait(kDefaultWait);
+    TRY_UART_COMM(OpenCommandMode(), "RunDynamicBackgroundAnalysis", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::RunDynamicBackgroundAnalysis, to_send(), to_recv()), "RunDynamicBackgroundAnalysis", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(CloseCommandMode(), "RunDynamicBackgroundAnalysis", ErrorCode::SendCommand_Failed);
+    m_DynamicBackgroundAnalysis = true;
+    return std::ref(*this);
+}
+
+bool LD2412::IsDynamicBackgroundAnalysisRunning()
+{
+    if (m_DynamicBackgroundAnalysis)
+        QueryDynamicBackgroundAnalysisRunState();
+    return m_DynamicBackgroundAnalysis;
+}
+
+LD2412::ExpectedResult LD2412::QueryDynamicBackgroundAnalysisRunState()
+{
+    SetDefaultWait(kDefaultWait);
+    uint16_t active = 0;
+    TRY_UART_COMM(OpenCommandMode(), "QueryDynamicBackgroundAnalysisRunState", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::QuearyDynamicBackgroundAnalysis, to_send(), to_recv(active)), "QueryDynamicBackgroundAnalysisRunState", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(CloseCommandMode(), "QueryDynamicBackgroundAnalysisRunState", ErrorCode::SendCommand_Failed);
+    m_DynamicBackgroundAnalysis = active != 0;
+    return std::ref(*this);
+}
+
 /**********************************************************************/
 /* ConfigBlock                                                        */
 /**********************************************************************/

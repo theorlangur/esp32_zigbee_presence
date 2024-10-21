@@ -17,6 +17,8 @@ namespace ld2412
             Stop,
             Restart,
             FactoryReset,
+            RunDynamicBackgroundAnalysis,
+            RunDynamicBackgroundAnalysisDone,
             StartCalibrate,
             StopCalibrate,
             ResetEnergyStat,
@@ -121,6 +123,17 @@ namespace ld2412
                         m_ConfigUpdateCallback();
                 }
                 break;
+            case QueueMsg::Type::RunDynamicBackgroundAnalysis:
+                if (!d.IsDynamicBackgroundAnalysisRunning())
+                {
+                    auto te = d.RunDynamicBackgroundAnalysis();
+                    if (!te)
+                    {
+                        FMT_PRINT("Running dynamic background analysis has failed: {}\n", te.error());
+                    }else
+                        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+                }
+                break;
             case QueueMsg::Type::ResetEnergyStat:
                 {
                     for(auto &e : m_MeasuredMinMax)
@@ -142,7 +155,10 @@ namespace ld2412
                         {
                             FMT_PRINT("Setting mode to energy for calibration has failed: {}\n", te.error());
                         }else
+                        {
                             m_CalibrationStarted = true;
+                            xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+                        }
                     }else
                     {
                         FMT_PRINT("Calibration is already running\n");
@@ -174,6 +190,7 @@ namespace ld2412
                         }
                         auto te = cfg.SetSystemMode(m_ModeBeforeCalibration).EndChange();
 
+                        xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
                         if (!te)
                         {
                             FMT_PRINT("Applying calibration and setting mode has failed: {}\n", te.error());
@@ -278,6 +295,7 @@ namespace ld2412
         Component &c = *pC;
         bool lastPresence = false;
         LD2412::PresenceResult lastPresenceData;
+        ExtendedState exState = ExtendedState::Normal;
         QueueMsg msg;
         while(true)
         {
@@ -292,7 +310,35 @@ namespace ld2412
                         FMT_PRINT("Msg presence interrupt: {}\n", l);
                         lastPresence = l == 1;
                         if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData);
+                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                    }
+                    break;
+                    case QueueMsg::Type::RunDynamicBackgroundAnalysis: 
+                    {
+                        exState = ExtendedState::RunningDynamicBackgroundAnalysis;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                    }
+                    break;
+                    case QueueMsg::Type::RunDynamicBackgroundAnalysisDone: 
+                    {
+                        exState = ExtendedState::Normal;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                    }
+                    break;
+                    case QueueMsg::Type::StartCalibrate: 
+                    {
+                        exState = ExtendedState::RunningCalibration;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                    }
+                    break;
+                    case QueueMsg::Type::StopCalibrate: 
+                    {
+                        exState = ExtendedState::Normal;
+                        if (c.m_MovementCallback)
+                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
                     }
                     break;
                     case QueueMsg::Type::Presence: 
@@ -319,7 +365,7 @@ namespace ld2412
                             lastPresenceData.m_MoveEnergy = msg.m_Presence.m_EnergyMove;
 
                             if (c.m_MovementCallback)
-                                c.m_MovementCallback(lastPresence, lastPresenceData);
+                                c.m_MovementCallback(lastPresence, lastPresenceData, exState);
                         }
                     break;
                     default:
@@ -342,7 +388,7 @@ namespace ld2412
         {
             //need to read initial state
             QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Dummy=false};
-            xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
+            xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
         }
 
         while(true)
@@ -354,6 +400,9 @@ namespace ld2412
                     c.HandleMessage(msg);
                     continue;
                 }
+
+                if (d.IsDynamicBackgroundAnalysisRunning())
+                    continue;
 
                 bool simpleMode = d.GetSystemMode() == LD2412::SystemMode::Simple;
                 auto te = d.TryReadFrame(3, true, LD2412::Drain::Try);
@@ -432,7 +481,8 @@ namespace ld2412
                 
                 if (anythingChanged)
                     xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
-            }
+            }else
+                d.IsDynamicBackgroundAnalysisRunning();
         }
     }
 
