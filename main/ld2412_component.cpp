@@ -131,7 +131,10 @@ namespace ld2412
                     {
                         FMT_PRINT("Running dynamic background analysis has failed: {}\n", te.error());
                     }else
+                    {
+                        m_DynamicBackgroundAnalysis = true;
                         xQueueSend(m_FastQueue, &msg, portMAX_DELAY);
+                    }
                 }
                 break;
             case QueueMsg::Type::ResetEnergyStat:
@@ -402,7 +405,20 @@ namespace ld2412
                 }
 
                 if (d.IsDynamicBackgroundAnalysisRunning())
+                {
+                    if (!c.m_DynamicBackgroundAnalysis)
+                    {
+                        c.m_DynamicBackgroundAnalysis = true;
+                        msg.m_Type = QueueMsg::Type::RunDynamicBackgroundAnalysis;
+                        xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+                    }
                     continue;
+                }else if (c.m_DynamicBackgroundAnalysis)
+                {
+                    c.m_DynamicBackgroundAnalysis = false;
+                    msg.m_Type = QueueMsg::Type::RunDynamicBackgroundAnalysisDone;
+                    xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+                }
 
                 bool simpleMode = d.GetSystemMode() == LD2412::SystemMode::Simple;
                 auto te = d.TryReadFrame(3, true, LD2412::Drain::Try);
@@ -482,7 +498,22 @@ namespace ld2412
                 if (anythingChanged)
                     xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
             }else
-                d.IsDynamicBackgroundAnalysisRunning();
+            {
+                if (d.IsDynamicBackgroundAnalysisRunning())
+                {
+                    if (!c.m_DynamicBackgroundAnalysis)
+                    {
+                        c.m_DynamicBackgroundAnalysis = true;
+                        msg.m_Type = QueueMsg::Type::RunDynamicBackgroundAnalysis;
+                        xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+                    }
+                }else if (c.m_DynamicBackgroundAnalysis)
+                {
+                    c.m_DynamicBackgroundAnalysis = false;
+                    msg.m_Type = QueueMsg::Type::RunDynamicBackgroundAnalysisDone;
+                    xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
+                }
+            }
         }
     }
 

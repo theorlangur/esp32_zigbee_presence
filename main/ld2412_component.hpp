@@ -102,6 +102,7 @@ namespace ld2412
         EnergyReading m_MeasuredMinMax[14];
 
         bool m_CalibrationStarted = false;
+        bool m_DynamicBackgroundAnalysis = false;
         LD2412::SystemMode m_ModeBeforeCalibration;
     };
 }
