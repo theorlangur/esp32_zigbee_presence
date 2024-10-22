@@ -34,6 +34,7 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_STATE = 6;
     static constexpr const uint16_t LD2412_ATTRIB_MIN_DISTANCE = 7;
     static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
+    static constexpr const uint16_t LD2412_ATTRIB_EX_STATE = 9;
 
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
@@ -108,6 +109,13 @@ namespace zb
         , LD2412_ATTRIB_STATE
         , LD2412State>;
 
+    using ZclAttributeExState_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_EX_STATE
+        , ld2412::Component::ExtendedState>;
+
     using ZclAttributeMaxDistance_t = ZclAttributeAccess<
         PRESENCE_EP
         , CLUSTER_ID_LD2412
@@ -131,6 +139,7 @@ namespace zb
     static ZclAttributeStillEnergy_t g_LD2412StillEnergy;
     static ZclAttributeMoveEnergy_t g_LD2412MoveEnergy;
     static ZclAttributeState_t g_LD2412State;
+    static ZclAttributeExState_t g_LD2412ExState;
     static ZclAttributeMaxDistance_t g_LD2412MaxDistance;
     static ZclAttributeMinDistance_t g_LD2412MinDistance;
 
@@ -157,7 +166,7 @@ namespace zb
 
     static void setup_sensor()
     {
-        g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p){
+        g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p, ld2412::Component::ExtendedState exState){
                 static bool g_FirstRun = true;
                 static bool g_LastPresence = false;
                 bool presence_changed = !g_FirstRun && (g_LastPresence != presence);
@@ -189,6 +198,10 @@ namespace zb
                     if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
                     {
                         FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
+                    }
+                    if (auto status = g_LD2412ExState.Set(exState); !status)
+                    {
+                        FMT_PRINT("Failed to set extended state attribute with error {:x}\n", (int)status.error());
                     }
                     if (presence_changed)
                     {
@@ -243,6 +256,10 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial state with error {:x}\n", (int)status.error());
             }
+            if (auto status = g_LD2412ExState.Set(ld2412::Component::ExtendedState::Normal); !status)
+            {
+                FMT_PRINT("Failed to set initial extended state with error {:x}\n", (int)status.error());
+            }
         }
 
         constexpr int kMaxTries = 3;
@@ -283,6 +300,7 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412State.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }

@@ -16,7 +16,7 @@ namespace ld2412
         static constexpr const uint16_t kEnergyReportChangeThreshold = 10;//10
         struct QueueMsg;
     public:
-        enum class ExtendedState
+        enum class ExtendedState: uint8_t
         {
             Normal,
             RunningDynamicBackgroundAnalysis,

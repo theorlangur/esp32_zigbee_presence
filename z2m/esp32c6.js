@@ -249,6 +249,7 @@ const definition = {
                 state: {ID: 0x0006, type: Zcl.DataType.ENUM8},
                 min_distance: {ID: 0x0007, type: Zcl.DataType.UINT16},
                 max_distance: {ID: 0x0008, type: Zcl.DataType.UINT16},
+                ex_state: {ID: 0x0009, type: Zcl.DataType.ENUM8},
             },
             commands: {
                 restart: {
@@ -274,11 +275,19 @@ const definition = {
         }),
         enumLookup({
             name: 'presence_state',
-            access: 'STATE',
+            access: 'STATE_GET',
             cluster: 'customOccupationConfig',
             attribute: 'state',
             description: 'Presence state',
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
+        }),
+        enumLookup({
+            name: 'extended_state',
+            access: 'STATE_GET',
+            cluster: 'customOccupationConfig',
+            attribute: 'ex_state',
+            description: 'Extended state',
+            lookup: {Normal: 0, DynamicBackgroundAnalysis: 1, Calibration: 2},
         }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
