@@ -122,106 +122,114 @@ namespace zb
         esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
+    static void on_movement_callback(bool presence, LD2412::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    {
+        static bool g_FirstRun = true;
+        static bool g_LastPresence = false;
+        bool presence_changed = !g_FirstRun && (g_LastPresence != presence);
+        g_FirstRun = false;
+        g_LastPresence = presence;
+        esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
+        {
+            APILock l;
+            if (auto status = g_OccupancyState.Set(val); !status)
+            {
+                FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412MoveDistance.Set(p.m_MoveDistance); !status)
+            {
+                FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
+            {
+                FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412MoveEnergy.Set(p.m_MoveEnergy); !status)
+            {
+                FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412StillEnergy.Set(p.m_StillEnergy); !status)
+            {
+                FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
+            {
+                FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412ExState.Set(exState); !status)
+            {
+                FMT_PRINT("Failed to set extended state attribute with error {:x}\n", (int)status.error());
+            }
+            if (presence_changed)
+            {
+                send_on_off(presence);
+            }
+        }
+        FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
+    }
+
+    static void on_measurements_callback()
+    {
+        {
+            APILock l;
+            if (auto status = g_LD2412EngineeringLight.Set(g_ld2412.GetMeasuredLight()); !status)
+            {
+                FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
+            }
+        }
+    }
+
+    static void on_config_update_callback()
+    {
+        SensitivityBufType moveBuf, stillBuf;
+        for(uint8_t i = 0; i < 14; ++i)
+        {
+            moveBuf.data[i] = g_ld2412.GetMoveThreshold(i);
+            stillBuf.data[i] = g_ld2412.GetStillThreshold(i);
+        }
+        auto timeout = g_ld2412.GetTimeout();
+        auto minDistance = g_ld2412.GetMinDistance();
+        auto maxDistance = g_ld2412.GetMaxDistance();
+
+        FMT_PRINT("Setting move sensitivity attribute with {}\n", moveBuf.sv());
+        FMT_PRINT("Setting still sensitivity attribute with {}\n", stillBuf.sv());
+        FMT_PRINT("Setting timeout attribute with {}\n", timeout);
+        {
+            APILock l;
+            if (auto status = g_LD2412MoveSensitivity.Set(moveBuf); !status)
+            {
+                FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412StillSensitivity.Set(stillBuf); !status)
+            {
+                FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
+            {
+                FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412MinDistance.Set(minDistance); !status)
+            {
+                FMT_PRINT("Failed to set min distance with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412MaxDistance.Set(maxDistance); !status)
+            {
+                FMT_PRINT("Failed to set max distance with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412Mode.Set(g_ld2412.GetMode()); !status)
+            {
+                FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
+            }
+        }
+    }
+
     static void setup_sensor()
     {
-        g_ld2412.SetCallbackOnMovement([](bool presence, LD2412::PresenceResult const& p, ld2412::Component::ExtendedState exState){
-                static bool g_FirstRun = true;
-                static bool g_LastPresence = false;
-                bool presence_changed = !g_FirstRun && (g_LastPresence != presence);
-                g_FirstRun = false;
-                g_LastPresence = presence;
-                esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
-                {
-                    APILock l;
-                    if (auto status = g_OccupancyState.Set(val); !status)
-                    {
-                        FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412MoveDistance.Set(p.m_MoveDistance); !status)
-                    {
-                        FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
-                    {
-                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412MoveEnergy.Set(p.m_MoveEnergy); !status)
-                    {
-                        FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412StillEnergy.Set(p.m_StillEnergy); !status)
-                    {
-                        FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
-                    {
-                        FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412ExState.Set(exState); !status)
-                    {
-                        FMT_PRINT("Failed to set extended state attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (presence_changed)
-                    {
-                        send_on_off(presence);
-                    }
-                }
-                FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
-                });
+        g_ld2412.SetCallbackOnMovement(on_movement_callback);
+        g_ld2412.SetCallbackOnMeasurementsUpdate(on_measurements_callback);
+        g_ld2412.SetCallbackOnConfigUpdate(on_config_update_callback);
 
-        g_ld2412.SetCallbackOnMeasurementsUpdate([](){
-                    {
-                        APILock l;
-                        if (auto status = g_LD2412EngineeringLight.Set(g_ld2412.GetMeasuredLight()); !status)
-                        {
-                            FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
-                        }
-                    }
-                });
-
-        g_ld2412.SetCallbackOnConfigUpdate([](){
-                SensitivityBufType moveBuf, stillBuf;
-                for(uint8_t i = 0; i < 14; ++i)
-                {
-                    moveBuf.data[i] = g_ld2412.GetMoveThreshold(i);
-                    stillBuf.data[i] = g_ld2412.GetStillThreshold(i);
-                }
-                auto timeout = g_ld2412.GetTimeout();
-                auto minDistance = g_ld2412.GetMinDistance();
-                auto maxDistance = g_ld2412.GetMaxDistance();
-
-                FMT_PRINT("Setting move sensitivity attribute with {}\n", moveBuf.sv());
-                FMT_PRINT("Setting still sensitivity attribute with {}\n", stillBuf.sv());
-                FMT_PRINT("Setting timeout attribute with {}\n", timeout);
-                {
-                    APILock l;
-                    if (auto status = g_LD2412MoveSensitivity.Set(moveBuf); !status)
-                    {
-                        FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412StillSensitivity.Set(stillBuf); !status)
-                    {
-                        FMT_PRINT("Failed to set move sensitivity attribute with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_OccupiedToUnoccupiedTimeout.Set(timeout); !status)
-                    {
-                        FMT_PRINT("Failed to set occupied to unoccupied timeout with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412MinDistance.Set(minDistance); !status)
-                    {
-                        FMT_PRINT("Failed to set min distance with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412MaxDistance.Set(maxDistance); !status)
-                    {
-                        FMT_PRINT("Failed to set max distance with error {:x}\n", (int)status.error());
-                    }
-                    if (auto status = g_LD2412Mode.Set(g_ld2412.GetMode()); !status)
-                    {
-                        FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
-                    }
-                }
-        });
-
+        //set initial state of certain attributes
         {
             APILock l;
             if (auto status = g_LD2412State.Set(LD2412State::Configuring); !status)
