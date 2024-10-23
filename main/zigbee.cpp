@@ -35,6 +35,8 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MIN_DISTANCE = 7;
     static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
     static constexpr const uint16_t LD2412_ATTRIB_EX_STATE = 9;
+    static constexpr const uint16_t LD2412_ATTRIB_MODE = 10;
+    static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11;
 
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
@@ -130,6 +132,20 @@ namespace zb
         , LD2412_ATTRIB_MIN_DISTANCE
         , uint16_t>;
 
+    using ZclAttributeMode_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_MODE
+        , LD2412::SystemMode>;
+
+    using ZclAttributeEngineeringLight_t = ZclAttributeAccess<
+        PRESENCE_EP
+        , CLUSTER_ID_LD2412
+        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
+        , LD2412_ATTRIB_ENGINEERING_LIGHT
+        , uint8_t>;
+
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
     static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
@@ -142,6 +158,8 @@ namespace zb
     static ZclAttributeExState_t g_LD2412ExState;
     static ZclAttributeMaxDistance_t g_LD2412MaxDistance;
     static ZclAttributeMinDistance_t g_LD2412MinDistance;
+    static ZclAttributeMode_t g_LD2412Mode;
+    static ZclAttributeEngineeringLight_t g_LD2412EngineeringLight;
 
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
@@ -211,6 +229,16 @@ namespace zb
                 FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
                 });
 
+        g_ld2412.SetCallbackOnMeasurementsUpdate([](){
+                    {
+                        APILock l;
+                        if (auto status = g_LD2412EngineeringLight.Set(g_ld2412.GetMeasuredLight()); !status)
+                        {
+                            FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
+                        }
+                    }
+                });
+
         g_ld2412.SetCallbackOnConfigUpdate([](){
                 SensitivityBufType moveBuf, stillBuf;
                 for(uint8_t i = 0; i < 14; ++i)
@@ -247,6 +275,10 @@ namespace zb
                     {
                         FMT_PRINT("Failed to set max distance with error {:x}\n", (int)status.error());
                     }
+                    if (auto status = g_LD2412Mode.Set(g_ld2412.GetMode()); !status)
+                    {
+                        FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
+                    }
                 }
         });
 
@@ -256,9 +288,17 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial state with error {:x}\n", (int)status.error());
             }
+            if (auto status = g_LD2412Mode.Set(g_ld2412.GetMode()); !status)
+            {
+                FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
+            }
             if (auto status = g_LD2412ExState.Set(ld2412::Component::ExtendedState::Normal); !status)
             {
                 FMT_PRINT("Failed to set initial extended state with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringLight.Set(0); !status)
+            {
+                FMT_PRINT("Failed to set initial measured light state with error {:x}\n", (int)status.error());
             }
         }
 
@@ -301,6 +341,8 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }

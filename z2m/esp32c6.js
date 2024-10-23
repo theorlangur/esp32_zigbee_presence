@@ -250,6 +250,8 @@ const definition = {
                 min_distance: {ID: 0x0007, type: Zcl.DataType.UINT16},
                 max_distance: {ID: 0x0008, type: Zcl.DataType.UINT16},
                 ex_state: {ID: 0x0009, type: Zcl.DataType.ENUM8},
+                presence_mode: {ID: 0x000a, type: Zcl.DataType.ENUM8},
+                measured_light: {ID: 0x000b, type: Zcl.DataType.UINT8},
             },
             commands: {
                 restart: {
@@ -289,6 +291,23 @@ const definition = {
             description: 'Extended state',
             lookup: {Normal: 0, DynamicBackgroundAnalysis: 1, Calibration: 2},
         }),
+        enumLookup({
+            name: 'mode',
+            access: 'ALL',
+            cluster: 'customOccupationConfig',
+            attribute: 'presence_mode',
+            description: 'Presence sensor mode',
+            lookup: {Simple: 1, Energy: 2},
+        }),
+        numeric({
+            name: 'measured_light',
+            cluster: 'customOccupationConfig',
+            attribute: 'measured_light',
+            description: 'Measured light level',
+            valueMin: 0,
+            valueMax: 255,
+            access: 'STATE',
+        }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
         orlangurOccupactionExtended.distanceConfig(),
@@ -322,6 +341,14 @@ const definition = {
         await endpoint.configureReporting('customOccupationConfig', [
             {
                 attribute: 'stillDistance',
+                minimumReportInterval: 5,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+        ]);
+        await endpoint.configureReporting('customOccupationConfig', [
+            {
+                attribute: 'measured_light',
                 minimumReportInterval: 5,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,

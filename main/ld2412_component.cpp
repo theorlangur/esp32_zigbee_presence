@@ -27,6 +27,7 @@ namespace ld2412
             //report
             Presence,
             PresenceIntr,
+            GatesEnergyState,
             //config
             SetTimeout,
             SetMinDistance,
@@ -344,6 +345,12 @@ namespace ld2412
                             c.m_MovementCallback(lastPresence, lastPresenceData, exState);
                     }
                     break;
+                    case QueueMsg::Type::GatesEnergyState:
+                    {
+                        if (c.m_MeasurementsUpdateCallback)
+                            c.m_MeasurementsUpdateCallback();
+                    }
+                    break;
                     case QueueMsg::Type::Presence: 
                         //FMT_PRINT("Msg presence: {:x}\n", msg.m_PresenceRaw.changedRaw);
                         //if (c.m_PresencePin != -1)
@@ -425,18 +432,39 @@ namespace ld2412
 
                 if (!simpleMode)
                 {
+                    bool changed = false;
                     for(uint8_t g = 0; g < 14; ++g)
                     {
                         auto e = c.GetMeasuredMoveEnergy(g);
-                        if (e > c.m_MeasuredMinMax[g].move.max)
-                            c.m_MeasuredMinMax[g].move.max = e;
-                        if (e < c.m_MeasuredMinMax[g].move.min)
-                            c.m_MeasuredMinMax[g].move.min = e;
+                        auto &move = c.m_MeasuredMinMax[g].move;
+                        auto &still = c.m_MeasuredMinMax[g].move;
+                        if (move.last != e)
+                        {
+                            move.last = e;
+                            changed = true;
+                        }
+                        if (e > move.max) move.max = e;
+                        if (e < move.min) move.min = e;
                         e = c.GetMeasuredStillEnergy(g);
-                        if (e > c.m_MeasuredMinMax[g].still.max)
-                            c.m_MeasuredMinMax[g].still.max = e;
-                        if (e < c.m_MeasuredMinMax[g].still.min)
-                            c.m_MeasuredMinMax[g].still.min = e;
+                        if (still.last != e)
+                        {
+                            still.last = e;
+                            changed = true;
+                        }
+                        if (e > still.max) still.max = e;
+                        if (e < still.min) still.min = e;
+                    }
+
+                    if (c.m_MeasuredLight != c.GetMeasuredLight())
+                    {
+                        c.m_MeasuredLight = c.GetMeasuredLight();
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        msg.m_Type = QueueMsg::Type::GatesEnergyState;
+                        xQueueSend(c.m_FastQueue, &msg, portMAX_DELAY);
                     }
                 }
 

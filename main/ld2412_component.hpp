@@ -24,10 +24,12 @@ namespace ld2412
         };
         using MovementCallback = GenericCallback<void(bool detected, LD2412::PresenceResult const& p, ExtendedState exState)>;
         using ConfigUpdateCallback = GenericCallback<void()>;
+        using MeasurementsUpdateCallback = GenericCallback<void()>;
         struct EnergyMinMax
         {
             uint16_t min;
             uint16_t max;
+            uint16_t last;
         };
         struct EnergyReading
         {
@@ -74,10 +76,15 @@ namespace ld2412
         uint8_t GetMeasuredMoveEnergy(uint8_t gate) const;
         uint8_t GetMeasuredStillEnergy(uint8_t gate) const;
 
+        const auto& GetMeasurements() const { return m_MeasuredMinMax; }
+        auto GetMeasuredLight() const { return m_MeasuredLight; }
+
         uint16_t GetTimeout() const;
                                                          //
         void SetCallbackOnMovement(MovementCallback cb) { m_MovementCallback = std::move(cb); }
         void SetCallbackOnConfigUpdate(ConfigUpdateCallback cb) { m_ConfigUpdateCallback = std::move(cb); }
+        void SetCallbackOnMeasurementsUpdate(MeasurementsUpdateCallback cb) { m_MeasurementsUpdateCallback = std::move(cb); }
+
     private:
         void ConfigurePresenceIsr();
         void HandleMessage(QueueMsg &msg);
@@ -92,6 +99,7 @@ namespace ld2412
 
         MovementCallback m_MovementCallback;
         ConfigUpdateCallback m_ConfigUpdateCallback;
+        MeasurementsUpdateCallback m_MeasurementsUpdateCallback;
 
         QueueHandle_t m_FastQueue = 0;
         std::atomic<QueueHandle_t> m_ManagingQueue{0};
@@ -100,6 +108,7 @@ namespace ld2412
         //std::jthread m_ManagingTask;
 
         EnergyReading m_MeasuredMinMax[14];
+        uint8_t m_MeasuredLight = 0;
 
         bool m_CalibrationStarted = false;
         bool m_DynamicBackgroundAnalysis = false;

@@ -215,6 +215,7 @@ public:
     auto const& GetAllStillThresholds() const { return m_Configuration.m_StillThreshold; }
     auto GetMeasuredMoveEnergy(uint8_t gate) const { return m_Engeneering.m_MoveEnergy[gate]; }
     auto GetMeasuredStillEnergy(uint8_t gate) const { return m_Engeneering.m_StillEnergy[gate]; }
+    auto GetMeasuredLight() const { return m_Engeneering.m_Light; }
 
     auto GetTimeout() const { return m_Configuration.m_Base.m_Duration; }//seconds
     bool GetOutPinPolarity() const { return m_Configuration.m_Base.m_OutputPinPolarity; }
