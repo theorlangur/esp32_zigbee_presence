@@ -22,13 +22,14 @@ const orlangurOccupactionExtended = {
         const exposes = [
             e.enum('restart', ea.SET, ['Restart']).withLabel('Restart').withDescription('Restart LD2412 module'),
             e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
+            e.enum('reset_energy_stat', ea.SET, ['Reset']).withLabel('Reset Energy Statistics').withDescription('Perform reset internally gathered energy statistics'),
         ];
 
         const fromZigbee = [];
 
         const toZigbee = [
             {
-                key: ['restart','factory_reset'],
+                key: ['restart','factory_reset','reset_energy_stat'],
                 convertSet: async (entity, key, value, meta) => {
                     await entity.command('customOccupationConfig', key, {}, {});
                     if (key == 'factory_reset')
@@ -260,6 +261,10 @@ const definition = {
                 },
                 factory_reset: {
                     ID: 0x0001,
+                    parameters: [],
+                },
+                reset_energy_stat: {
+                    ID: 0x0002,
                     parameters: [],
                 },
             },

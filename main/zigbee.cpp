@@ -40,6 +40,7 @@ namespace zb
 
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
+    static constexpr const uint8_t LD2412_CMD_RESET_ENERGY_STAT = 2;
 
     using ZclAttributeOccupancy_t = ZclAttributeAccess<
         PRESENCE_EP
@@ -487,6 +488,13 @@ namespace zb
         return ESP_OK;
     }
 
+    esp_err_t ld2412_cmd_reset_energy_stat()
+    {
+        FMT_PRINT("Resetting collected energy stat...\n");
+        g_ld2412.ResetEnergyStatistics();
+        return ESP_OK;
+    }
+
 
     /**********************************************************************/
     /* Commands                                                           */
@@ -494,6 +502,7 @@ namespace zb
     static const ZbCmdHandler g_Commands[] = {
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESTART, &ld2412_cmd_restart>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_FACTORY_RESET, &ld2412_cmd_factory_reset>{},
+        CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESET_ENERGY_STAT, &ld2412_cmd_reset_energy_stat>{},
     };
 
     static const ZbCmdHandlingDesc g_CommandsDesc{

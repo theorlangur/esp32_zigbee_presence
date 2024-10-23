@@ -142,8 +142,8 @@ namespace ld2412
                 {
                     for(auto &e : m_MeasuredMinMax)
                     {
-                        e.move = {.min=0xffff, .max=0};
-                        e.still = {.min=0xffff, .max=0};
+                        e.move = {.min=0xffff, .max=0, .last = 0};
+                        e.still = {.min=0xffff, .max=0, .last = 0};
                     }
                 }
                 break;
