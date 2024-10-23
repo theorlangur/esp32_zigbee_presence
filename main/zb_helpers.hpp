@@ -350,6 +350,8 @@ namespace zb
             , cmd_id(_cmd)
             , handler(&generic_zb_cmd_handler<TargetType, h>)
         {}
+        ZbCmdHandler() = default;
+
         uint8_t ep;
         uint16_t cluster_id;
         uint8_t cmd_id;
