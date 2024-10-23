@@ -223,6 +223,20 @@ namespace zb
         }
     };
 
+    template<uint8_t EP, uint16_t ClusterID>
+    struct ZclServerCluster
+    {
+        template<uint16_t Attr, typename T, typename Default = TypeInitDefault<T>>
+        using Attribute = ZclAttributeAccess<EP, ClusterID, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, Attr, T, Default>;
+    };
+
+    template<uint8_t EP, uint16_t ClusterID>
+    struct ZclClientCluster
+    {
+        template<uint16_t Attr, typename T, typename Default = TypeInitDefault<T>>
+        using Attribute = ZclAttributeAccess<EP, ClusterID, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE, Attr, T, Default>;
+    };
+
     /**********************************************************************/
     /* SetAttributeHandler                                                */
     /**********************************************************************/
