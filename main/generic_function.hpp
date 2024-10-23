@@ -44,7 +44,7 @@ const VTable<R(Args...)> v_PlainFunc = {
         using S = VTable<R(Args...)>::Sig;
         S *pDst = (S*)_pDst;
         const S *pSrc = (const S*)_pSrc;
-        pDst = *pSrc;
+        *pDst = *pSrc;
     },
     /*move*/[](void *_pDst, void *_pSrc){
         using S = VTable<R(Args...)>::Sig;
@@ -127,8 +127,8 @@ public:
     FixedFunction() = default;
 
     FixedFunction(R(*pF)(Args...)):
-        m_pTable(v_PlainFunc<R(Args...)>)
-        ,m_pInvoker(&InvokeFunction<R(Args...)>)
+        m_pTable(&v_PlainFunc<R,Args...>)
+        ,m_pInvoker(&InvokeFunction<R, Args...>)
     {
         static_assert(sizeof(pF) <= Sz);
         *((typename VTableType::Sig*)m_Storage) = pF;
