@@ -15,16 +15,27 @@
 
 namespace zb
 {
-    constexpr uint8_t PRESENCE_EP = 1;
+    enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
+    {
+        Configuring = 0x80,
+        Failed = 0x81,
+    };
+    struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
+
 
     static auto g_Manufacturer = ZbStr("Orlangur");
     static auto g_Model = ZbStr("P-NextGen");
     static uint8_t g_AppVersion = 1;
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
-    static ld2412::Component g_ld2412;
+    static ld2412::Component g_ld2412;//THE presence sensor component
 
+    constexpr uint8_t PRESENCE_EP = 1;
     static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
+
+    /**********************************************************************/
+    /* Custom attributes IDs                                              */
+    /**********************************************************************/
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_SENSITIVITY = 0;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_SENSITIVITY = 1;
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_ENERGY = 2;
@@ -38,137 +49,65 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MODE = 10;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11;
 
+    /**********************************************************************/
+    /* Commands IDs                                                       */
+    /**********************************************************************/
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
     static constexpr const uint8_t LD2412_CMD_RESET_ENERGY_STAT = 2;
 
-    using ZclAttributeOccupancy_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID
-        , esp_zb_zcl_occupancy_sensing_occupancy_t>;
+    /**********************************************************************/
+    /* Cluster type definitions                                           */
+    /**********************************************************************/
+    using LD2412OccupancyCluster_t = ZclServerCluster<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING>;
+    using LD2412CustomCluster_t = ZclServerCluster<PRESENCE_EP, CLUSTER_ID_LD2412>;
 
-    using ZclAttributeOccupiedToUnoccupiedTimeout_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID
-        , uint16_t>;
+    /**********************************************************************/
+    /* Attributes types for occupancy cluster                             */
+    /**********************************************************************/
+    using ZclAttributeOccupancy_t                   = LD2412OccupancyCluster_t::Attribute<ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, esp_zb_zcl_occupancy_sensing_occupancy_t>;
+    using ZclAttributeOccupiedToUnoccupiedTimeout_t = LD2412OccupancyCluster_t::Attribute<ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID , uint16_t>;
 
-    struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
-    using ZclAttributeLD2412MoveSensetivity_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MOVE_SENSITIVITY
-        , SensitivityBufType>;
+    /**********************************************************************/
+    /* Attributes types for a custom cluster                              */
+    /**********************************************************************/
+    using ZclAttributeLD2412MoveSensetivity_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_SENSITIVITY, SensitivityBufType>;
+    using ZclAttributeLD2412StillSensetivity_t = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_SENSITIVITY, SensitivityBufType>;
+    using ZclAttributeStillDistance_t          = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
+    using ZclAttributeMoveDistance_t           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_DISTANCE, uint16_t>;
+    using ZclAttributeMoveEnergy_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_ENERGY, uint8_t>;
+    using ZclAttributeStillEnergy_t            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_ENERGY, uint8_t>;
+    using ZclAttributeState_t                  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STATE , LD2412State>;
+    using ZclAttributeExState_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_EX_STATE, ld2412::Component::ExtendedState>;
+    using ZclAttributeMaxDistance_t            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MAX_DISTANCE, uint16_t>;
+    using ZclAttributeMinDistance_t            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MIN_DISTANCE, uint16_t>;
+    using ZclAttributeMode_t                   = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MODE, LD2412::SystemMode>;
+    using ZclAttributeEngineeringLight_t       = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_LIGHT, uint8_t>;
 
-    using ZclAttributeLD2412StillSensetivity_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_STILL_SENSITIVITY
-        , SensitivityBufType>;
-
-    using ZclAttributeStillDistance_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_STILL_DISTANCE
-        , uint16_t>;
-
-    using ZclAttributeMoveDistance_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MOVE_DISTANCE
-        , uint16_t>;
-
-    using ZclAttributeMoveEnergy_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MOVE_ENERGY
-        , uint8_t>;
-
-    using ZclAttributeStillEnergy_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_STILL_ENERGY
-        , uint8_t>;
-
-    enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
-    {
-        Configuring = 0x80,
-        Failed = 0x81,
-    };
-
-    using ZclAttributeState_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_STATE
-        , LD2412State>;
-
-    using ZclAttributeExState_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_EX_STATE
-        , ld2412::Component::ExtendedState>;
-
-    using ZclAttributeMaxDistance_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MAX_DISTANCE
-        , uint16_t>;
-
-    using ZclAttributeMinDistance_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MIN_DISTANCE
-        , uint16_t>;
-
-    using ZclAttributeMode_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_MODE
-        , LD2412::SystemMode>;
-
-    using ZclAttributeEngineeringLight_t = ZclAttributeAccess<
-        PRESENCE_EP
-        , CLUSTER_ID_LD2412
-        , ESP_ZB_ZCL_CLUSTER_SERVER_ROLE
-        , LD2412_ATTRIB_ENGINEERING_LIGHT
-        , uint8_t>;
-
+    /**********************************************************************/
+    /* Attributes for occupancy cluster                                   */
+    /**********************************************************************/
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
-    static ZclAttributeLD2412MoveSensetivity_t g_LD2412MoveSensitivity;
+
+    /**********************************************************************/
+    /* Attributes for a custom cluster                                    */
+    /**********************************************************************/
+    static ZclAttributeLD2412MoveSensetivity_t  g_LD2412MoveSensitivity;
     static ZclAttributeLD2412StillSensetivity_t g_LD2412StillSensitivity;
-    static ZclAttributeStillDistance_t g_LD2412StillDistance;
-    static ZclAttributeMoveDistance_t g_LD2412MoveDistance;
-    static ZclAttributeStillEnergy_t g_LD2412StillEnergy;
-    static ZclAttributeMoveEnergy_t g_LD2412MoveEnergy;
-    static ZclAttributeState_t g_LD2412State;
-    static ZclAttributeExState_t g_LD2412ExState;
-    static ZclAttributeMaxDistance_t g_LD2412MaxDistance;
-    static ZclAttributeMinDistance_t g_LD2412MinDistance;
-    static ZclAttributeMode_t g_LD2412Mode;
-    static ZclAttributeEngineeringLight_t g_LD2412EngineeringLight;
+    static ZclAttributeStillDistance_t          g_LD2412StillDistance;
+    static ZclAttributeMoveDistance_t           g_LD2412MoveDistance;
+    static ZclAttributeStillEnergy_t            g_LD2412StillEnergy;
+    static ZclAttributeMoveEnergy_t             g_LD2412MoveEnergy;
+    static ZclAttributeState_t                  g_LD2412State;
+    static ZclAttributeExState_t                g_LD2412ExState;
+    static ZclAttributeMaxDistance_t            g_LD2412MaxDistance;
+    static ZclAttributeMinDistance_t            g_LD2412MinDistance;
+    static ZclAttributeMode_t                   g_LD2412Mode;
+    static ZclAttributeEngineeringLight_t       g_LD2412EngineeringLight;
 
+    //initialized at start
     esp_zb_ieee_addr_t g_CoordinatorIeee;
-
-    struct EpCluster
-    {
-        uint8_t ep;
-        uint16_t cluster_id;
-    };
 
     static void send_on_off(bool on)
     {
