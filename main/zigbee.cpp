@@ -274,153 +274,9 @@ namespace zb
         ESP_LOGI(TAG, "Sensor setup done");
     }
 
-    static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
-    {
-        esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
-
-        ESP_ERROR_CHECK(g_LD2412MoveSensitivity.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412StillSensitivity.AddToCluster(custom_cluster, Access::RW));
-
-        ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412StillDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412MoveEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412StillEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412State.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
-
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
-    }
-
-    static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
-    {
-        static esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
-            {                                                                                       
-                .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,                          
-                .power_source = 0x1,//mains                        
-            };                                                                                      
-        static esp_zb_identify_cluster_cfg_t identify_cfg =                                                                             
-            {                                                                                       
-                .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,                   
-            };                                                                                      
-        static esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
-            {                                                                                       
-                /*uint8_t*/  .occupancy = 0,                                                               /*!<  Bit 0 specifies the sensed occupancy as follows: 1 = occupied, 0 = unoccupied. */
-                /*uint32_t*/ .sensor_type = ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC, /*!<  The attribute specifies the type of the occupancy sensor */
-                /*uint8_t*/  .sensor_type_bitmap = uint8_t(1) << ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC /*!<  The attribute specifies the types of the occupancy sensor */
-            };                                                                                      
-        esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
-        esp_zb_attribute_list_t *basic_cluster = esp_zb_basic_cluster_create(&basic_cfg);
-        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, g_Manufacturer));
-        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, g_Model));
-        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_APPLICATION_VERSION_ID, &g_AppVersion));
-
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_identify_cluster_create(&identify_cfg), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
-        esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
-        uint16_t delay = 10;
-        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
-        create_presence_config_custom_cluster(cluster_list);
-
-        esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
-        esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
-
-        if (false)
-        {
-            FMT_PRINT("Cluster summary to create:\n");
-            auto *pNext = cluster_list;
-            while(pNext)
-            {
-                auto id = pNext->cluster.cluster_id;
-                auto cnt = pNext->cluster.attr_count;
-                FMT_PRINT("Cluster {:x}; Attributes: {}\n", id, cnt);
-                auto *pNextAttr = pNext->cluster.attr_list;
-                while(pNextAttr)
-                {
-                    auto a_id = pNextAttr->attribute.id;
-                    auto a_type = pNextAttr->attribute.type;
-                    auto a_access = pNextAttr->attribute.access;
-                    FMT_PRINT("   Attribute: {:x}; Type:{:x} Access:{:x}\n", a_id, a_type, a_access);
-                    pNextAttr = pNextAttr->next;
-                }
-                pNext = pNext->next;
-            }
-        }
-
-        esp_zb_endpoint_config_t endpoint_config = {
-            .endpoint = ep_id,
-            .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-            .app_device_id = ESP_ZB_HA_SIMPLE_SENSOR_DEVICE_ID,
-            .app_device_version = 0
-        };
-        esp_zb_ep_list_add_ep(ep_list, cluster_list, endpoint_config);
-    }
-
-    static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
-    {
-        ESP_RETURN_ON_FALSE(esp_zb_bdb_start_top_level_commissioning(mode_mask) == ESP_OK, ,
-                            TAG, "Failed to start Zigbee bdb commissioning");
-    }
-
-    extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
-    {
-        uint32_t *p_sg_p     = signal_struct->p_app_signal;
-        esp_err_t err_status = signal_struct->esp_err_status;
-        esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
-        switch (sig_type) {
-        case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
-            ESP_LOGI(TAG, "Initialize Zigbee stack");
-            esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
-            break;
-        case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
-        case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
-            if (err_status == ESP_OK) {
-                //async setup
-                thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
-                //setup_sensor();
-
-                ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
-                if (esp_zb_bdb_is_factory_new()) {
-                    ESP_LOGI(TAG, "Start network steering");
-                    esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
-                } else {
-                    ESP_LOGI(TAG, "Device rebooted");
-                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
-                }
-            } else {
-                /* commissioning failed */
-                ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
-                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
-            }
-            break;
-        case ESP_ZB_BDB_SIGNAL_STEERING:
-            if (err_status == ESP_OK) {
-                esp_zb_ieee_addr_t extended_pan_id;
-                esp_zb_get_extended_pan_id(extended_pan_id);
-                ESP_LOGI(TAG, "Joined network successfully (Extended PAN ID: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, PAN ID: 0x%04hx, Channel:%d, Short Address: 0x%04hx)",
-                         extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
-                         extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
-                         esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
-
-                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
-            } else {
-                ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
-                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
-            }
-            break;
-        default:
-            ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
-                     esp_err_to_name(err_status));
-            break;
-        }
-    }
-
+    /**********************************************************************/
+    /* Commands                                                           */
+    /**********************************************************************/
     esp_err_t ld2412_cmd_restart()
     {
         FMT_PRINT("Restarting...\n");
@@ -442,14 +298,11 @@ namespace zb
         return ESP_OK;
     }
 
-
-    /**********************************************************************/
-    /* Commands                                                           */
-    /**********************************************************************/
     static const ZbCmdHandler g_Commands[] = {
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESTART, &ld2412_cmd_restart>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_FACTORY_RESET, &ld2412_cmd_factory_reset>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESET_ENERGY_STAT, &ld2412_cmd_reset_energy_stat>{},
+        {} //last, terminating one
     };
 
     static const ZbCmdHandlingDesc g_CommandsDesc{
@@ -532,6 +385,161 @@ namespace zb
         ,g_AttributeHandlers
     };
 
+    /**********************************************************************/
+    /* Registering ZigBee device with clusters and attributes             */
+    /**********************************************************************/
+    static void create_presence_config_custom_cluster(esp_zb_cluster_list_t *cluster_list)
+    {
+        esp_zb_attribute_list_t *custom_cluster = esp_zb_zcl_attr_list_create(CLUSTER_ID_LD2412);
+
+        ESP_ERROR_CHECK(g_LD2412MoveSensitivity.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412StillSensitivity.AddToCluster(custom_cluster, Access::RW));
+
+        ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412StillDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412MoveEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412StillEnergy.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412State.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
+
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+    }
+
+    static void create_presence_ep(esp_zb_ep_list_t *ep_list, uint8_t ep_id)
+    {
+
+        /**********************************************************************/
+        /* Boilerplate config for standard clusters: basic, identify          */
+        /**********************************************************************/
+        esp_zb_basic_cluster_cfg_t basic_cfg =                                                                                \
+            {                                                                                       
+                .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,                          
+                .power_source = 0x1,//mains                        
+            };                                                                                      
+        esp_zb_identify_cluster_cfg_t identify_cfg =                                                                             
+            {                                                                                       
+                .identify_time = ESP_ZB_ZCL_IDENTIFY_IDENTIFY_TIME_DEFAULT_VALUE,                   
+            };                                                                                      
+        esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
+        esp_zb_attribute_list_t *basic_cluster = esp_zb_basic_cluster_create(&basic_cfg);
+        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, g_Manufacturer));
+        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, g_Model));
+        ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_APPLICATION_VERSION_ID, &g_AppVersion));
+
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_identify_cluster_create(&identify_cfg), ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+
+        /**********************************************************************/
+        /* Occupancy cluster config                                           */
+        /**********************************************************************/
+        esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
+            {                                                                                       
+                /*uint8_t*/  .occupancy = 0,                                                               /*!<  Bit 0 specifies the sensed occupancy as follows: 1 = occupied, 0 = unoccupied. */
+                /*uint32_t*/ .sensor_type = ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC, /*!<  The attribute specifies the type of the occupancy sensor */
+                /*uint8_t*/  .sensor_type_bitmap = uint8_t(1) << ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC /*!<  The attribute specifies the types of the occupancy sensor */
+            };                                                                                      
+        esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
+        uint16_t delay = 10;
+        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+
+
+        /**********************************************************************/
+        /* Custom cluster                                                     */
+        /**********************************************************************/
+        create_presence_config_custom_cluster(cluster_list);
+
+        /**********************************************************************/
+        /* Client on/off cluster for direct binding purposes                  */
+        /**********************************************************************/
+        esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
+        esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
+        ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+
+        /**********************************************************************/
+        /* Endpoint configuration                                             */
+        /**********************************************************************/
+        esp_zb_endpoint_config_t endpoint_config = {
+            .endpoint = ep_id,
+            .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+            .app_device_id = ESP_ZB_HA_SIMPLE_SENSOR_DEVICE_ID,
+            .app_device_version = 0
+        };
+        esp_zb_ep_list_add_ep(ep_list, cluster_list, endpoint_config);
+    }
+
+
+    /**********************************************************************/
+    /* Common zigbee network handling                                     */
+    /**********************************************************************/
+    static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
+    {
+        ESP_RETURN_ON_FALSE(esp_zb_bdb_start_top_level_commissioning(mode_mask) == ESP_OK, ,
+                            TAG, "Failed to start Zigbee bdb commissioning");
+    }
+
+    extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
+    {
+        uint32_t *p_sg_p     = signal_struct->p_app_signal;
+        esp_err_t err_status = signal_struct->esp_err_status;
+        esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
+        switch (sig_type) {
+        case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
+            ESP_LOGI(TAG, "Initialize Zigbee stack");
+            esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
+            break;
+        case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
+        case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
+            if (err_status == ESP_OK) {
+                //async setup
+                thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
+                //setup_sensor();
+
+                ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
+                if (esp_zb_bdb_is_factory_new()) {
+                    ESP_LOGI(TAG, "Start network steering");
+                    esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
+                } else {
+                    ESP_LOGI(TAG, "Device rebooted");
+                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+                }
+            } else {
+                /* commissioning failed */
+                ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
+                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+            }
+            break;
+        case ESP_ZB_BDB_SIGNAL_STEERING:
+            if (err_status == ESP_OK) {
+                esp_zb_ieee_addr_t extended_pan_id;
+                esp_zb_get_extended_pan_id(extended_pan_id);
+                ESP_LOGI(TAG, "Joined network successfully (Extended PAN ID: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, PAN ID: 0x%04hx, Channel:%d, Short Address: 0x%04hx)",
+                         extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
+                         extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
+                         esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
+
+                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+            } else {
+                ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
+                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+            }
+            break;
+        default:
+            ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
+                     esp_err_to_name(err_status));
+            break;
+        }
+    }
+
+
+    /**********************************************************************/
+    /* Zigbee Task Entry Point                                            */
+    /**********************************************************************/
     void zigbee_main(void *)
     {
         ESP_LOGI(TAG, "ZB main");
@@ -558,10 +566,10 @@ namespace zb
         create_presence_ep(ep_list, PRESENCE_EP);
         ESP_LOGI(TAG, "ZB created ep");
         fflush(stdout);
-        ep_list->endpoint.rep_info_count = 8;
 
         /* Register the device */
         esp_zb_device_register(ep_list);
+        //here we install our handler for attributes and commands
         esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc, &g_CommandsDesc>);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
