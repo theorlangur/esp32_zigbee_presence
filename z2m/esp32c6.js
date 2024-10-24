@@ -148,6 +148,46 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    measure: (prefix, suffix, descr) => {
+        const attr = prefix + '_energy_' + suffix
+        const exp_entity = attr
+
+        const exposes = e.composite(attr, exp_entity, ea.STATE)
+                            .withLabel(prefix + ' energy ' + suffix)
+                            .withDescription(descr);
+        for(var i = 0; i < 14; ++i)
+            exposes.withFeature(e.numeric('gate'+i, ea.STATE).withValueMin(0).withValueMax(100));
+
+        const fromZigbee = [{
+            cluster: 'customOccupationConfig',
+            type: ['attributeReport', 'readResponse'],
+            convert: (model, msg, publish, options, meta) => {
+                const result = {};
+                const data = msg.data;
+                if (attr in data) 
+                {
+                    const buffer = Buffer.from(data[attr]);
+                    if (buffer.length==14)
+                    {
+                        res = {}
+                        for(var i = 0; i < 14; ++i)
+                            res['gate'+i] = buffer[i]
+                        result[exp_entity] = res
+                        return result;
+                    }
+                }
+            }
+        }];
+
+        const toZigbee = [];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    }
     sensitivity: (prefix, descr) => {
         const attr = prefix + 'Sensitivity'
         const exp_entity = prefix + '_sensitivity'
@@ -253,6 +293,12 @@ const definition = {
                 ex_state: {ID: 0x0009, type: Zcl.DataType.ENUM8},
                 presence_mode: {ID: 0x000a, type: Zcl.DataType.ENUM8},
                 measured_light: {ID: 0x000b, type: Zcl.DataType.UINT8},
+                move_energy_last: {ID: 0x000c, type: Zcl.DataType.OCTET_STR},
+                still_energy_last: {ID: 0x000d, type: Zcl.DataType.OCTET_STR},
+                move_energy_min: {ID: 0x000e, type: Zcl.DataType.OCTET_STR},
+                still_energy_min: {ID: 0x000f, type: Zcl.DataType.OCTET_STR},
+                move_energy_max: {ID: 0x0010, type: Zcl.DataType.OCTET_STR},
+                still_energy_max: {ID: 0x0011, type: Zcl.DataType.OCTET_STR},
             },
             commands: {
                 restart: {
@@ -318,6 +364,12 @@ const definition = {
         orlangurOccupactionExtended.distanceConfig(),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
+        orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
+        orlangurOccupactionExtended.measure('still', 'last', 'Last measured still energy per gate'),
+        orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
+        orlangurOccupactionExtended.measure('still', 'min', 'Min measured still energy per gate'),
+        orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
+        orlangurOccupactionExtended.measure('still', 'max', 'Max measured still energy per gate'),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
