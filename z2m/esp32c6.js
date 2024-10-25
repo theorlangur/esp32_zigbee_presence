@@ -51,6 +51,73 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    mode: () => {
+        const exposes = [
+            e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
+        ];
+
+        const lookup: KeyValue = {Simple: 1, Energy: 2};
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    if (data['presence_mode'] !== undefined) 
+                    {
+                        for (const name in lookup) {
+                            if (lookup[name] === data['presence_mode'])
+                            {
+                                result['presence_mode'] = name;
+                                if (name == 'Energy')
+                                {
+                                    //subscribe to attributes
+                                }else
+                                {
+                                    //make sure we're not subscribed
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    else 
+                    {
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            {
+                key: ['presence_mode'],
+                convertSet: async (entity, key, value, meta) => {
+                    const payload = {[key]: lookup[value]}
+                    if (value == 'Simple')
+                    {
+                        //unsubscribe
+                    }else if (value == 'Energy')
+                    {
+                        //subscribe
+                    }
+                    await entity.write('customOccupationConfig', payload);
+                    return {state: {[key]: value}};
+                },
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', [key]);
+                },
+            }
+        ]
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    }
     distanceConfig: () => {
         const exposes = [
             e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
@@ -342,14 +409,7 @@ const definition = {
             description: 'Extended state',
             lookup: {Normal: 0, DynamicBackgroundAnalysis: 1, Calibration: 2},
         }),
-        enumLookup({
-            name: 'mode',
-            access: 'ALL',
-            cluster: 'customOccupationConfig',
-            attribute: 'presence_mode',
-            description: 'Presence sensor mode',
-            lookup: {Simple: 1, Energy: 2},
-        }),
+        orlangurOccupactionExtended.mode(),
         numeric({
             name: 'measured_light',
             cluster: 'customOccupationConfig',
