@@ -56,7 +56,7 @@ const orlangurOccupactionExtended = {
             e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
         ];
 
-        const lookup: KeyValue = {Simple: 1, Energy: 2};
+        const lookup = {Simple: 1, Energy: 2};
         const fromZigbee = [
             {
                 cluster: 'customOccupationConfig',
@@ -117,7 +117,7 @@ const orlangurOccupactionExtended = {
             toZigbee,
             isModernExtend: true,
         };
-    }
+    },
     distanceConfig: () => {
         const exposes = [
             e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
@@ -249,12 +249,12 @@ const orlangurOccupactionExtended = {
         const toZigbee = [];
 
         return {
-            exposes,
+            exposes: [exposes],
             fromZigbee,
             toZigbee,
             isModernExtend: true,
         };
-    }
+    },
     sensitivity: (prefix, descr) => {
         const attr = prefix + 'Sensitivity'
         const exp_entity = prefix + '_sensitivity'
