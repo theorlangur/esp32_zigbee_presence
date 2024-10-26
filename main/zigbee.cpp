@@ -424,6 +424,14 @@ namespace zb
                 return ESP_OK;
             }
         >{},
+        AttrDescr<ZclAttributeMode_t, 
+            [](const LD2412::SystemMode &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing system mode to {}\n", to);
+                g_ld2412.ChangeMode(to);
+                return ESP_OK;
+            }
+        >{},
 
         {}//last one
     };

@@ -56,7 +56,7 @@ const orlangurOccupactionExtended = {
             e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
         ];
 
-        const lookup = {Simple: 1, Energy: 2};
+        const lookup = {Simple: 2, Energy: 1};
         const fromZigbee = [
             {
                 cluster: 'customOccupationConfig',
