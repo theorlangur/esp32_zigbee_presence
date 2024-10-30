@@ -22,6 +22,7 @@ namespace ld2412
             StartCalibrate,
             StopCalibrate,
             ResetEnergyStat,
+            SwitchBluetooth,
             Flush,
             ReadData,
             //report
@@ -80,6 +81,7 @@ namespace ld2412
             uint16_t m_Distance;
             LD2412::SystemMode m_Mode;
             uint8_t m_Sensitivity[14];
+            bool m_Bluetooth;
         };
     };
 
@@ -144,6 +146,15 @@ namespace ld2412
                     {
                         e.move = {.min=0xffff, .max=0, .last = 0};
                         e.still = {.min=0xffff, .max=0, .last = 0};
+                    }
+                }
+                break;
+            case QueueMsg::Type::SwitchBluetooth:
+                {
+                    auto te = d.SwitchBluetooth(msg.m_Bluetooth);
+                    if (!te)
+                    {
+                        FMT_PRINT("Switching bluetooth has failed: {}\n", te.error());
                     }
                 }
                 break;
@@ -574,14 +585,14 @@ namespace ld2412
 
     void Component::ChangeMoveSensitivity(const uint8_t (&sensitivity)[14])
     {
-        QueueMsg msg{.m_Type = QueueMsg::Type::SetMoveSensitivity};
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetMoveSensitivity, .m_Dummy = 0};
         static_assert(sizeof(sensitivity) == sizeof(msg.m_Sensitivity));
         memcpy(msg.m_Sensitivity, sensitivity, sizeof(msg.m_Sensitivity));
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
     void Component::ChangeStillSensitivity(const uint8_t (&sensitivity)[14])
     {
-        QueueMsg msg{.m_Type = QueueMsg::Type::SetStillSensitivity};
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetStillSensitivity, .m_Dummy = 0};
         static_assert(sizeof(sensitivity) == sizeof(msg.m_Sensitivity));
         memcpy(msg.m_Sensitivity, sensitivity, sizeof(msg.m_Sensitivity));
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
@@ -626,6 +637,12 @@ namespace ld2412
     void Component::ResetEnergyStatistics()
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::ResetEnergyStat, .m_Dummy = true};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
+
+    void Component::SwitchBluetooth(bool on)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SwitchBluetooth, .m_Bluetooth = on};
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
 

@@ -59,6 +59,8 @@ namespace ld2412
         void StopCalibration();
         void ResetEnergyStatistics();
 
+        void SwitchBluetooth(bool on);
+
         void Restart();
         void FactoryReset();
         void RunDynamicBackgroundAnalysis();
