@@ -73,6 +73,15 @@ const orlangurOccupactionExtended = {
                                 if (name == 'Energy')
                                 {
                                     //subscribe to attributes
+                                    const endpoint = meta.device.getEndpoint(1);
+                                    await endpoint.configureReporting('customOccupationConfig', [
+                                        {
+                                            attribute: 'stillDistance',
+                                            minimumReportInterval: 5,
+                                            maximumReportInterval: constants.repInterval.HOUR,
+                                            reportableChange: null,
+                                        },
+                                    ]);
                                 }else
                                 {
                                     //make sure we're not subscribed
