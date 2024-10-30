@@ -389,6 +389,10 @@ const definition = {
                     ID: 0x0002,
                     parameters: [],
                 },
+                switch_bluetooth: {
+                    ID: 0x0003,
+                    parameters: [/*Here be dragons*/],
+                },
             },
             commandsResponse: {},
         }),
