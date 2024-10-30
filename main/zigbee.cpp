@@ -62,6 +62,7 @@ namespace zb
     static constexpr const uint8_t LD2412_CMD_RESTART = 0;
     static constexpr const uint8_t LD2412_CMD_FACTORY_RESET = 1;
     static constexpr const uint8_t LD2412_CMD_RESET_ENERGY_STAT = 2;
+    static constexpr const uint8_t LD2412_CMD_BLUETOOTH = 3;
 
     /**********************************************************************/
     /* Cluster type definitions                                           */
@@ -355,10 +356,18 @@ namespace zb
         return ESP_OK;
     }
 
+    esp_err_t ld2412_cmd_switch_bluetooth(bool on)
+    {
+        FMT_PRINT("Switching bluetooth {}...\n", on);
+        g_ld2412.SwitchBluetooth(on);
+        return ESP_OK;
+    }
+
     static const ZbCmdHandler g_Commands[] = {
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESTART, &ld2412_cmd_restart>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_FACTORY_RESET, &ld2412_cmd_factory_reset>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESET_ENERGY_STAT, &ld2412_cmd_reset_energy_stat>{},
+        CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_BLUETOOTH, &ld2412_cmd_switch_bluetooth, bool>{},
         {} //last, terminating one
     };
 
