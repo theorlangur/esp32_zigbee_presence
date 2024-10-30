@@ -23,6 +23,7 @@ const orlangurOccupactionExtended = {
             e.enum('restart', ea.SET, ['Restart']).withLabel('Restart').withDescription('Restart LD2412 module'),
             e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
             e.enum('reset_energy_stat', ea.SET, ['Reset']).withLabel('Reset Energy Statistics').withDescription('Perform reset internally gathered energy statistics'),
+            e.enum('switch_bluetooth', ea.SET, ['On','Off']).withLabel('Switch Bluetooth').withDescription('Turn Bluetooth On/Off'),
         ];
 
         const fromZigbee = [];
@@ -40,6 +41,13 @@ const orlangurOccupactionExtended = {
                         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
                         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
                     }
+                },
+            },
+            {
+                key: ['switch_bluetooth'],
+                convertSet: async (entity, key, value, meta) => {
+                    const turn_on = value == 'On';
+                    await entity.command('customOccupationConfig', key, {on:turn_on}, {});
                 },
             },
         ];
@@ -70,21 +78,93 @@ const orlangurOccupactionExtended = {
                             if (lookup[name] === data['presence_mode'])
                             {
                                 result['presence_mode'] = name;
-                                if (name == 'Energy')
+                                if (name != model.meta.presence_mode)
                                 {
-                                    //subscribe to attributes
-                                    const endpoint = meta.device.getEndpoint(1);
-                                    await endpoint.configureReporting('customOccupationConfig', [
-                                        {
-                                            attribute: 'stillDistance',
-                                            minimumReportInterval: 5,
-                                            maximumReportInterval: constants.repInterval.HOUR,
-                                            reportableChange: null,
-                                        },
-                                    ]);
-                                }else
-                                {
-                                    //make sure we're not subscribed
+                                    if (name == 'Energy')
+                                    {
+                                        //subscribe to attributes
+                                        const endpoint = meta.device.getEndpoint(1);
+                                        await endpoint.configureReporting('customOccupationConfig', [
+                                            {
+                                                attribute: 'still_energy_last',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_last',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'still_energy_min',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_min',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'still_energy_max',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_max',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: constants.repInterval.HOUR,
+                                                reportableChange: null,
+                                            },
+                                        ]);
+                                    }else
+                                    {
+                                        //make sure we're not subscribed
+                                        const endpoint = meta.device.getEndpoint(1);
+                                        await endpoint.configureReporting('customOccupationConfig', [
+                                            {
+                                                attribute: 'still_energy_last',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_last',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'still_energy_min',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_min',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'still_energy_max',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                            {
+                                                attribute: 'move_energy_max',
+                                                minimumReportInterval: 0,
+                                                maximumReportInterval: 0xffff,
+                                                reportableChange: null,
+                                            },
+                                        ]);
+                                    }
                                 }
                                 break;
                             }
@@ -391,7 +471,7 @@ const definition = {
                 },
                 switch_bluetooth: {
                     ID: 0x0003,
-                    parameters: [/*Here be dragons*/],
+                    parameters: [{name: 'on', type: Zcl.BuffaloZclDataType.BOOLEAN}],
                 },
             },
             commandsResponse: {},
