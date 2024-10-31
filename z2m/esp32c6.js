@@ -64,19 +64,6 @@ const orlangurOccupactionExtended = {
             e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
         ];
 
-        const toggleSubscription = async (ep, on) => {
-            var attributes = []
-            for (const a in ['still_energy_last', 'move_energy_last', 'still_energy_min', 'still_energy_max', 'move_energy_min', 'move_energy_max']) {
-                attributes.push({
-                    attribute: a,
-                    minimumReportInterval: 0,
-                    maximumReportInterval: on === true ? constants.repInterval.HOUR : 0xffff,
-                    reportableChange: null,
-                })
-            }
-            await endpoint.configureReporting('customOccupationConfig', attributes);
-        };
-
         const lookup = {Simple: 2, Energy: 1};
         const fromZigbee = [
             {
@@ -91,18 +78,20 @@ const orlangurOccupactionExtended = {
                             if (lookup[name] === data['presence_mode'])
                             {
                                 result['presence_mode'] = name;
-                                const endpoint = meta.device.getEndpoint(1);
-                                if (name != meta.presence_mode)
-                                {
-                                    if (name == 'Energy')
-                                    {
-                                        Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
-                                    }
-                                    else
-                                    {
-                                        Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
-                                    }
-                                }
+                                //const endpoint = meta.device.getEndpoint(1);
+                                //if (name != meta.presence_mode)
+                                //{
+                                //    if (name == 'Energy')
+                                //    {
+                                //        //logger.debug(`fZ convert: Energy;`, NS);
+                                //        Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
+                                //    }
+                                //    else
+                                //    {
+                                //        //logger.debug(`fZ convert: Simple;`, NS);
+                                //        Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
+                                //    }
+                                //}
                                 break;
                             }
                         }
@@ -122,16 +111,20 @@ const orlangurOccupactionExtended = {
                 convertSet: async (entity, key, value, meta) => {
                     const payload = {[key]: lookup[value]}
                     const endpoint = meta.device.getEndpoint(1);
-                    if (value == 'Simple')
-                    {
-                        //unsubscribe
-                        await toggleSubscription(endpoint, false)
-                    }else if (value == 'Energy')
-                    {
-                        //subscribe
-                        await toggleSubscription(endpoint, true)
-                    }
                     await entity.write('customOccupationConfig', payload);
+                    //if (value == 'Simple')
+                    //{
+                    //    //unsubscribe
+                    //    //logger.debug(`tZ : Simple;`, NS);
+                    //    //await toggleSubscription(endpoint, false)
+                    //    Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
+                    //}else if (value == 'Energy')
+                    //{
+                    //    //subscribe
+                    //    //logger.debug(`tZ : Energy;`, NS);
+                    //    //await toggleSubscription(endpoint, true)
+                    //    Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
+                    //}
                     return {state: {[key]: value}};
                 },
                 convertGet: async (entity, key, meta) => {
@@ -388,7 +381,7 @@ const definition = {
                 max_distance: {ID: 0x0008, type: Zcl.DataType.UINT16},
                 ex_state: {ID: 0x0009, type: Zcl.DataType.ENUM8},
                 presence_mode: {ID: 0x000a, type: Zcl.DataType.ENUM8},
-                measured_light: {ID: 0x000b, type: Zcl.DataType.UINT8},
+                measured_light: {ID: 0x001b, type: Zcl.DataType.UINT8},
                 move_energy_last: {ID: 0x000c, type: Zcl.DataType.OCTET_STR},
                 still_energy_last: {ID: 0x000d, type: Zcl.DataType.OCTET_STR},
                 move_energy_min: {ID: 0x000e, type: Zcl.DataType.OCTET_STR},
@@ -505,6 +498,29 @@ const definition = {
                 reportableChange: null,
             },
         ]);
+
+        //await endpoint.configureReporting('customOccupationConfig', [
+        //    {
+        //        attribute: 'still_energy_last',
+        //        minimumReportInterval: 5,
+        //        maximumReportInterval: constants.repInterval.HOUR,
+        //        reportableChange: null,
+        //    },
+        //]);
+        //{
+        //    var attributes = []
+        //    for (const a of ['still_energy_last'/*, 'move_energy_last', 'still_energy_min', 'still_energy_max', 'move_energy_min', 'move_energy_max'*/]) 
+        //    {
+        //        attributes.push({
+        //            attribute: a,
+        //            minimumReportInterval: 0,
+        //            maximumReportInterval: constants.repInterval.HOUR,
+        //            reportableChange: null,
+        //        });
+        //    }
+        //    await endpoint.configureReporting('customOccupationConfig', attributes);
+        //}
+
     },
 
 };

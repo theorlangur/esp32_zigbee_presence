@@ -434,7 +434,7 @@ namespace zb
             }
             break;
         default:
-            //ESP_LOGW(TAG, "Receive Zigbee action(0x%x) callback", callback_id);
+            FMT_PRINT("Receive Zigbee action({:x}) callback\n", (int)callback_id);
             break;
         }
         return ESP_OK;

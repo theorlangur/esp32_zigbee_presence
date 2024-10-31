@@ -48,7 +48,7 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
     static constexpr const uint16_t LD2412_ATTRIB_EX_STATE = 9;
     static constexpr const uint16_t LD2412_ATTRIB_MODE = 10;
-    static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11;
+    static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11 + 16;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE = 12;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL = 13;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN = 14;
@@ -359,7 +359,7 @@ namespace zb
     esp_err_t ld2412_cmd_switch_bluetooth(bool on)
     {
         FMT_PRINT("Switching bluetooth {}...\n", on);
-        g_ld2412.SwitchBluetooth(on);
+        //g_ld2412.SwitchBluetooth(on);
         return ESP_OK;
     }
 
@@ -478,13 +478,13 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStill.AddToCluster(custom_cluster, Access::Report));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMin.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMin.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMax.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMax.AddToCluster(custom_cluster, Access::Report));
+        ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
