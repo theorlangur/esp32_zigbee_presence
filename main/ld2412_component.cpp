@@ -448,7 +448,7 @@ namespace ld2412
                     {
                         auto e = c.GetMeasuredMoveEnergy(g);
                         auto &move = c.m_MeasuredMinMax[g].move;
-                        auto &still = c.m_MeasuredMinMax[g].move;
+                        auto &still = c.m_MeasuredMinMax[g].still;
                         if (move.last != e)
                         {
                             move.last = e;

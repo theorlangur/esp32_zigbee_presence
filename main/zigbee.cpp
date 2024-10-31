@@ -48,7 +48,7 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
     static constexpr const uint16_t LD2412_ATTRIB_EX_STATE = 9;
     static constexpr const uint16_t LD2412_ATTRIB_MODE = 10;
-    static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11 + 16;
+    static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE = 12;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL = 13;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN = 14;
@@ -204,6 +204,8 @@ namespace zb
             ++i;
         }
 
+        //FMT_PRINT("Measurements update: still {};\n", stillBuf.sv());
+        //FMT_PRINT("Measurements update: move {};\n", moveBuf.sv());
         {
             APILock l;
             if (auto status = g_LD2412EngineeringLight.Set(g_ld2412.GetMeasuredLight()); !status)
@@ -214,7 +216,7 @@ namespace zb
             {
                 FMT_PRINT("Failed to set measured move energy attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412EngineeringEnergyStill.Set(moveBuf); !status)
+            if (auto status = g_LD2412EngineeringEnergyStill.Set(stillBuf); !status)
             {
                 FMT_PRINT("Failed to set measured still energy attribute with error {:x}\n", (int)status.error());
             }
@@ -222,15 +224,15 @@ namespace zb
             {
                 FMT_PRINT("Failed to set measured min move energy attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412EngineeringEnergyStillMin.Set(moveMinBuf); !status)
+            if (auto status = g_LD2412EngineeringEnergyStillMin.Set(stillMinBuf); !status)
             {
                 FMT_PRINT("Failed to set measured min still energy attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412EngineeringEnergyMoveMax.Set(moveMinBuf); !status)
+            if (auto status = g_LD2412EngineeringEnergyMoveMax.Set(moveMaxBuf); !status)
             {
                 FMT_PRINT("Failed to set measured max move energy attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412EngineeringEnergyStillMax.Set(moveMinBuf); !status)
+            if (auto status = g_LD2412EngineeringEnergyStillMax.Set(stillMaxBuf); !status)
             {
                 FMT_PRINT("Failed to set measured max still energy attribute with error {:x}\n", (int)status.error());
             }
@@ -478,13 +480,13 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStill.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMin.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMin.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMax.AddToCluster(custom_cluster, Access::Report));
-        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMax.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStill.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMin.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMin.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMax.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMax.AddToCluster(custom_cluster, Access::Read));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
