@@ -241,11 +241,11 @@ const orlangurOccupactionExtended = {
         const attr = prefix + '_energy_' + suffix
         const exp_entity = attr
 
-        const exposes = e.composite(attr, exp_entity, ea.STATE)
+        const exposes = e.composite(attr, exp_entity, ea.STATE_GET)
                             .withLabel(prefix + ' energy ' + suffix)
                             .withDescription(descr);
         for(var i = 0; i < 14; ++i)
-            exposes.withFeature(e.numeric('gate'+i, ea.STATE).withValueMin(0).withValueMax(100));
+            exposes.withFeature(e.numeric('gate'+i, ea.STATE_GET).withValueMin(0).withValueMax(100));
 
         const fromZigbee = [{
             cluster: 'customOccupationConfig',
@@ -253,6 +253,7 @@ const orlangurOccupactionExtended = {
             convert: (model, msg, publish, options, meta) => {
                 const result = {};
                 const data = msg.data;
+                logger.debug(`fZ convert attr: ${attr}; data:${util.inspect(data)}`, NS);
                 if (attr in data) 
                 {
                     const buffer = Buffer.from(data[attr]);
@@ -381,7 +382,7 @@ const definition = {
                 max_distance: {ID: 0x0008, type: Zcl.DataType.UINT16},
                 ex_state: {ID: 0x0009, type: Zcl.DataType.ENUM8},
                 presence_mode: {ID: 0x000a, type: Zcl.DataType.ENUM8},
-                measured_light: {ID: 0x001b, type: Zcl.DataType.UINT8},
+                measured_light: {ID: 0x000b, type: Zcl.DataType.UINT8},
                 move_energy_last: {ID: 0x000c, type: Zcl.DataType.OCTET_STR},
                 still_energy_last: {ID: 0x000d, type: Zcl.DataType.OCTET_STR},
                 move_energy_min: {ID: 0x000e, type: Zcl.DataType.OCTET_STR},
@@ -466,6 +467,8 @@ const definition = {
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
         await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
+        await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
+        await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
         await endpoint.configureReporting('msOccupancySensing', [
             {
                 attribute: 'occupancy',
@@ -507,6 +510,7 @@ const definition = {
         //        reportableChange: null,
         //    },
         //]);
+        
         //{
         //    var attributes = []
         //    for (const a of ['still_energy_last'/*, 'move_energy_last', 'still_energy_min', 'still_energy_max', 'move_energy_min', 'move_energy_max'*/]) 
