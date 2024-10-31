@@ -467,6 +467,7 @@ const definition = {
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
         await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig']);
+        await endpoint.read('customOccupationConfig', ['presence_mode']);
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
