@@ -64,6 +64,19 @@ const orlangurOccupactionExtended = {
             e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
         ];
 
+        const toggleSubscription = async (ep, on) => {
+            var attributes = []
+            for (const a in ['still_energy_last', 'move_energy_last', 'still_energy_min', 'still_energy_max', 'move_energy_min', 'move_energy_max']) {
+                attributes.push({
+                    attribute: a,
+                    minimumReportInterval: 0,
+                    maximumReportInterval: on === true ? constants.repInterval.HOUR : 0xffff,
+                    reportableChange: null,
+                })
+            }
+            await endpoint.configureReporting('customOccupationConfig', attributes);
+        };
+
         const lookup = {Simple: 2, Energy: 1};
         const fromZigbee = [
             {
@@ -78,92 +91,16 @@ const orlangurOccupactionExtended = {
                             if (lookup[name] === data['presence_mode'])
                             {
                                 result['presence_mode'] = name;
-                                if (name != model.meta.presence_mode)
+                                const endpoint = meta.device.getEndpoint(1);
+                                if (name != meta.presence_mode)
                                 {
                                     if (name == 'Energy')
                                     {
-                                        //subscribe to attributes
-                                        const endpoint = meta.device.getEndpoint(1);
-                                        await endpoint.configureReporting('customOccupationConfig', [
-                                            {
-                                                attribute: 'still_energy_last',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_last',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'still_energy_min',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_min',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'still_energy_max',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_max',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: constants.repInterval.HOUR,
-                                                reportableChange: null,
-                                            },
-                                        ]);
-                                    }else
+                                        Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
+                                    }
+                                    else
                                     {
-                                        //make sure we're not subscribed
-                                        const endpoint = meta.device.getEndpoint(1);
-                                        await endpoint.configureReporting('customOccupationConfig', [
-                                            {
-                                                attribute: 'still_energy_last',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_last',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'still_energy_min',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_min',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'still_energy_max',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                            {
-                                                attribute: 'move_energy_max',
-                                                minimumReportInterval: 0,
-                                                maximumReportInterval: 0xffff,
-                                                reportableChange: null,
-                                            },
-                                        ]);
+                                        Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
                                     }
                                 }
                                 break;
@@ -184,12 +121,15 @@ const orlangurOccupactionExtended = {
                 key: ['presence_mode'],
                 convertSet: async (entity, key, value, meta) => {
                     const payload = {[key]: lookup[value]}
+                    const endpoint = meta.device.getEndpoint(1);
                     if (value == 'Simple')
                     {
                         //unsubscribe
+                        await toggleSubscription(endpoint, false)
                     }else if (value == 'Energy')
                     {
                         //subscribe
+                        await toggleSubscription(endpoint, true)
                     }
                     await entity.write('customOccupationConfig', payload);
                     return {state: {[key]: value}};
