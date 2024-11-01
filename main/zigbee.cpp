@@ -314,7 +314,7 @@ namespace zb
         constexpr int kMaxTries = 3;
         for(int tries = 0; tries < kMaxTries; ++tries)
         {
-            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=2/*8*/}))
+            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=4}))
             {
                 printf("Failed to configure ld2412 (attempt %d)\n", tries);
                 fflush(stdout);
