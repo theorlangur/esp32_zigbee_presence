@@ -78,20 +78,6 @@ const orlangurOccupactionExtended = {
                             if (lookup[name] === data['presence_mode'])
                             {
                                 result['presence_mode'] = name;
-                                //const endpoint = meta.device.getEndpoint(1);
-                                //if (name != meta.presence_mode)
-                                //{
-                                //    if (name == 'Energy')
-                                //    {
-                                //        //logger.debug(`fZ convert: Energy;`, NS);
-                                //        Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
-                                //    }
-                                //    else
-                                //    {
-                                //        //logger.debug(`fZ convert: Simple;`, NS);
-                                //        Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
-                                //    }
-                                //}
                                 break;
                             }
                         }
@@ -112,19 +98,6 @@ const orlangurOccupactionExtended = {
                     const payload = {[key]: lookup[value]}
                     const endpoint = meta.device.getEndpoint(1);
                     await entity.write('customOccupationConfig', payload);
-                    //if (value == 'Simple')
-                    //{
-                    //    //unsubscribe
-                    //    //logger.debug(`tZ : Simple;`, NS);
-                    //    //await toggleSubscription(endpoint, false)
-                    //    Promise.resolve().then(() => { toggleSubscription(endpoint, false); })
-                    //}else if (value == 'Energy')
-                    //{
-                    //    //subscribe
-                    //    //logger.debug(`tZ : Energy;`, NS);
-                    //    //await toggleSubscription(endpoint, true)
-                    //    Promise.resolve().then(() => { toggleSubscription(endpoint, true); })
-                    //}
                     return {state: {[key]: value}};
                 },
                 convertGet: async (entity, key, meta) => {
@@ -241,11 +214,9 @@ const orlangurOccupactionExtended = {
         const attr = prefix + '_energy_' + suffix
         const exp_entity = attr
 
-        const exposes = e.composite(attr, exp_entity, ea.STATE_GET)
+        const exposes = e.text(exp_entity, ea.STATE_GET)
                             .withLabel(prefix + ' energy ' + suffix)
                             .withDescription(descr);
-        for(var i = 0; i < 14; ++i)
-            exposes.withFeature(e.numeric('gate'+i, ea.STATE_GET).withValueMin(0).withValueMax(100));
 
         const fromZigbee = [{
             cluster: 'customOccupationConfig',
@@ -259,17 +230,22 @@ const orlangurOccupactionExtended = {
                     const buffer = Buffer.from(data[attr]);
                     if (buffer.length==14)
                     {
-                        res = {}
-                        for(var i = 0; i < 14; ++i)
-                            res['gate'+i] = buffer[i]
-                        result[exp_entity] = res
+                        const toHexString = Array.from(buffer, byte => ('0' + (byte & 0xFF).toString(16)).slice(-2)).join(' ')
+                        result[exp_entity] = toHexString
                         return result;
                     }
                 }
             }
         }];
 
-        const toZigbee = [];
+        const toZigbee = [
+            {
+                key: [attr],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', [key]);
+                },
+            }
+        ];
 
         return {
             exposes: [exposes],
@@ -451,12 +427,12 @@ const definition = {
         orlangurOccupactionExtended.distanceConfig(),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
-        orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
         orlangurOccupactionExtended.measure('still', 'last', 'Last measured still energy per gate'),
-        orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
         orlangurOccupactionExtended.measure('still', 'min', 'Min measured still energy per gate'),
-        orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
         orlangurOccupactionExtended.measure('still', 'max', 'Max measured still energy per gate'),
+        orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
+        orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
+        orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
@@ -501,30 +477,6 @@ const definition = {
                 reportableChange: null,
             },
         ]);
-
-        //await endpoint.configureReporting('customOccupationConfig', [
-        //    {
-        //        attribute: 'still_energy_last',
-        //        minimumReportInterval: 5,
-        //        maximumReportInterval: constants.repInterval.HOUR,
-        //        reportableChange: null,
-        //    },
-        //]);
-        
-        //{
-        //    var attributes = []
-        //    for (const a of ['still_energy_last'/*, 'move_energy_last', 'still_energy_min', 'still_energy_max', 'move_energy_min', 'move_energy_max'*/]) 
-        //    {
-        //        attributes.push({
-        //            attribute: a,
-        //            minimumReportInterval: 0,
-        //            maximumReportInterval: constants.repInterval.HOUR,
-        //            reportableChange: null,
-        //        });
-        //    }
-        //    await endpoint.configureReporting('customOccupationConfig', attributes);
-        //}
-
     },
 
 };
