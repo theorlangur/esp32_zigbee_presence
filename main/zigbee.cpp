@@ -204,7 +204,8 @@ namespace zb
             ++i;
         }
 
-        //FMT_PRINT("Measurements update: still {};\n", stillBuf.sv());
+        //FMT_PRINT("Measurements update: stillMax {};\n", stillMaxBuf.sv());
+        //FMT_PRINT("Measurements update: stillMin {};\n", stillMinBuf.sv());
         //FMT_PRINT("Measurements update: move {};\n", moveBuf.sv());
         {
             APILock l;

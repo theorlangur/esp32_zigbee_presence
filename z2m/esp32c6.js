@@ -18,11 +18,29 @@ const ea = exposes.access;
 const NS = 'zhc:orlangur';
 
 const orlangurOccupactionExtended = {
+    reset_energy_stat: () => {
+        const exposes = [
+            e.enum('reset_energy_stat', ea.SET, ['Reset']).withLabel('Reset Energy Statistics').withDescription('Perform reset internally gathered energy statistics'),
+        ];
+        const fromZigbee = [];
+        const toZigbee = [
+            {
+                key: ['reset_energy_stat'],
+                convertSet: async (entity, key, value, meta) => { await entity.command('customOccupationConfig', key, {}, {}); },
+            },
+        ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     commands: () => {
         const exposes = [
             e.enum('restart', ea.SET, ['Restart']).withLabel('Restart').withDescription('Restart LD2412 module'),
             e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
-            e.enum('reset_energy_stat', ea.SET, ['Reset']).withLabel('Reset Energy Statistics').withDescription('Perform reset internally gathered energy statistics'),
             e.enum('switch_bluetooth', ea.SET, ['On','Off']).withLabel('Switch Bluetooth').withDescription('Turn Bluetooth On/Off'),
         ];
 
@@ -427,6 +445,7 @@ const definition = {
         orlangurOccupactionExtended.distanceConfig(),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
+        orlangurOccupactionExtended.reset_energy_stat(),
         orlangurOccupactionExtended.measure('still', 'last', 'Last measured still energy per gate'),
         orlangurOccupactionExtended.measure('still', 'min', 'Min measured still energy per gate'),
         orlangurOccupactionExtended.measure('still', 'max', 'Max measured still energy per gate'),
