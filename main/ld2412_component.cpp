@@ -466,9 +466,9 @@ namespace ld2412
                         if (e < still.min) still.min = e;
                     }
 
-                    if (c.m_MeasuredLight != c.GetMeasuredLight())
+                    if (c.m_MeasuredLight != d.GetMeasuredLight())
                     {
-                        c.m_MeasuredLight = c.GetMeasuredLight();
+                        c.m_MeasuredLight = d.GetMeasuredLight();
                         changed = true;
                     }
 
