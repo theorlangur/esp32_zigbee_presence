@@ -497,6 +497,12 @@ const definition = {
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
+            {
+                attribute: 'presence_mode',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
         ]);
     },
 

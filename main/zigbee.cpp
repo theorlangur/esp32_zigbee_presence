@@ -480,7 +480,7 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MaxDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RWP));
         ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStill.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Read));
