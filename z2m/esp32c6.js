@@ -242,7 +242,7 @@ const orlangurOccupactionExtended = {
             convert: (model, msg, publish, options, meta) => {
                 const result = {};
                 const data = msg.data;
-                logger.debug(`fZ convert attr: ${attr}; data:${util.inspect(data)}`, NS);
+                //logger.debug(`fZ convert attr: ${attr}; data:${util.inspect(data)}`, NS);
                 if (attr in data) 
                 {
                     const buffer = Buffer.from(data[attr]);
