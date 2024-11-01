@@ -28,6 +28,7 @@ namespace ld2412
             //report
             Presence,
             PresenceIntr,
+            PIRPresenceIntr,
             GatesEnergyState,
             //config
             SetTimeout,
@@ -94,6 +95,13 @@ namespace ld2412
     {
         Component &c = *static_cast<Component*>(param);
         QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Dummy=false};
+        xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
+    }
+
+    void Component::presence_pir_pin_isr(void *param)
+    {
+        Component &c = *static_cast<Component*>(param);
+        QueueMsg msg{.m_Type=QueueMsg::Type::PIRPresenceIntr, .m_Dummy=false};
         xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
     }
 
@@ -309,7 +317,9 @@ namespace ld2412
     {
         Component &c = *pC;
         bool lastPresence = false;
-        LD2412::PresenceResult lastPresenceData;
+        bool lastPIRPresence = false;
+        bool lastCompositePresence = false;
+        PresenceResult lastPresenceData;
         ExtendedState exState = ExtendedState::Normal;
         QueueMsg msg;
         while(true)
@@ -324,36 +334,52 @@ namespace ld2412
                         int l = gpio_get_level(gpio_num_t(c.m_PresencePin));
                         FMT_PRINT("Msg presence interrupt: {}\n", l);
                         lastPresence = l == 1;
-                        if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                        bool prev = lastCompositePresence;
+                        lastCompositePresence = lastPresence || lastPIRPresence;
+                        if ((prev != lastCompositePresence) && c.m_MovementCallback)
+                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
+                    }
+                    break;
+                    case QueueMsg::Type::PIRPresenceIntr: 
+                    {
+                        int l = gpio_get_level(gpio_num_t(c.m_PIRPresencePin));
+                        FMT_PRINT("Msg PIR presence interrupt: {}\n", l);
+                        lastPIRPresence = l == 1;
+                        lastCompositePresence = lastPresence || lastPIRPresence;
+                        if (lastPresenceData.pirPresence != lastPIRPresence)
+                        {
+                            lastPresenceData.pirPresence = lastPIRPresence;
+                            if (c.m_MovementCallback)
+                                c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
+                        }
                     }
                     break;
                     case QueueMsg::Type::RunDynamicBackgroundAnalysis: 
                     {
                         exState = ExtendedState::RunningDynamicBackgroundAnalysis;
                         if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                     }
                     break;
                     case QueueMsg::Type::RunDynamicBackgroundAnalysisDone: 
                     {
                         exState = ExtendedState::Normal;
                         if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                     }
                     break;
                     case QueueMsg::Type::StartCalibrate: 
                     {
                         exState = ExtendedState::RunningCalibration;
                         if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                     }
                     break;
                     case QueueMsg::Type::StopCalibrate: 
                     {
                         exState = ExtendedState::Normal;
                         if (c.m_MovementCallback)
-                            c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                     }
                     break;
                     case QueueMsg::Type::GatesEnergyState:
@@ -384,9 +410,9 @@ namespace ld2412
                             lastPresenceData.m_MoveDistance = msg.m_Presence.m_DistanceMove;
                             lastPresenceData.m_StillEnergy = msg.m_Presence.m_EnergyStill;
                             lastPresenceData.m_MoveEnergy = msg.m_Presence.m_EnergyMove;
-
+                            lastCompositePresence = lastPresence || lastPIRPresence;
                             if (c.m_MovementCallback)
-                                c.m_MovementCallback(lastPresence, lastPresenceData, exState);
+                                c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                         }
                     break;
                     default:
@@ -558,18 +584,32 @@ namespace ld2412
 
     void Component::ConfigurePresenceIsr()
     {
-        if (m_PresencePin == -1)
-            return;
-        gpio_config_t ld2412_presence_pin_cfg = {
-            .pin_bit_mask = 1ULL << m_PresencePin,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_ENABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_ANYEDGE,
-        };
+        if (m_PresencePin != -1)
+        {
+            gpio_config_t ld2412_presence_pin_cfg = {
+                .pin_bit_mask = 1ULL << m_PresencePin,
+                .mode = GPIO_MODE_INPUT,
+                .pull_up_en = GPIO_PULLUP_ENABLE,
+                .pull_down_en = GPIO_PULLDOWN_DISABLE,
+                .intr_type = GPIO_INTR_ANYEDGE,
+            };
 
-        gpio_config(&ld2412_presence_pin_cfg);
-        gpio_isr_handler_add(gpio_num_t(m_PresencePin), presence_pin_isr, this);
+            gpio_config(&ld2412_presence_pin_cfg);
+            gpio_isr_handler_add(gpio_num_t(m_PresencePin), presence_pin_isr, this);
+        }
+        if (m_PIRPresencePin != -1)
+        {
+            gpio_config_t ld2412_presence_pin_cfg = {
+                .pin_bit_mask = 1ULL << m_PIRPresencePin,
+                .mode = GPIO_MODE_INPUT,
+                .pull_up_en = GPIO_PULLUP_ENABLE,
+                .pull_down_en = GPIO_PULLDOWN_DISABLE,
+                .intr_type = GPIO_INTR_ANYEDGE,
+            };
+
+            gpio_config(&ld2412_presence_pin_cfg);
+            gpio_isr_handler_add(gpio_num_t(m_PIRPresencePin), presence_pir_pin_isr, this);
+        }
     }
 
     void Component::ChangeMode(LD2412::SystemMode m)
@@ -715,6 +755,7 @@ namespace ld2412
         }
 
         m_PresencePin = args.presencePin;
+        m_PIRPresencePin = args.presencePIRPin;
 
         {
             printf("Config\n");

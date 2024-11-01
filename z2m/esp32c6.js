@@ -383,6 +383,7 @@ const definition = {
                 still_energy_min: {ID: 0x000f, type: Zcl.DataType.OCTET_STR},
                 move_energy_max: {ID: 0x0010, type: Zcl.DataType.OCTET_STR},
                 still_energy_max: {ID: 0x0011, type: Zcl.DataType.OCTET_STR},
+                pir_presence: {ID: 0x0012, type: Zcl.DataType.BOOLEAN},
             },
             commands: {
                 restart: {
@@ -423,6 +424,14 @@ const definition = {
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
         }),
         enumLookup({
+            name: 'pir_presence',
+            access: 'STATE_GET',
+            cluster: 'customOccupationConfig',
+            attribute: 'pir_presence',
+            description: 'PIR Presence',
+            lookup: {Clear: 0, Detected: 1},
+        }),
+        enumLookup({
             name: 'extended_state',
             access: 'STATE_GET',
             cluster: 'customOccupationConfig',
@@ -456,7 +465,7 @@ const definition = {
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
         await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig']);
-        await endpoint.read('customOccupationConfig', ['presence_mode']);
+        await endpoint.read('customOccupationConfig', ['presence_mode','pir_presence']);
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
@@ -499,6 +508,12 @@ const definition = {
             },
             {
                 attribute: 'presence_mode',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'pir_presence',
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,

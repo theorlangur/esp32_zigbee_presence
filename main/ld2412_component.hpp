@@ -22,7 +22,11 @@ namespace ld2412
             RunningDynamicBackgroundAnalysis,
             RunningCalibration
         };
-        using MovementCallback = GenericCallback<void(bool detected, LD2412::PresenceResult const& p, ExtendedState exState)>;
+        struct PresenceResult: LD2412::PresenceResult
+        {
+            bool pirPresence = false;
+        };
+        using MovementCallback = GenericCallback<void(bool detected, PresenceResult const& p, ExtendedState exState)>;
         using ConfigUpdateCallback = GenericCallback<void()>;
         using MeasurementsUpdateCallback = GenericCallback<void()>;
         struct EnergyMinMax
@@ -44,6 +48,7 @@ namespace ld2412
             int rxPin;
             uart::Port port = uart::Port::Port1;
             int presencePin = -1;
+            int presencePIRPin = -1;
         };
 
         bool Setup(setup_args_t const& args);
@@ -92,12 +97,14 @@ namespace ld2412
         void HandleMessage(QueueMsg &msg);
 
         static void presence_pin_isr(void *param);
+        static void presence_pir_pin_isr(void *param);
         static void fast_loop(Component *pC);
         static void manage_loop(Component *pC);
 
         bool m_Setup = false;
         LD2412 m_Sensor;
         int m_PresencePin = -1;
+        int m_PIRPresencePin = -1;
 
         MovementCallback m_MovementCallback;
         ConfigUpdateCallback m_ConfigUpdateCallback;
@@ -117,5 +124,18 @@ namespace ld2412
         LD2412::SystemMode m_ModeBeforeCalibration;
     };
 }
+
+template<>
+struct tools::formatter_t<ld2412::Component::PresenceResult>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, ld2412::Component::PresenceResult const& p)
+    {
+        return tools::format_to(std::forward<Dest>(dst), "{}; PIR={}"
+                , (LD2412::PresenceResult const&)p
+                , p.pirPresence
+            );
+    }
+};
 
 #endif

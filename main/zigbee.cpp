@@ -33,6 +33,7 @@ namespace zb
     static constexpr int LD2412_PINS_TX = 11;
     static constexpr int LD2412_PINS_RX = 10;
     static constexpr int LD2412_PINS_PRESENCE = 4;
+    static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
     constexpr uint8_t PRESENCE_EP = 1;
     static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
 
@@ -57,6 +58,7 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN = 15;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX = 16;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX = 17;
+    static constexpr const uint16_t LD2412_ATTRIB_PIR_PRESENCE = 18;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -99,6 +101,7 @@ namespace zb
     using ZclAttributeEngineeringEnergyMoveMin_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN, EnergyBufType>;
     using ZclAttributeEngineeringEnergyStillMax_t = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
     using ZclAttributeEngineeringEnergyMoveMax_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
+    using ZclAttributePIRPresence_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -127,6 +130,7 @@ namespace zb
     static ZclAttributeEngineeringEnergyStillMin_t g_LD2412EngineeringEnergyStillMin;
     static ZclAttributeEngineeringEnergyMoveMax_t  g_LD2412EngineeringEnergyMoveMax;
     static ZclAttributeEngineeringEnergyStillMax_t g_LD2412EngineeringEnergyStillMax;
+    static ZclAttributePIRPresence_t               g_LD2412PIRPresence;
 
     //initialized at start
     esp_zb_ieee_addr_t g_CoordinatorIeee;
@@ -144,7 +148,7 @@ namespace zb
         esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
-    static void on_movement_callback(bool presence, LD2412::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    static void on_movement_callback(bool presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
     {
         static bool g_FirstRun = true;
         static bool g_LastPresence = false;
@@ -181,6 +185,10 @@ namespace zb
             if (auto status = g_LD2412ExState.Set(exState); !status)
             {
                 FMT_PRINT("Failed to set extended state attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412PIRPresence.Set(p.pirPresence); !status)
+            {
+                FMT_PRINT("Failed to set PIR presence attribute with error {:x}\n", (int)status.error());
             }
             if (presence_changed)
             {
@@ -316,7 +324,12 @@ namespace zb
         constexpr int kMaxTries = 3;
         for(int tries = 0; tries < kMaxTries; ++tries)
         {
-            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=LD2412_PINS_TX, .rxPin=LD2412_PINS_RX, .presencePin=LD2412_PINS_PRESENCE}))
+            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{
+                        .txPin=LD2412_PINS_TX, 
+                        .rxPin=LD2412_PINS_RX, 
+                        .presencePin=LD2412_PINS_PRESENCE,
+                        .presencePIRPin=LD2412_PINS_PIR_PRESENCE
+                        }))
             {
                 printf("Failed to configure ld2412 (attempt %d)\n", tries);
                 fflush(stdout);
@@ -483,6 +496,7 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412MinDistance.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_LD2412ExState.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412Mode.AddToCluster(custom_cluster, Access::RWP));
+        ESP_ERROR_CHECK(g_LD2412PIRPresence.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringLight.AddToCluster(custom_cluster, Access::Report));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStill.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMove.AddToCluster(custom_cluster, Access::Read));
