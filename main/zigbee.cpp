@@ -30,7 +30,9 @@ namespace zb
     static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
     static ld2412::Component g_ld2412;//THE presence sensor component
-
+    static constexpr int LD2412_PINS_TX = 11;
+    static constexpr int LD2412_PINS_RX = 10;
+    static constexpr int LD2412_PINS_PRESENCE = 4;
     constexpr uint8_t PRESENCE_EP = 1;
     static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
 
@@ -314,7 +316,7 @@ namespace zb
         constexpr int kMaxTries = 3;
         for(int tries = 0; tries < kMaxTries; ++tries)
         {
-            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=11, .rxPin=10, .presencePin=4}))
+            if (!g_ld2412.Setup(ld2412::Component::setup_args_t{.txPin=LD2412_PINS_TX, .rxPin=LD2412_PINS_RX, .presencePin=LD2412_PINS_PRESENCE}))
             {
                 printf("Failed to configure ld2412 (attempt %d)\n", tries);
                 fflush(stdout);
