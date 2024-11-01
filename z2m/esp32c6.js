@@ -479,19 +479,21 @@ const definition = {
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
-        ]);
-        await endpoint.configureReporting('customOccupationConfig', [
             {
                 attribute: 'stillDistance',
                 minimumReportInterval: 5,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
-        ]);
-        await endpoint.configureReporting('customOccupationConfig', [
             {
                 attribute: 'measured_light',
                 minimumReportInterval: 5,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'ex_state',
+                minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
