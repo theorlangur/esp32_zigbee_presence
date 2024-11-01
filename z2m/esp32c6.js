@@ -384,6 +384,8 @@ const definition = {
                 move_energy_max: {ID: 0x0010, type: Zcl.DataType.OCTET_STR},
                 still_energy_max: {ID: 0x0011, type: Zcl.DataType.OCTET_STR},
                 pir_presence: {ID: 0x0012, type: Zcl.DataType.BOOLEAN},
+                on_off_mode: {ID: 0x0013, type: Zcl.DataType.ENUM8},
+                on_off_timeout: {ID: 0x0014, type: Zcl.DataType.UINT16},
             },
             commands: {
                 restart: {
@@ -440,6 +442,23 @@ const definition = {
             lookup: {Normal: 0, DynamicBackgroundAnalysis: 1, Calibration: 2},
         }),
         orlangurOccupactionExtended.mode(),
+        enumLookup({
+            name: 'on_off_mode',
+            access: 'ALL',
+            cluster: 'customOccupationConfig',
+            attribute: 'on_off_mode',
+            description: 'On/Off Command Mode',
+            lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3},
+        }),
+        numeric({
+            name: 'on_off_timeout',
+            cluster: 'customOccupationConfig',
+            attribute: 'on_off_timeout',
+            description: 'On/Off Timeout',
+            valueMin: 0,
+            valueMax: 6000,
+            access: 'ALL',
+        }),
         numeric({
             name: 'measured_light',
             cluster: 'customOccupationConfig',

@@ -23,6 +23,14 @@ namespace zb
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
 
+    enum class OnOffMode: uint8_t
+    {
+        OnOff = 0,
+        OnOnly = 1,
+        OffOnly = 2,
+        TimedOn = 3,
+    };
+
 
     static auto g_Manufacturer = ZbStr("Orlangur");
     static auto g_Model = ZbStr("P-NextGen");
@@ -59,6 +67,8 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX = 16;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX = 17;
     static constexpr const uint16_t LD2412_ATTRIB_PIR_PRESENCE = 18;
+    static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
+    static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -102,6 +112,8 @@ namespace zb
     using ZclAttributeEngineeringEnergyStillMax_t = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
     using ZclAttributeEngineeringEnergyMoveMax_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
     using ZclAttributePIRPresence_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
+    using ZclAttributeOnOffCommandMode_t          = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
+    using ZclAttributeOnOffCommandTimeout_t       = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -131,21 +143,40 @@ namespace zb
     static ZclAttributeEngineeringEnergyMoveMax_t  g_LD2412EngineeringEnergyMoveMax;
     static ZclAttributeEngineeringEnergyStillMax_t g_LD2412EngineeringEnergyStillMax;
     static ZclAttributePIRPresence_t               g_LD2412PIRPresence;
+    static ZclAttributeOnOffCommandMode_t          g_OnOffCommandMode;
+    static ZclAttributeOnOffCommandTimeout_t       g_OnOffCommandTimeout;
+
+    OnOffMode g_OnOffMode = OnOffMode::TimedOn;
+    uint16_t g_OnOffTimeout = 10;
 
     //initialized at start
     esp_zb_ieee_addr_t g_CoordinatorIeee;
 
     static void send_on_off(bool on)
     {
-        FMT_PRINT("Sending command to binded: {};\n", (int)on);
-        esp_zb_zcl_on_off_cmd_t cmd_req;
-        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        if (on)
-            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
-        else
-            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
-        esp_zb_zcl_on_off_cmd_req(&cmd_req);
+        if (on && (g_OnOffMode == OnOffMode::OffOnly))
+            return;//nothing
+        if (!on && (g_OnOffMode == OnOffMode::OnOnly || g_OnOffMode == OnOffMode::TimedOn))
+            return;//nothing
+
+        if (g_OnOffMode == OnOffMode::TimedOn)
+        {
+            FMT_PRINT("Sending timed on command to binded with timeout: {};\n", g_OnOffTimeout);
+            esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
+            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+            cmd_req.on_off_control = ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID;
+            cmd_req.on_time = g_OnOffTimeout * 10;
+            esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
+        }else
+        {
+            FMT_PRINT("Sending command to binded: {};\n", (int)on);
+            esp_zb_zcl_on_off_cmd_t cmd_req;
+            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+            cmd_req.on_off_cmd_id = on ? ESP_ZB_ZCL_CMD_ON_OFF_ON_ID : ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+        }
     }
 
     static void on_movement_callback(bool presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
@@ -319,6 +350,14 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial measured light state with error {:x}\n", (int)status.error());
             }
+            if (auto status = g_OnOffCommandMode.Set(g_OnOffMode); !status)
+            {
+                FMT_PRINT("Failed to set initial on-off mode {:x}\n", (int)status.error());
+            }
+            if (auto status = g_OnOffCommandTimeout.Set(g_OnOffTimeout); !status)
+            {
+                FMT_PRINT("Failed to set initial on-off timeout {:x}\n", (int)status.error());
+            }
         }
 
         constexpr int kMaxTries = 3;
@@ -459,6 +498,22 @@ namespace zb
                 return ESP_OK;
             }
         >{},
+        AttrDescr<ZclAttributeOnOffCommandMode_t, 
+            [](const OnOffMode &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing on-off command mode to {}\n", to);
+                g_OnOffMode = to;
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeOnOffCommandTimeout_t, 
+            [](const uint16_t &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing on-off command timeout to {}\n", to);
+                g_OnOffTimeout = to;
+                return ESP_OK;
+            }
+        >{},
 
         {}//last one
     };
@@ -504,6 +559,8 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMin.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMax.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMax.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_OnOffCommandMode.AddToCluster(custom_cluster, Access::RWP));
+        ESP_ERROR_CHECK(g_OnOffCommandTimeout.AddToCluster(custom_cluster, Access::RWP));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
