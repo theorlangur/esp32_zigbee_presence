@@ -146,10 +146,62 @@ extern "C" void app_main(void)
     unsigned major_rev = chip_info.revision / 100;
     unsigned minor_rev = chip_info.revision % 100;
 
+    {
+        constexpr gpio_num_t PIR_PIN = gpio_num_t(5);
+        gpio_config_t ld2412_presence_pin_cfg = {
+            .pin_bit_mask = 1ULL << PIR_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_ANYEDGE,
+        };
 
-    //test_ld2412();
-    //fflush(stdout);
-    //return;
+        ESP_ERROR_CHECK(gpio_config(&ld2412_presence_pin_cfg));
+
+        constexpr gpio_num_t LED_PIN = gpio_num_t(8);
+        //gpio_config_t led_cfg = {
+        //    .pin_bit_mask = 1ULL << LED_PIN,
+        //    .mode = GPIO_MODE_OUTPUT,
+        //    .pull_up_en = GPIO_PULLUP_DISABLE,
+        //    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        //    .intr_type = GPIO_INTR_DISABLE,//GPIO_INTR_ANYEDGE,
+        //};
+        //
+        //ESP_ERROR_CHECK(gpio_config(&led_cfg));
+        //gpio_reset_pin(LED_PIN);
+        //gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
+
+        static QueueHandle_t pirQueue = xQueueCreate(10, sizeof(int));
+        static int prev_val = gpio_get_level(PIR_PIN);
+        FMT_PRINT("Initial PIR: {}\n", prev_val);
+        gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
+        gpio_isr_handler_add(gpio_num_t(PIR_PIN), [](void*){
+            int v = gpio_get_level(PIR_PIN);
+            if (v != prev_val)
+            {
+                prev_val = v;
+                xQueueSendFromISR(pirQueue, &prev_val, nullptr);
+            }
+                }, nullptr);
+        while(true)
+        {
+            int val;
+            if (xQueueReceive(pirQueue, &val, 10000 / portTICK_PERIOD_MS))
+            {
+                FMT_PRINT("PIR changed to: {}\n", val);
+                if (val) {
+                    ///* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
+                    //led_strip_set_pixel(led_strip, 0, 255, 255, 255);
+                    ///* Refresh the strip to send data */
+                    //led_strip_refresh(led_strip);
+                } else {
+                    /* Set all LED off to clear all pixels */
+                    //led_strip_clear(led_strip);
+                }
+            }
+        }
+        //gpio_isr_handler_add(gpio_num_t(m_PresencePin), presence_pin_isr, this);
+    }
 
     gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
     //ld2420::Component ld2420;
