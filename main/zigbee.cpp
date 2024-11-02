@@ -254,7 +254,7 @@ namespace zb
             case PresenceDetectionMode::mmWaveOnly: presence = p.mmPresence; break;
             case PresenceDetectionMode::PIRDriven: 
             {
-                if (!g_State.m_FirstRun || !g_State.m_LastPresence)
+                if (g_State.m_FirstRun || !g_State.m_LastPresence)
                     presence = p.pirPresence;//only PIR dictates if presence is detected 
                 //otherwise 'presence' as-is is ok, since it comes combined
             }
