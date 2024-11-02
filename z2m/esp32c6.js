@@ -386,6 +386,7 @@ const definition = {
                 pir_presence: {ID: 0x0012, type: Zcl.DataType.BOOLEAN},
                 on_off_mode: {ID: 0x0013, type: Zcl.DataType.ENUM8},
                 on_off_timeout: {ID: 0x0014, type: Zcl.DataType.UINT16},
+                presence_detection_mode: {ID: 0x0015, type: Zcl.DataType.ENUM8},
             },
             commands: {
                 restart: {
@@ -443,12 +444,20 @@ const definition = {
         }),
         orlangurOccupactionExtended.mode(),
         enumLookup({
+            name: 'detection_mode',
+            access: 'ALL',
+            cluster: 'customOccupationConfig',
+            attribute: 'presence_detection_mode',
+            description: 'Presence Detection Mode',
+            lookup: {Combined: 0, mmWaveOnly: 1, PIROnly: 2, PIRDriven: 3},
+        }),
+        enumLookup({
             name: 'on_off_mode',
             access: 'ALL',
             cluster: 'customOccupationConfig',
             attribute: 'on_off_mode',
             description: 'On/Off Command Mode',
-            lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3},
+            lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3, TimedOnLocal: 4},
         }),
         numeric({
             name: 'on_off_timeout',
