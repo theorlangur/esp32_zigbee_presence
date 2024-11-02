@@ -456,7 +456,7 @@ const definition = {
             attribute: 'on_off_timeout',
             description: 'On/Off Timeout',
             valueMin: 0,
-            valueMax: 6000,
+            valueMax: 1000,
             access: 'ALL',
         }),
         numeric({
