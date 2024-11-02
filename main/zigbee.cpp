@@ -29,6 +29,15 @@ namespace zb
         OnOnly = 1,
         OffOnly = 2,
         TimedOn = 3,
+        TimedOnLocal = 4,
+    };
+
+    enum class PresenceDetectionMode: uint8_t
+    {
+        Combined = 0,//PIR or mmWave to detect, PIR and mmWave both cleared to clear
+        mmWaveOnly = 1,
+        PIROnly = 2,
+        PIRDriven = 3,//occupancy detected only when PIR reports the detection, cleared when both are clear
     };
 
 
@@ -69,6 +78,7 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_PIR_PRESENCE = 18;
     static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
+    static constexpr const uint16_t LD2412_ATTRIB_PRESENCE_DETECTION_MODE = 21;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -114,6 +124,7 @@ namespace zb
     using ZclAttributePIRPresence_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
     using ZclAttributeOnOffCommandMode_t          = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
     using ZclAttributeOnOffCommandTimeout_t       = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
+    using ZclAttributePresenceDetectionMode_t     = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PRESENCE_DETECTION_MODE, PresenceDetectionMode>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -145,30 +156,86 @@ namespace zb
     static ZclAttributePIRPresence_t               g_LD2412PIRPresence;
     static ZclAttributeOnOffCommandMode_t          g_OnOffCommandMode;
     static ZclAttributeOnOffCommandTimeout_t       g_OnOffCommandTimeout;
+    static ZclAttributePresenceDetectionMode_t     g_PresenceDetectionMode;
 
-    OnOffMode g_OnOffMode = OnOffMode::TimedOn;
-    uint16_t g_OnOffTimeout = 10;
+    struct LocalConfig
+    {
+        OnOffMode m_OnOffMode = OnOffMode::TimedOn;
+        PresenceDetectionMode m_PresenceDetectionMode = PresenceDetectionMode::Combined;
+        uint16_t m_OnOffTimeout = 10;
+    };
+    LocalConfig g_Config;
 
     //initialized at start
-    esp_zb_ieee_addr_t g_CoordinatorIeee;
+    struct RuntimeState
+    {
+        esp_zb_ieee_addr_t m_CoordinatorIeee;
+        bool m_FirstRun = true;
+        bool m_LastPresence = false;
+        esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+    };
+    RuntimeState g_State;
+
+    void on_local_on_timer_finished(void* param)
+    {
+        //this runs in the context of zigbee task
+        if (g_State.m_LastPresence)//presence still active. start another timer
+        {
+            if (g_Config.m_OnOffTimeout)//still valid timeout?
+                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.m_OnOffTimeout * 1000);
+            else
+                g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        }
+        else
+        {
+            //no presence. send 'off' command, no timer reset
+            g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+            esp_zb_zcl_on_off_cmd_t cmd_req;
+            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+        }
+    }
 
     static void send_on_off(bool on)
     {
-        if (on && (g_OnOffMode == OnOffMode::OffOnly))
+        if (on && (g_Config.m_OnOffMode == OnOffMode::OffOnly))
             return;//nothing
-        if (!on && (g_OnOffMode == OnOffMode::OnOnly || g_OnOffMode == OnOffMode::TimedOn))
+        if (!on && (g_Config.m_OnOffMode == OnOffMode::OnOnly || g_Config.m_OnOffMode == OnOffMode::TimedOn || g_Config.m_OnOffMode == OnOffMode::TimedOnLocal))
             return;//nothing
 
-        if (g_OnOffMode == OnOffMode::TimedOn)
+        if (g_Config.m_OnOffMode == OnOffMode::TimedOn)
         {
-            FMT_PRINT("Sending timed on command to binded with timeout: {};\n", g_OnOffTimeout);
+            FMT_PRINT("Sending timed on command to binded with timeout: {};\n", g_Config.m_OnOffTimeout);
             esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
             cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
             cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
             cmd_req.on_off_control = ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID;
-            cmd_req.on_time = g_OnOffTimeout * 10;
+            cmd_req.on_time = g_Config.m_OnOffTimeout * 10;
             esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
-        }else
+        }
+        else if (g_Config.m_OnOffMode == OnOffMode::TimedOnLocal)
+        {
+            if (g_Config.m_OnOffTimeout)//makes sense only for non-0
+            {
+                //set/reset the local timer
+                if (g_State.m_RunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
+                {
+                    //timer IS running already
+                    //need to cancel it
+                    g_State.m_RunningTimer = esp_zb_scheduler_user_alarm_cancel(g_State.m_RunningTimer);
+                }
+                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.m_OnOffTimeout * 1000);
+            }
+            FMT_PRINT("Sending ON (timed-on-local) command to binded\n");
+            esp_zb_zcl_on_off_cmd_t cmd_req;
+            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+        }
+        else
         {
             FMT_PRINT("Sending command to binded: {};\n", (int)on);
             esp_zb_zcl_on_off_cmd_t cmd_req;
@@ -181,11 +248,24 @@ namespace zb
 
     static void on_movement_callback(bool presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
     {
-        static bool g_FirstRun = true;
-        static bool g_LastPresence = false;
-        bool presence_changed = !g_FirstRun && (g_LastPresence != presence);
-        g_FirstRun = false;
-        g_LastPresence = presence;
+        switch(g_Config.m_PresenceDetectionMode)
+        {
+            case PresenceDetectionMode::PIROnly: presence = p.pirPresence; break;
+            case PresenceDetectionMode::mmWaveOnly: presence = p.mmPresence; break;
+            case PresenceDetectionMode::PIRDriven: 
+            {
+                if (!g_State.m_FirstRun || !g_State.m_LastPresence)
+                    presence = p.pirPresence;//only PIR dictates if presence is detected 
+                //otherwise 'presence' as-is is ok, since it comes combined
+            }
+            break;
+            case PresenceDetectionMode::Combined:
+            //nothing, presence is good as-is
+            break;
+        }
+        bool presence_changed = !g_State.m_FirstRun && (g_State.m_LastPresence != presence);
+        g_State.m_FirstRun = false;
+        g_State.m_LastPresence = presence;
         esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         {
             APILock l;
@@ -350,13 +430,17 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial measured light state with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_OnOffCommandMode.Set(g_OnOffMode); !status)
+            if (auto status = g_OnOffCommandMode.Set(g_Config.m_OnOffMode); !status)
             {
                 FMT_PRINT("Failed to set initial on-off mode {:x}\n", (int)status.error());
             }
-            if (auto status = g_OnOffCommandTimeout.Set(g_OnOffTimeout); !status)
+            if (auto status = g_OnOffCommandTimeout.Set(g_Config.m_OnOffTimeout); !status)
             {
                 FMT_PRINT("Failed to set initial on-off timeout {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceDetectionMode.Set(g_Config.m_PresenceDetectionMode); !status)
+            {
+                FMT_PRINT("Failed to set initial presence detection mode {:x}\n", (int)status.error());
             }
         }
 
@@ -502,7 +586,7 @@ namespace zb
             [](const OnOffMode &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing on-off command mode to {}\n", to);
-                g_OnOffMode = to;
+                g_Config.m_OnOffMode = to;
                 return ESP_OK;
             }
         >{},
@@ -510,7 +594,15 @@ namespace zb
             [](const uint16_t &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing on-off command timeout to {}\n", to);
-                g_OnOffTimeout = to;
+                g_Config.m_OnOffTimeout = to;
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceDetectionMode_t, 
+            [](const PresenceDetectionMode &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence detection mode to {}\n", to);
+                g_Config.m_PresenceDetectionMode = to;
                 return ESP_OK;
             }
         >{},
@@ -559,8 +651,11 @@ namespace zb
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMin.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyMoveMax.AddToCluster(custom_cluster, Access::Read));
         ESP_ERROR_CHECK(g_LD2412EngineeringEnergyStillMax.AddToCluster(custom_cluster, Access::Read));
-        ESP_ERROR_CHECK(g_OnOffCommandMode.AddToCluster(custom_cluster, Access::RWP));
-        ESP_ERROR_CHECK(g_OnOffCommandTimeout.AddToCluster(custom_cluster, Access::RWP));
+
+        ESP_ERROR_CHECK(g_OnOffCommandMode.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_OnOffCommandTimeout.AddToCluster(custom_cluster, Access::RW));
+
+        ESP_ERROR_CHECK(g_PresenceDetectionMode.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
@@ -662,7 +757,7 @@ namespace zb
                     esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
                 } else {
                     ESP_LOGI(TAG, "Device rebooted");
-                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
                 }
             } else {
                 /* commissioning failed */
@@ -679,7 +774,7 @@ namespace zb
                          extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
                          esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
 
-                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_CoordinatorIeee);
+                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);

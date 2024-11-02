@@ -25,6 +25,7 @@ namespace ld2412
         struct PresenceResult: LD2412::PresenceResult
         {
             bool pirPresence = false;
+            bool mmPresence = false;
         };
         using MovementCallback = GenericCallback<void(bool detected, PresenceResult const& p, ExtendedState exState)>;
         using ConfigUpdateCallback = GenericCallback<void()>;

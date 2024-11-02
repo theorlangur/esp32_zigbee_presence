@@ -336,8 +336,12 @@ namespace ld2412
                         lastPresence = l == 1;
                         bool prev = lastCompositePresence;
                         lastCompositePresence = lastPresence || lastPIRPresence;
-                        if ((prev != lastCompositePresence) && c.m_MovementCallback)
-                            c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
+                        if (lastPresenceData.mmPresence != lastPresence)
+                        {
+                            lastPresenceData.mmPresence = lastPresence;
+                            if (c.m_MovementCallback)
+                                c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
+                        }
                     }
                     break;
                     case QueueMsg::Type::PIRPresenceIntr: 
@@ -411,6 +415,8 @@ namespace ld2412
                             lastPresenceData.m_StillEnergy = msg.m_Presence.m_EnergyStill;
                             lastPresenceData.m_MoveEnergy = msg.m_Presence.m_EnergyMove;
                             lastCompositePresence = lastPresence || lastPIRPresence;
+                            lastPresenceData.mmPresence = lastPresence;
+
                             if (c.m_MovementCallback)
                                 c.m_MovementCallback(lastCompositePresence, lastPresenceData, exState);
                         }
