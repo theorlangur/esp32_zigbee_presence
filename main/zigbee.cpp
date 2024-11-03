@@ -13,6 +13,9 @@
 #include <bitset>
 #include "ld2412_component.hpp"
 
+#include "device_common.hpp"
+#include "device_config.hpp"
+
 namespace zb
 {
     enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
@@ -22,24 +25,6 @@ namespace zb
     };
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
-
-    enum class OnOffMode: uint8_t
-    {
-        OnOff = 0,
-        OnOnly = 1,
-        OffOnly = 2,
-        TimedOn = 3,
-        TimedOnLocal = 4,
-        Nothing = 5,
-    };
-
-    enum class PresenceDetectionMode: uint8_t
-    {
-        Combined = 0,//PIR or mmWave to detect, PIR and mmWave both cleared to clear
-        mmWaveOnly = 1,
-        PIROnly = 2,
-        PIRDriven = 3,//occupancy detected only when PIR reports the detection, cleared when both are clear
-    };
 
 
     static auto g_Manufacturer = ZbStr("Orlangur");
@@ -159,12 +144,7 @@ namespace zb
     static ZclAttributeOnOffCommandTimeout_t       g_OnOffCommandTimeout;
     static ZclAttributePresenceDetectionMode_t     g_PresenceDetectionMode;
 
-    struct LocalConfig
-    {
-        OnOffMode m_OnOffMode = OnOffMode::TimedOn;
-        PresenceDetectionMode m_PresenceDetectionMode = PresenceDetectionMode::Combined;
-        uint16_t m_OnOffTimeout = 10;
-    };
+    //storable configuration
     LocalConfig g_Config;
 
     //initialized at start
@@ -590,6 +570,7 @@ namespace zb
             {
                 FMT_PRINT("Changing on-off command mode to {}\n", to);
                 g_Config.m_OnOffMode = to;
+                g_Config.on_change();
                 return ESP_OK;
             }
         >{},
@@ -598,6 +579,7 @@ namespace zb
             {
                 FMT_PRINT("Changing on-off command timeout to {}\n", to);
                 g_Config.m_OnOffTimeout = to;
+                g_Config.on_change();
                 return ESP_OK;
             }
         >{},
@@ -606,6 +588,7 @@ namespace zb
             {
                 FMT_PRINT("Changing presence detection mode to {}\n", to);
                 g_Config.m_PresenceDetectionMode = to;
+                g_Config.on_change();
                 return ESP_OK;
             }
         >{},
@@ -838,6 +821,8 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_start(false));
         ESP_LOGI(TAG, "ZB started, looping...");
         esp_zb_stack_main_loop();
+
+        g_Config.on_end();
     }
 
     void setup()
@@ -850,7 +835,7 @@ namespace zb
         FMT_PRINT("nvs_flash_init done\n");
         ESP_ERROR_CHECK(esp_zb_platform_config(&config));
         FMT_PRINT("esp_zb_platform_config done\n");
-        
+        ESP_ERROR_CHECK(g_Config.on_start());
         xTaskCreate(zigbee_main, "Zigbee_main", 2*4096, NULL, 5, NULL);
     }
 }

@@ -8,4 +8,7 @@ idf_component_register(SRCS
                     ld2420.cpp 
                     ld2420_component.cpp
                     zigbee.cpp
+                    device_common.hpp
+                    device_config.hpp
+                    device_config.cpp
                     INCLUDE_DIRS "")

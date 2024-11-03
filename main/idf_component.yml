@@ -1,5 +1,6 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  joltwallet/littlefs: "~=1.14.4"
   espressif/esp-zigbee-lib: "*"
   espressif/esp-zboss-lib: "*"
   ## Required IDF version
