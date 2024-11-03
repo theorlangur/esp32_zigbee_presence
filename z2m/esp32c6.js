@@ -510,14 +510,26 @@ const definition = {
             },
         ]);
         await endpoint.configureReporting('customOccupationConfig', [
-            {
+            {//skip for final version
                 attribute: 'moveDistance',
                 minimumReportInterval: 1,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
-            {
+            {//skip for final version
                 attribute: 'stillDistance',
+                minimumReportInterval: 5,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {//skip for final version
+                attribute: 'moveEnergy',
+                minimumReportInterval: 1,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {//skip for final version
+                attribute: 'stillEnergy',
                 minimumReportInterval: 5,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
