@@ -30,6 +30,7 @@ namespace zb
         OffOnly = 2,
         TimedOn = 3,
         TimedOnLocal = 4,
+        Nothing = 5,
     };
 
     enum class PresenceDetectionMode: uint8_t
@@ -200,6 +201,8 @@ namespace zb
 
     static void send_on_off(bool on)
     {
+        if (g_Config.m_OnOffMode == OnOffMode::Nothing)
+            return;//nothing
         if (on && (g_Config.m_OnOffMode == OnOffMode::OffOnly))
             return;//nothing
         if (!on && (g_Config.m_OnOffMode == OnOffMode::OnOnly || g_Config.m_OnOffMode == OnOffMode::TimedOn || g_Config.m_OnOffMode == OnOffMode::TimedOnLocal))

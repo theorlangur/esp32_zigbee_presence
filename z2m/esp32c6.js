@@ -457,7 +457,7 @@ const definition = {
             cluster: 'customOccupationConfig',
             attribute: 'on_off_mode',
             description: 'On/Off Command Mode',
-            lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3, TimedOnLocal: 4},
+            lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3, TimedOnLocal: 4, Nothing: 5},
         }),
         numeric({
             name: 'on_off_timeout',
