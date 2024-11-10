@@ -6,6 +6,7 @@
 
 #include "zigbee.hpp"
 #include "esp_zigbee_core.h"
+#include "driver/gpio.h"
 
 #include "zb_helpers.hpp"
 
@@ -37,6 +38,9 @@ namespace zb
     static constexpr int LD2412_PINS_RX = 10;
     static constexpr int LD2412_PINS_PRESENCE = 4;
     static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
+    static constexpr int PINS_RESET = 6;
+    static constexpr TickType_t FACTORY_RESET_TIMEOUT = 4;//4 seconds
+    static constexpr TickType_t FACTORY_RESET_TIMEOUT_WAIT = 1000 * FACTORY_RESET_TIMEOUT / portTICK_PERIOD_MS;
     constexpr uint8_t PRESENCE_EP = 1;
     static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
 
@@ -826,6 +830,27 @@ namespace zb
         g_Config.on_end();
     }
 
+    void reset_pin_isr(void *param)
+    {
+        QueueHandle_t q = (QueueHandle_t)param;
+        int l = gpio_get_level(gpio_num_t(PINS_RESET));
+        xQueueSendFromISR(q, &l, nullptr);
+    }
+
+    void config_reset_pin(QueueHandle_t q)
+    {
+        gpio_config_t reset_pin_cfg = {
+            .pin_bit_mask = 1ULL << PINS_RESET,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_ANYEDGE,
+        };
+
+        gpio_config(&reset_pin_cfg);
+        gpio_isr_handler_add(gpio_num_t(PINS_RESET), reset_pin_isr, q);
+    }
+
     void setup()
     {
         esp_zb_platform_config_t config = {
@@ -837,6 +862,61 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_platform_config(&config));
         FMT_PRINT("esp_zb_platform_config done\n");
         ESP_ERROR_CHECK(g_Config.on_start());
+        QueueHandle_t mainQueue = xQueueCreate(10, sizeof(int));
+        config_reset_pin(mainQueue);
         xTaskCreate(zigbee_main, "Zigbee_main", 2*4096, NULL, 5, NULL);
+
+        auto waitTime = portMAX_DELAY;
+        // FACTORY_RESET_TIMEOUT_WAIT
+        enum States{
+            Idle,
+            ResetPressed,
+        } state = States::Idle;
+        while(true)
+        {
+            int v;
+            if (xQueueReceive(mainQueue, &v, waitTime)) //process
+            {
+                switch(state)
+                {
+                    case States::Idle:
+                    {
+                        if (v == 0)//pressed
+                        {
+                            FMT_PRINT("detected RESET pin LOW\n");
+                            state = States::ResetPressed;
+                            waitTime = FACTORY_RESET_TIMEOUT_WAIT;
+                        }
+                    }
+                    break;
+                    case States::ResetPressed:
+                    {
+                        //need a gate here to prevent sporadic changes
+                        if (v == 1)//actually released. before timeout
+                        {
+                            FMT_PRINT("detected RESET pin HIGH before timeout\n");
+                            state = States::Idle;
+                            waitTime = portMAX_DELAY;
+                            esp_restart();//simple restart
+                        }
+                    }
+                    break;
+                }
+            }else
+            {
+                //timeout
+                if (state == States::ResetPressed)
+                {
+                    //yep, pressed
+                    //factory reset
+                    FMT_PRINT("detected RESET pin LOW long time. Making Factory Reset\n");
+                    waitTime = portMAX_DELAY;
+                    state = States::Idle;
+                    APILock l;
+                    ld2412_cmd_factory_reset();
+                    esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
+                }
+            }
+        }
     }
 }
