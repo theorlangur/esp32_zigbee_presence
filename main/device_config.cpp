@@ -95,4 +95,36 @@ namespace zb
         esp_vfs_littlefs_unregister(kParitionLabel);
         ESP_LOGI(TAG, "LittleFS unmounted");
     }
+
+    void LocalConfig::SetVersion(uint32_t v)
+    {
+        m_Version = v;
+        on_change();
+    }
+
+    void LocalConfig::SetOnOffTimeout(uint16_t v)
+    {
+        m_OnOffTimeout = v;
+        on_change();
+    }
+
+    void LocalConfig::SetOnOffMode(OnOffMode v)
+    {
+        m_OnOffMode = v;
+        on_change();
+    }
+
+    void LocalConfig::SetPresenceDetectionMode(PresenceDetectionMode v)
+    {
+        m_PresenceDetectionMode = v;
+        on_change();
+    }
+
+    void LocalConfig::FactoryReset()
+    {
+        esp_littlefs_format(kParitionLabel);
+        *this = {};
+        on_change();
+        on_end();
+    }
 }

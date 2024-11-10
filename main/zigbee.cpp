@@ -162,8 +162,8 @@ namespace zb
         //this runs in the context of zigbee task
         if (g_State.m_LastPresence)//presence still active. start another timer
         {
-            if (g_Config.m_OnOffTimeout)//still valid timeout?
-                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.m_OnOffTimeout * 1000);
+            if (g_Config.GetOnOffTimeout())//still valid timeout?
+                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.GetOnOffTimeout() * 1000);
             else
                 g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
         }
@@ -181,26 +181,28 @@ namespace zb
 
     static void send_on_off(bool on)
     {
-        if (g_Config.m_OnOffMode == OnOffMode::Nothing)
+        auto m = g_Config.GetOnOffMode();
+        auto t = g_Config.GetOnOffTimeout();
+        if (m == OnOffMode::Nothing)
             return;//nothing
-        if (on && (g_Config.m_OnOffMode == OnOffMode::OffOnly))
+        if (on && (m == OnOffMode::OffOnly))
             return;//nothing
-        if (!on && (g_Config.m_OnOffMode == OnOffMode::OnOnly || g_Config.m_OnOffMode == OnOffMode::TimedOn || g_Config.m_OnOffMode == OnOffMode::TimedOnLocal))
+        if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
             return;//nothing
 
-        if (g_Config.m_OnOffMode == OnOffMode::TimedOn)
+        if (m == OnOffMode::TimedOn)
         {
-            FMT_PRINT("Sending timed on command to binded with timeout: {};\n", g_Config.m_OnOffTimeout);
+            FMT_PRINT("Sending timed on command to binded with timeout: {};\n", t);
             esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
             cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
             cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
             cmd_req.on_off_control = ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID;
-            cmd_req.on_time = g_Config.m_OnOffTimeout * 10;
+            cmd_req.on_time = t * 10;
             esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
         }
-        else if (g_Config.m_OnOffMode == OnOffMode::TimedOnLocal)
+        else if (m == OnOffMode::TimedOnLocal)
         {
-            if (g_Config.m_OnOffTimeout)//makes sense only for non-0
+            if (t)//makes sense only for non-0
             {
                 //set/reset the local timer
                 if (g_State.m_RunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
@@ -209,7 +211,7 @@ namespace zb
                     //need to cancel it
                     g_State.m_RunningTimer = esp_zb_scheduler_user_alarm_cancel(g_State.m_RunningTimer);
                 }
-                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.m_OnOffTimeout * 1000);
+                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, t * 1000);
             }
             FMT_PRINT("Sending ON (timed-on-local) command to binded\n");
             esp_zb_zcl_on_off_cmd_t cmd_req;
@@ -231,7 +233,7 @@ namespace zb
 
     static void on_movement_callback(bool presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
     {
-        switch(g_Config.m_PresenceDetectionMode)
+        switch(g_Config.GetPresenceDetectionMode())
         {
             case PresenceDetectionMode::PIROnly: presence = p.pirPresence; break;
             case PresenceDetectionMode::mmWaveOnly: presence = p.mmPresence; break;
@@ -413,15 +415,15 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial measured light state with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_OnOffCommandMode.Set(g_Config.m_OnOffMode); !status)
+            if (auto status = g_OnOffCommandMode.Set(g_Config.GetOnOffMode()); !status)
             {
                 FMT_PRINT("Failed to set initial on-off mode {:x}\n", (int)status.error());
             }
-            if (auto status = g_OnOffCommandTimeout.Set(g_Config.m_OnOffTimeout); !status)
+            if (auto status = g_OnOffCommandTimeout.Set(g_Config.GetOnOffTimeout()); !status)
             {
                 FMT_PRINT("Failed to set initial on-off timeout {:x}\n", (int)status.error());
             }
-            if (auto status = g_PresenceDetectionMode.Set(g_Config.m_PresenceDetectionMode); !status)
+            if (auto status = g_PresenceDetectionMode.Set(g_Config.GetPresenceDetectionMode()); !status)
             {
                 FMT_PRINT("Failed to set initial presence detection mode {:x}\n", (int)status.error());
             }
@@ -470,11 +472,8 @@ namespace zb
     {
         FMT_PRINT("Factory resetting...\n");
         g_ld2412.FactoryReset();
-
-        g_Config = {};
-        g_Config.on_change();
-        g_Config.on_end();
-        esp_zb_factory_reset();
+        g_Config.FactoryReset();
+        esp_zb_factory_reset();//this resets/reboots the device
         return ESP_OK;
     }
 
@@ -574,8 +573,7 @@ namespace zb
             [](const OnOffMode &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing on-off command mode to {}\n", to);
-                g_Config.m_OnOffMode = to;
-                g_Config.on_change();
+                g_Config.SetOnOffMode(to);
                 return ESP_OK;
             }
         >{},
@@ -583,8 +581,7 @@ namespace zb
             [](const uint16_t &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing on-off command timeout to {}\n", to);
-                g_Config.m_OnOffTimeout = to;
-                g_Config.on_change();
+                g_Config.SetOnOffTimeout(to);
                 return ESP_OK;
             }
         >{},
@@ -592,8 +589,7 @@ namespace zb
             [](const PresenceDetectionMode &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing presence detection mode to {}\n", to);
-                g_Config.m_PresenceDetectionMode = to;
-                g_Config.on_change();
+                g_Config.SetPresenceDetectionMode(to);
                 return ESP_OK;
             }
         >{},
