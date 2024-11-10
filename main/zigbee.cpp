@@ -470,6 +470,11 @@ namespace zb
     {
         FMT_PRINT("Factory resetting...\n");
         g_ld2412.FactoryReset();
+
+        g_Config = {};
+        g_Config.on_change();
+        g_Config.on_end();
+        esp_zb_factory_reset();
         return ESP_OK;
     }
 
@@ -483,7 +488,7 @@ namespace zb
     esp_err_t ld2412_cmd_switch_bluetooth(bool on)
     {
         FMT_PRINT("Switching bluetooth {}...\n", on);
-        //g_ld2412.SwitchBluetooth(on);
+        g_ld2412.SwitchBluetooth(on);
         return ESP_OK;
     }
 
