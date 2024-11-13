@@ -7,6 +7,39 @@
 #include "thread_helper.hpp"
 #include <format>
 
+//#include "led_strip.h"
+//
+//static led_strip_handle_t led_strip;
+//static void configure_led(void)
+//{
+//    /* LED strip initialization with the GPIO and pixels number*/
+//    led_strip_config_t strip_config = {
+//        .strip_gpio_num = 8,
+//        .max_leds = 1, // at least one LED on board
+//    };
+//    led_strip_rmt_config_t rmt_config = {
+//        .resolution_hz = 10 * 1000 * 1000, // 10MHz
+//        .flags ={.with_dma= false},
+//    };
+//    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+//    /* Set all LED off to clear all pixels */
+//    led_strip_clear(led_strip);
+//}
+//
+//static void blink_led(bool v)
+//{
+//    /* If the addressable LED is enabled */
+//    if (v) {
+//        /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
+//        led_strip_set_pixel(led_strip, 0, 255, 255, 255);
+//        /* Refresh the strip to send data */
+//        led_strip_refresh(led_strip);
+//    } else {
+//        /* Set all LED off to clear all pixels */
+//        led_strip_clear(led_strip);
+//    }
+//}
+
 namespace ld2412
 {
     struct Component::QueueMsg
@@ -334,7 +367,7 @@ namespace ld2412
                         int l = gpio_get_level(gpio_num_t(c.m_PresencePin));
                         FMT_PRINT("Msg presence interrupt: {}\n", l);
                         lastPresence = l == 1;
-                        bool prev = lastCompositePresence;
+                        //bool prev = lastCompositePresence;
                         lastCompositePresence = lastPresence || lastPIRPresence;
                         if (lastPresenceData.mmPresence != lastPresence)
                         {
@@ -349,6 +382,7 @@ namespace ld2412
                         int l = gpio_get_level(gpio_num_t(c.m_PIRPresencePin));
                         FMT_PRINT("Msg PIR presence interrupt: {}\n", l);
                         lastPIRPresence = l == 1;
+                        //blink_led(lastPIRPresence);
                         lastCompositePresence = lastPresence || lastPIRPresence;
                         if (lastPresenceData.pirPresence != lastPIRPresence)
                         {
@@ -805,6 +839,7 @@ namespace ld2412
 
         FMT_PRINT("ld2412 component: configuring isr\n");
         fflush(stdout);
+        //configure_led();
         ConfigurePresenceIsr();
 
         m_Setup = true;
@@ -812,6 +847,7 @@ namespace ld2412
         fflush(stdout);
         if (m_ConfigUpdateCallback)
             m_ConfigUpdateCallback();
+
         return true;
     }
 }
