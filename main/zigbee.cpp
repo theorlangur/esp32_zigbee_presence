@@ -872,6 +872,9 @@ namespace zb
             Idle,
             ResetPressed,
         } state = States::Idle;
+
+        using clock_t = std::chrono::system_clock;
+        auto pressed_time = clock_t::now();
         while(true)
         {
             int v;
@@ -885,6 +888,7 @@ namespace zb
                         {
                             FMT_PRINT("detected RESET pin LOW\n");
                             state = States::ResetPressed;
+                            pressed_time = clock_t::now();
                             waitTime = FACTORY_RESET_TIMEOUT_WAIT;
                         }
                     }
@@ -894,10 +898,17 @@ namespace zb
                         //need a gate here to prevent sporadic changes
                         if (v == 1)//actually released. before timeout
                         {
-                            FMT_PRINT("detected RESET pin HIGH before timeout\n");
                             state = States::Idle;
                             waitTime = portMAX_DELAY;
-                            esp_restart();//simple restart
+
+                            if (std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - pressed_time).count() > 100)
+                            {
+                                //FMT_PRINT("detected RESET pin HIGH before timeout\n");
+                                esp_restart();//simple restart
+                            }else
+                            {
+                                //FMT_PRINT("filtered out pin HIGH before timeout\n");
+                            }
                         }
                     }
                     break;
