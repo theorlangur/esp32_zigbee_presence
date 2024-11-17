@@ -209,7 +209,7 @@ namespace zb
             report_attr_cmd.zcl_basic_cmd.src_endpoint = EP;
             report_attr_cmd.zcl_basic_cmd.dst_endpoint = {};
             report_attr_cmd.attributeID = Attr;
-            report_attr_cmd.cluster_role = Role;
+            //report_attr_cmd.cluster_role = Role;
             report_attr_cmd.clusterID = ClusterID;
             if (auto r = esp_zb_zcl_report_attr_cmd_req(&report_attr_cmd); r != ESP_OK)
                 return std::unexpected(r);
