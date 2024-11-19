@@ -38,7 +38,7 @@ namespace zb
     static constexpr int LD2412_PINS_RX = 10;
     static constexpr int LD2412_PINS_PRESENCE = 4;
     static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
-    static constexpr int PINS_RESET = 6;
+    static constexpr int PINS_RESET = 3;
     static constexpr TickType_t FACTORY_RESET_TIMEOUT = 4;//4 seconds
     static constexpr TickType_t FACTORY_RESET_TIMEOUT_WAIT = 1000 * FACTORY_RESET_TIMEOUT / portTICK_PERIOD_MS;
     constexpr uint8_t PRESENCE_EP = 1;
