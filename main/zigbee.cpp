@@ -903,8 +903,8 @@ namespace zb
 
                             if (std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - pressed_time).count() > 100)
                             {
-                                //FMT_PRINT("detected RESET pin HIGH before timeout\n");
-                                esp_restart();//simple restart
+                                FMT_PRINT("detected RESET pin HIGH before timeout\n");
+                                //esp_restart();//simple restart
                             }else
                             {
                                 //FMT_PRINT("filtered out pin HIGH before timeout\n");
@@ -923,9 +923,9 @@ namespace zb
                     FMT_PRINT("detected RESET pin LOW long time. Making Factory Reset\n");
                     waitTime = portMAX_DELAY;
                     state = States::Idle;
-                    APILock l;
-                    ld2412_cmd_factory_reset();
-                    esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
+                    //APILock l;
+                    //ld2412_cmd_factory_reset();
+                    //esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
                 }
             }
         }
