@@ -1,6 +1,7 @@
 #ifndef DEVICE_COMMON_HPP_
 #define DEVICE_COMMON_HPP_
 #include <cstdint>
+#include "ld2412_component.hpp"
 
 namespace zb
 {
