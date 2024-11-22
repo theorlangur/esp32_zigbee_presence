@@ -120,6 +120,12 @@ namespace zb
         on_change();
     }
 
+    void LocalConfig::SetLD2412Mode(LD2412::SystemMode v)
+    {
+        m_LD2412Mode = v;
+        on_change();
+    }
+
     void LocalConfig::FactoryReset()
     {
         esp_littlefs_format(kParitionLabel);
