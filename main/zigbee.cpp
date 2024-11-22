@@ -194,6 +194,14 @@ namespace zb
         if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
             return;//nothing
 
+        if (on && (g_Config.GetIlluminanceThreshold() < 100))
+        {
+            //only if threshold is set to something below 100 we might have a change in the logic
+            //otherwise - no effect
+            if (g_ld2412.GetMeasuredLight() > g_Config.GetIlluminanceThreshold())
+                return;
+        }
+
         if (m == OnOffMode::TimedOn)
         {
             FMT_PRINT("Sending timed on command to binded with timeout: {};\n", t);
@@ -392,6 +400,8 @@ namespace zb
                 FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
             }
         }
+
+        g_Config.SetLD2412Mode(g_ld2412.GetMode());//save in the config
     }
 
     static void setup_sensor()
@@ -440,7 +450,8 @@ namespace zb
                         .txPin=LD2412_PINS_TX, 
                         .rxPin=LD2412_PINS_RX, 
                         .presencePin=LD2412_PINS_PRESENCE,
-                        .presencePIRPin=LD2412_PINS_PIR_PRESENCE
+                        .presencePIRPin=LD2412_PINS_PIR_PRESENCE,
+                        .mode=g_Config.GetLD2412Mode()
                         }))
             {
                 printf("Failed to configure ld2412 (attempt %d)\n", tries);

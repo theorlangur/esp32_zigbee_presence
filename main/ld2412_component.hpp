@@ -50,6 +50,7 @@ namespace ld2412
             uart::Port port = uart::Port::Port1;
             int presencePin = -1;
             int presencePIRPin = -1;
+            LD2412::SystemMode mode = LD2412::SystemMode::Simple;
         };
 
         bool Setup(setup_args_t const& args);

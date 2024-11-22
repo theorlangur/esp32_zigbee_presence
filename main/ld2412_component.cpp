@@ -757,16 +757,8 @@ namespace ld2412
                         {
                         case UART_DATA:
                         {
-                        //using clock_t = std::chrono::system_clock;
-                        //using time_point_t = std::chrono::time_point<clock_t>;
-                        //static time_point_t prev = clock_t::now();
-                        //auto now = clock_t::now();
-                        //FMT_PRINT("Data available: {}; Ellapsed since prev: {}ms\n"
-                        //        , m_Sensor.GetReadyToReadDataLen().value().v
-                        //        , std::chrono::duration_cast<std::chrono::milliseconds>(now - prev).count());
-                        //prev = now;
-                        QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Dummy = true};
-                        xQueueSend(q, &msg, 0);
+                            QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Dummy = true};
+                            xQueueSend(q, &msg, 0);
                         }
                         break;
                         case UART_BUFFER_FULL:
@@ -800,7 +792,7 @@ namespace ld2412
         {
             printf("Config\n");
             auto changeConfig = m_Sensor.ChangeConfiguration()
-                .SetSystemMode(LD2412::SystemMode::Simple)
+                .SetSystemMode(args.mode)
                 .EndChange();
             if (!changeConfig)
             {
