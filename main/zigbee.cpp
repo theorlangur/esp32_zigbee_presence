@@ -856,6 +856,7 @@ namespace zb
             .pull_up_en = GPIO_PULLUP_ENABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
             .intr_type = GPIO_INTR_ANYEDGE,
+            .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
         };
 
         gpio_config(&reset_pin_cfg);
