@@ -69,6 +69,7 @@ namespace zb
     static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
     static constexpr const uint16_t LD2412_ATTRIB_PRESENCE_DETECTION_MODE = 21;
+    static constexpr const uint16_t PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD = 22;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -93,28 +94,29 @@ namespace zb
     /**********************************************************************/
     /* Attributes types for a custom cluster                              */
     /**********************************************************************/
-    using ZclAttributeLD2412MoveSensetivity_t     = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_SENSITIVITY, SensitivityBufType>;
-    using ZclAttributeLD2412StillSensetivity_t    = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_SENSITIVITY, SensitivityBufType>;
-    using ZclAttributeStillDistance_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
-    using ZclAttributeMoveDistance_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_DISTANCE, uint16_t>;
-    using ZclAttributeMoveEnergy_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_ENERGY, uint8_t>;
-    using ZclAttributeStillEnergy_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_ENERGY, uint8_t>;
-    using ZclAttributeState_t                     = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STATE , LD2412State>;
-    using ZclAttributeExState_t                   = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_EX_STATE, ld2412::Component::ExtendedState>;
-    using ZclAttributeMaxDistance_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MAX_DISTANCE, uint16_t>;
-    using ZclAttributeMinDistance_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MIN_DISTANCE, uint16_t>;
-    using ZclAttributeMode_t                      = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MODE, LD2412::SystemMode>;
-    using ZclAttributeEngineeringLight_t          = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_LIGHT, uint8_t>;
-    using ZclAttributeEngineeringEnergyStill_t    = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMove_t     = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyStillMin_t = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMoveMin_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyStillMax_t = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMoveMax_t  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
-    using ZclAttributePIRPresence_t               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
-    using ZclAttributeOnOffCommandMode_t          = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
-    using ZclAttributeOnOffCommandTimeout_t       = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
-    using ZclAttributePresenceDetectionMode_t     = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PRESENCE_DETECTION_MODE, PresenceDetectionMode>;
+    using ZclAttributeLD2412MoveSensetivity_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_SENSITIVITY, SensitivityBufType>;
+    using ZclAttributeLD2412StillSensetivity_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_SENSITIVITY, SensitivityBufType>;
+    using ZclAttributeStillDistance_t                         = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
+    using ZclAttributeMoveDistance_t                          = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_DISTANCE, uint16_t>;
+    using ZclAttributeMoveEnergy_t                            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_ENERGY, uint8_t>;
+    using ZclAttributeStillEnergy_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_ENERGY, uint8_t>;
+    using ZclAttributeState_t                                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STATE , LD2412State>;
+    using ZclAttributeExState_t                               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_EX_STATE, ld2412::Component::ExtendedState>;
+    using ZclAttributeMaxDistance_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MAX_DISTANCE, uint16_t>;
+    using ZclAttributeMinDistance_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MIN_DISTANCE, uint16_t>;
+    using ZclAttributeMode_t                                  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MODE, LD2412::SystemMode>;
+    using ZclAttributeEngineeringLight_t                      = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_LIGHT, uint8_t>;
+    using ZclAttributeEngineeringEnergyStill_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMove_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyStillMin_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMoveMin_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyStillMax_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMoveMax_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
+    using ZclAttributePIRPresence_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
+    using ZclAttributeOnOffCommandMode_t                      = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
+    using ZclAttributeOnOffCommandTimeout_t                   = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
+    using ZclAttributePresenceDetectionMode_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PRESENCE_DETECTION_MODE, PresenceDetectionMode>;
+    using ZclAttributePresenceDetectionIlluminanceThreshold_t = LD2412CustomCluster_t::Attribute<PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD, uint8_t>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -125,28 +127,29 @@ namespace zb
     /**********************************************************************/
     /* Attributes for a custom cluster                                    */
     /**********************************************************************/
-    static ZclAttributeLD2412MoveSensetivity_t     g_LD2412MoveSensitivity;
-    static ZclAttributeLD2412StillSensetivity_t    g_LD2412StillSensitivity;
-    static ZclAttributeStillDistance_t             g_LD2412StillDistance;
-    static ZclAttributeMoveDistance_t              g_LD2412MoveDistance;
-    static ZclAttributeStillEnergy_t               g_LD2412StillEnergy;
-    static ZclAttributeMoveEnergy_t                g_LD2412MoveEnergy;
-    static ZclAttributeState_t                     g_LD2412State;
-    static ZclAttributeExState_t                   g_LD2412ExState;
-    static ZclAttributeMaxDistance_t               g_LD2412MaxDistance;
-    static ZclAttributeMinDistance_t               g_LD2412MinDistance;
-    static ZclAttributeMode_t                      g_LD2412Mode;
-    static ZclAttributeEngineeringLight_t          g_LD2412EngineeringLight;
-    static ZclAttributeEngineeringEnergyMove_t     g_LD2412EngineeringEnergyMove;
-    static ZclAttributeEngineeringEnergyStill_t    g_LD2412EngineeringEnergyStill;
-    static ZclAttributeEngineeringEnergyMoveMin_t  g_LD2412EngineeringEnergyMoveMin;
-    static ZclAttributeEngineeringEnergyStillMin_t g_LD2412EngineeringEnergyStillMin;
-    static ZclAttributeEngineeringEnergyMoveMax_t  g_LD2412EngineeringEnergyMoveMax;
-    static ZclAttributeEngineeringEnergyStillMax_t g_LD2412EngineeringEnergyStillMax;
-    static ZclAttributePIRPresence_t               g_LD2412PIRPresence;
-    static ZclAttributeOnOffCommandMode_t          g_OnOffCommandMode;
-    static ZclAttributeOnOffCommandTimeout_t       g_OnOffCommandTimeout;
-    static ZclAttributePresenceDetectionMode_t     g_PresenceDetectionMode;
+    static ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity;
+    static ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity;
+    static ZclAttributeStillDistance_t                         g_LD2412StillDistance;
+    static ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
+    static ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
+    static ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
+    static ZclAttributeState_t                                 g_LD2412State;
+    static ZclAttributeExState_t                               g_LD2412ExState;
+    static ZclAttributeMaxDistance_t                           g_LD2412MaxDistance;
+    static ZclAttributeMinDistance_t                           g_LD2412MinDistance;
+    static ZclAttributeMode_t                                  g_LD2412Mode;
+    static ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
+    static ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
+    static ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
+    static ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
+    static ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
+    static ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
+    static ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
+    static ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
+    static ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
+    static ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
+    static ZclAttributePresenceDetectionMode_t                 g_PresenceDetectionMode;
+    static ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
 
     //storable configuration
     LocalConfig g_Config;
@@ -441,6 +444,10 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial presence detection mode {:x}\n", (int)status.error());
             }
+            if (auto status = g_PresenceDetectionIlluminanceThreshold.Set(g_Config.GetIlluminanceThreshold()); !status)
+            {
+                FMT_PRINT("Failed to set initial illuminance threshold {:x}\n", (int)status.error());
+            }
         }
 
         constexpr int kMaxTries = 3;
@@ -608,6 +615,14 @@ namespace zb
                 return ESP_OK;
             }
         >{},
+        AttrDescr<ZclAttributePresenceDetectionIlluminanceThreshold_t, 
+            [](const uint8_t &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence detection illuminance threshold to {}\n", to);
+                g_Config.SetIlluminanceThreshold(to);
+                return ESP_OK;
+            }
+        >{},
 
         {}//last one
     };
@@ -658,6 +673,7 @@ namespace zb
         ESP_ERROR_CHECK(g_OnOffCommandTimeout.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(g_PresenceDetectionMode.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceDetectionIlluminanceThreshold.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }

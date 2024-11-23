@@ -129,6 +129,12 @@ namespace zb
         on_change();
     }
 
+    void LocalConfig::SetIlluminanceThreshold(uint8_t v)
+    {
+        m_IlluminanceThreshold = v;
+        on_change();
+    }
+
     void LocalConfig::FactoryReset()
     {
         esp_littlefs_format(kParitionLabel);
