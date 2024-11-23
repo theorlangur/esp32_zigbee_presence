@@ -387,6 +387,7 @@ const definition = {
                 on_off_mode: {ID: 0x0013, type: Zcl.DataType.ENUM8},
                 on_off_timeout: {ID: 0x0014, type: Zcl.DataType.UINT16},
                 presence_detection_mode: {ID: 0x0015, type: Zcl.DataType.ENUM8},
+                illuminance_threshold: {ID: 0x0016, type: Zcl.DataType.UINT8},
             },
             commands: {
                 restart: {
@@ -477,6 +478,15 @@ const definition = {
             valueMax: 255,
             access: 'STATE',
         }),
+        numeric({
+            name: 'illuminance_threshold',
+            cluster: 'customOccupationConfig',
+            attribute: 'illuminance_threshold',
+            description: 'Illuminance level below which presence is detected',
+            valueMin: 0,
+            valueMax: 1000,
+            access: 'ALL',
+        }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
         orlangurOccupactionExtended.distanceConfig(),
@@ -496,7 +506,7 @@ const definition = {
         await endpoint.read('customOccupationConfig', ['presence_mode','pir_presence']);
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
-        await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
+        await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance', 'illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
         await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
