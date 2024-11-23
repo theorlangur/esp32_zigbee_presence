@@ -29,10 +29,20 @@ namespace zb
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
 
-    static constexpr led::Color kSteering{255, 128, 0};
-    static constexpr led::Color kSteeringError{255, 0, 0};
-    static constexpr led::Color kZStackError{255, 0, 255};
-    static constexpr led::Color kFactoryReset{0, 255, 255};
+    static constexpr led::Color kColorInfo{255, 128, 0};
+    static constexpr led::Color kColorError{255, 0, 0};
+    static constexpr led::Color kColorError2{255, 0, 255};
+    static constexpr led::Color kColorSpecial{0, 255, 255};
+
+    static constexpr uint32_t kBlinkPatternFactoryReset = 0x0F00F00F;
+    static constexpr uint32_t kBlinkPatternZStackError = 0x0F00F00F;
+    static constexpr uint32_t kBlinkPatternSteeringError = 0x0000F00F;
+
+    static constexpr led::Color kColorSteering = kColorInfo;
+    static constexpr led::Color kSteeringError = kColorError;
+    static constexpr led::Color kSteering = kColorInfo;
+    static constexpr led::Color kZStackError = kColorError2;
+    static constexpr led::Color kLD2412ConfigError = kColorError;
 
     static auto g_Manufacturer = ZbStr("Orlangur");
     static auto g_Model = ZbStr("P-NextGen");
@@ -489,6 +499,7 @@ namespace zb
                     if (auto status = g_LD2412State.Set(LD2412State::Failed); !status)
                     {
                         FMT_PRINT("Failed to set initial state with error {:x}\n", (int)status.error());
+                        led::blink(true, kLD2412ConfigError);
                     }
                     return;
                 }
@@ -785,11 +796,11 @@ namespace zb
         case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
+                led::blink(false, {});
                 //async setup
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
                 //setup_sensor();
 
-                led::blink(false, {});
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
                     ESP_LOGI(TAG, "Start network steering");
@@ -801,7 +812,7 @@ namespace zb
             } else {
                 /* commissioning failed */
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
-                led::blink_pattern(0x0F00F00F, kZStackError, duration_ms_t(1000));
+                led::blink_pattern(kBlinkPatternZStackError, kZStackError, duration_ms_t(1000));
                 led::blink(true, kSteering);
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
@@ -819,7 +830,7 @@ namespace zb
                 esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
-                led::blink_pattern(0x0000F00F, kSteeringError, duration_ms_t(1000));
+                led::blink_pattern(kBlinkPatternSteeringError, kSteeringError, duration_ms_t(1000));
                 led::blink(true, kSteering);
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
@@ -983,7 +994,7 @@ namespace zb
                     waitTime = portMAX_DELAY;
                     state = States::Idle;
                     APILock l;
-                    led::blink_pattern(0x0F00F00F, kFactoryReset, duration_ms_t(1500));
+                    led::blink_pattern(kBlinkPatternFactoryReset, kColorSpecial, duration_ms_t(1500));
                     ld2412_cmd_factory_reset();
                     esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
                 }
