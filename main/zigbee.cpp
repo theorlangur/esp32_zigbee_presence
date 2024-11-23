@@ -934,7 +934,7 @@ namespace zb
         ESP_ERROR_CHECK(g_Config.on_start());
         QueueHandle_t mainQueue = xQueueCreate(10, sizeof(int));
         config_reset_pin(mainQueue);
-        xTaskCreate(zigbee_main, "Zigbee_main", 2*4096, NULL, 5, NULL);
+        xTaskCreate(zigbee_main, "Zigbee_main", 2*4096, NULL, thread::kPrioDefault, NULL);
 
         auto waitTime = portMAX_DELAY;
         // FACTORY_RESET_TIMEOUT_WAIT

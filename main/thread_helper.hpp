@@ -8,10 +8,21 @@
 
 namespace thread
 {
+    inline int64_t get_us()
+    {
+        struct timeval tv_now;
+        gettimeofday(&tv_now, NULL);
+        return (int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec;
+    }
+    static constexpr UBaseType_t kPrioIDLE = tskIDLE_PRIORITY;
+    static constexpr UBaseType_t kPrioDefault = 5;
+    static constexpr UBaseType_t kPrioElevated = 6;
+    static constexpr UBaseType_t kPrioHigh = 7;
     struct task_config_t
     {
         const char *pName = "";
         uint32_t stackSize = 2048;
+        UBaseType_t prio = kPrioDefault;
     };
 
     struct args_base_t
@@ -81,7 +92,7 @@ namespace thread
 
         TaskBase r;
         r.args.reset(new args_with_f_t{std::move(f), std::make_tuple(std::forward<Args>(args)...) });
-        xTaskCreate(_func, cfg.pName, cfg.stackSize, r.args.get(), 5, &r.h);
+        xTaskCreate(_func, cfg.pName, cfg.stackSize, r.args.get(), cfg.prio, &r.h);
         return r;
     }
 
