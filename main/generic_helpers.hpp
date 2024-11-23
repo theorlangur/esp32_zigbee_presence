@@ -182,6 +182,10 @@ constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::va
     if (auto err = f; err != ESP_OK) \
         return std::unexpected(Err{location, err})
 
+#ifdef NDEBUG
+#define FMT_PRINT(fmt,...) {}
+#else
 #define FMT_PRINT(fmt,...) { char buf[256]; tools::format_to(tools::BufferFormatter(buf), fmt __VA_OPT__(,) __VA_ARGS__); printf("%s", buf); }
+#endif
 
 #endif
