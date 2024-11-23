@@ -15,7 +15,7 @@ namespace zb
         uint16_t m_OnOffTimeout = 10;//seconds
         OnOffMode m_OnOffMode = OnOffMode::TimedOnLocal;
         PresenceDetectionMode m_PresenceDetectionMode = PresenceDetectionMode::Combined;
-        LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Simple;
+        LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
         uint8_t m_IlluminanceThreshold = 100; //Illuminance<=Threashold -> active, sending on/off commands
         uint8_t m_Unused1;
         uint8_t m_Unused2;
