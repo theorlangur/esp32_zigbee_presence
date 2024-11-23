@@ -11,9 +11,14 @@ namespace led
         led_strip_config_t strip_config = {
             .strip_gpio_num = 8,
             .max_leds = 1, // at least one LED on board
+            .led_pixel_format = {}, //GRB
+            .led_model = {},//WS2812
+            .flags = {.invert_out = false}
         };
         led_strip_rmt_config_t rmt_config = {
+            .clk_src = {},
             .resolution_hz = 10 * 1000 * 1000, // 10MHz
+            .mem_block_symbols = {},
             .flags ={.with_dma= false},
         };
         ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
