@@ -1,6 +1,4 @@
 #include "uart.hpp"
-#include <utility>
-#include "functional/functional.hpp"
 
 #define DBG_SEND {\
 if (!m_DbgPrintSend) \
@@ -280,7 +278,6 @@ namespace uart
 
     Channel::ExpectedValue<uint8_t> Channel::ReadByte(duration_ms_t wait)
     {
-        using namespace functional;
         if (wait == kDefaultWait) wait = m_DefaultWait;
         uint8_t b;
         CHECK_STACK(3500);
@@ -298,7 +295,6 @@ namespace uart
 
     Channel::ExpectedValue<uint8_t> Channel::PeekByte(duration_ms_t wait)
     {
-        using namespace functional;
         if (m_HasPeekByte)
             return RetVal{std::ref(*this), m_PeekByte};
         if (wait == kDefaultWait) wait = m_DefaultWait;
