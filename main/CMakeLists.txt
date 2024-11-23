@@ -11,4 +11,6 @@ idf_component_register(SRCS
                     device_common.hpp
                     device_config.hpp
                     device_config.cpp
+                    board_led.hpp
+                    board_led.cpp
                     INCLUDE_DIRS "")

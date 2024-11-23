@@ -17,6 +17,8 @@
 #include "device_common.hpp"
 #include "device_config.hpp"
 
+#include "board_led.hpp"
+
 namespace zb
 {
     enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
@@ -27,6 +29,10 @@ namespace zb
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
 
+    static constexpr led::Color kSteering{255, 128, 0};
+    static constexpr led::Color kSteeringError{255, 0, 0};
+    static constexpr led::Color kZStackError{255, 0, 255};
+    static constexpr led::Color kFactoryReset{0, 255, 255};
 
     static auto g_Manufacturer = ZbStr("Orlangur");
     static auto g_Model = ZbStr("P-NextGen");
@@ -783,6 +789,7 @@ namespace zb
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
                 //setup_sensor();
 
+                led::blink(false, {});
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
                     ESP_LOGI(TAG, "Start network steering");
@@ -794,11 +801,14 @@ namespace zb
             } else {
                 /* commissioning failed */
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
+                led::blink_pattern(0x0F00F00F, kZStackError, duration_ms_t(1000));
+                led::blink(true, kSteering);
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {
+                led::blink(false, {});
                 esp_zb_ieee_addr_t extended_pan_id;
                 esp_zb_get_extended_pan_id(extended_pan_id);
                 ESP_LOGI(TAG, "Joined network successfully (Extended PAN ID: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, PAN ID: 0x%04hx, Channel:%d, Short Address: 0x%04hx)",
@@ -809,6 +819,8 @@ namespace zb
                 esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
             } else {
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
+                led::blink_pattern(0x0000F00F, kSteeringError, duration_ms_t(1000));
+                led::blink(true, kSteering);
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
             break;
@@ -864,6 +876,7 @@ namespace zb
         ESP_LOGI(TAG, "ZB set channel masks");
         fflush(stdout);
 
+        led::blink(true, kSteering);
         ESP_ERROR_CHECK(esp_zb_start(false));
         ESP_LOGI(TAG, "ZB started, looping...");
         esp_zb_stack_main_loop();
@@ -895,6 +908,10 @@ namespace zb
 
     void setup()
     {
+
+        led::setup();
+        led::blink(false, {});
+
         esp_zb_platform_config_t config = {
             .radio_config = {.radio_mode = ZB_RADIO_MODE_NATIVE, .radio_uart_config = {}},
             .host_config = {.host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE, .host_uart_config = {}},
@@ -966,6 +983,7 @@ namespace zb
                     waitTime = portMAX_DELAY;
                     state = States::Idle;
                     APILock l;
+                    led::blink_pattern(0x0F00F00F, kFactoryReset, duration_ms_t(1500));
                     ld2412_cmd_factory_reset();
                     esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
                 }
