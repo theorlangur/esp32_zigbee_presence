@@ -484,7 +484,7 @@ const definition = {
             attribute: 'illuminance_threshold',
             description: 'Illuminance level below which presence is detected',
             valueMin: 0,
-            valueMax: 1000,
+            valueMax: 255,
             access: 'ALL',
         }),
         orlangurOccupactionExtended.presenceInfo('move'),

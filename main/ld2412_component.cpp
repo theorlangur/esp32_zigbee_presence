@@ -842,6 +842,21 @@ namespace ld2412
         if (m_ConfigUpdateCallback)
             m_ConfigUpdateCallback();
 
+        {
+            //initial read of the presence pins
+            QueueMsg msg{.m_Type=QueueMsg::Type::PresenceIntr, .m_Dummy=false};
+            if (m_PresencePin != -1)
+            {
+                xQueueSend(m_FastQueue, &msg, 0);
+            }
+
+            if (m_PIRPresencePin != -1)
+            {
+                msg.m_Type=QueueMsg::Type::PIRPresenceIntr;
+                xQueueSendFromISR(m_FastQueue, &msg, 0);
+            }
+        }
+
         return true;
     }
 }

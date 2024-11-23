@@ -160,6 +160,7 @@ namespace zb
         esp_zb_ieee_addr_t m_CoordinatorIeee;
         bool m_FirstRun = true;
         bool m_LastPresence = false;
+        bool m_SuppressedByIllulminance = false;
         esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
     };
     RuntimeState g_State;
@@ -197,13 +198,6 @@ namespace zb
         if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
             return;//nothing
 
-        if (on && (g_Config.GetIlluminanceThreshold() < 100))
-        {
-            //only if threshold is set to something below 100 we might have a change in the logic
-            //otherwise - no effect
-            if (g_ld2412.GetMeasuredLight() > g_Config.GetIlluminanceThreshold())
-                return;
-        }
 
         if (m == OnOffMode::TimedOn)
         {
@@ -266,6 +260,26 @@ namespace zb
         bool presence_changed = !g_State.m_FirstRun && (g_State.m_LastPresence != presence);
         g_State.m_FirstRun = false;
         g_State.m_LastPresence = presence;
+
+        /**********************************************************************/
+        /* Illuminance threshold logic                                        */
+        /**********************************************************************/
+        if (presence_changed && presence)//react only to the 'front', or 'clear->detected' event
+        {
+            //only if threshold is set to something below kMaxIlluminance we might have a change in the logic
+            //otherwise - no effect
+            if ((g_Config.GetIlluminanceThreshold() < LocalConfig::kMaxIlluminance) && (g_ld2412.GetMeasuredLight() > g_Config.GetIlluminanceThreshold()))
+                g_State.m_SuppressedByIllulminance = true;
+            else
+                g_State.m_SuppressedByIllulminance = false;
+        }
+
+        if (g_State.m_SuppressedByIllulminance)
+            return;
+
+        /**********************************************************************/
+        /* Zigbee attributes update                                           */
+        /**********************************************************************/
         esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         {
             APILock l;
@@ -932,10 +946,10 @@ namespace zb
                             if (std::chrono::duration_cast<std::chrono::milliseconds>(clock_t::now() - pressed_time).count() > 100)
                             {
                                 FMT_PRINT("detected RESET pin HIGH before timeout\n");
-                                //esp_restart();//simple restart
+                                esp_restart();//simple restart
                             }else
                             {
-                                //FMT_PRINT("filtered out pin HIGH before timeout\n");
+                                FMT_PRINT("filtered out pin HIGH before timeout\n");
                             }
                         }
                     }
@@ -951,9 +965,9 @@ namespace zb
                     FMT_PRINT("detected RESET pin LOW long time. Making Factory Reset\n");
                     waitTime = portMAX_DELAY;
                     state = States::Idle;
-                    //APILock l;
-                    //ld2412_cmd_factory_reset();
-                    //esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
+                    APILock l;
+                    ld2412_cmd_factory_reset();
+                    esp_restart();//not sure if this is necessarry, since zigbee factory resets should restart as well
                 }
             }
         }

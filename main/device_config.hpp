@@ -9,6 +9,7 @@ namespace zb
     struct LocalConfig
     {
         static constexpr uint32_t kActualStreamingVersion = 1;
+        static constexpr uint8_t kMaxIlluminance = 255;
 
     private:
         uint32_t m_Version = kActualStreamingVersion;
@@ -16,7 +17,7 @@ namespace zb
         OnOffMode m_OnOffMode = OnOffMode::TimedOnLocal;
         PresenceDetectionMode m_PresenceDetectionMode = PresenceDetectionMode::Combined;
         LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
-        uint8_t m_IlluminanceThreshold = 100; //Illuminance<=Threashold -> active, sending on/off commands
+        uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
         uint8_t m_Unused1;
         uint8_t m_Unused2;
     public:
