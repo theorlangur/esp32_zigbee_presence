@@ -10,8 +10,6 @@
 
 #include "zb_helpers.hpp"
 
-#include <thread>
-#include <bitset>
 #include "ld2412_component.hpp"
 
 #include "device_common.hpp"
@@ -29,6 +27,37 @@ namespace zb
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
 
+    /**********************************************************************/
+    /*Device basic parameters                                             */
+    /**********************************************************************/
+
+    static auto g_Manufacturer = ZbStr("Orlangur");
+    static auto g_Model = ZbStr("P-NextGen");
+    static uint8_t g_AppVersion = 1;
+    static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
+
+    /**********************************************************************/
+    /* PINS                                                               */
+    /**********************************************************************/
+    static constexpr int LD2412_PINS_TX = 11;
+    static constexpr int LD2412_PINS_RX = 10;
+    static constexpr int LD2412_PINS_PRESENCE = 4;
+    static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
+    static constexpr int PINS_RESET = 3;
+
+    static constexpr TickType_t FACTORY_RESET_TIMEOUT = 4;//4 seconds
+    static constexpr TickType_t FACTORY_RESET_TIMEOUT_WAIT = 1000 * FACTORY_RESET_TIMEOUT / portTICK_PERIOD_MS;
+    constexpr uint8_t PRESENCE_EP = 1;
+    static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
+
+    /**********************************************************************/
+    /* LD2412 Component                                                   */
+    /**********************************************************************/
+    static ld2412::Component g_ld2412;//THE presence sensor component
+
+    /**********************************************************************/
+    /* Colors and patterns                                                */
+    /**********************************************************************/
     static constexpr led::Color kColorInfo{255, 128, 0};
     static constexpr led::Color kColorError{255, 0, 0};
     static constexpr led::Color kColorError2{255, 0, 255};
@@ -43,23 +72,6 @@ namespace zb
     static constexpr led::Color kSteering = kColorInfo;
     static constexpr led::Color kZStackError = kColorError2;
     static constexpr led::Color kLD2412ConfigError = kColorError;
-
-    static auto g_Manufacturer = ZbStr("Orlangur");
-    static auto g_Model = ZbStr("P-NextGen");
-    static uint8_t g_AppVersion = 1;
-    static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
-
-    static ld2412::Component g_ld2412;//THE presence sensor component
-    static constexpr int LD2412_PINS_TX = 11;
-    static constexpr int LD2412_PINS_RX = 10;
-    static constexpr int LD2412_PINS_PRESENCE = 4;
-    static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
-    static constexpr int PINS_RESET = 3;
-    static constexpr TickType_t FACTORY_RESET_TIMEOUT = 4;//4 seconds
-    static constexpr TickType_t FACTORY_RESET_TIMEOUT_WAIT = 1000 * FACTORY_RESET_TIMEOUT / portTICK_PERIOD_MS;
-    constexpr uint8_t PRESENCE_EP = 1;
-    static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
-
     /**********************************************************************/
     /* Custom attributes IDs                                              */
     /**********************************************************************/
