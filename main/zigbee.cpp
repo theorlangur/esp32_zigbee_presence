@@ -179,9 +179,16 @@ namespace zb
     static ZclAttributePresenceDetectionMode_t                 g_PresenceDetectionMode;
     static ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
 
+    /**********************************************************************/
+    /* Storable data                                                      */
+    /**********************************************************************/
     //storable configuration
     LocalConfig g_Config;
 
+    
+    /**********************************************************************/
+    /* Runtime data                                                       */
+    /**********************************************************************/
     //initialized at start
     struct RuntimeState
     {
@@ -931,6 +938,9 @@ namespace zb
 
     void setup()
     {
+#ifdef NDEBUG
+        esp_log_set_level_master(ESP_LOG_NONE); 
+#endif
 
         led::setup();
         led::blink(false, {});
