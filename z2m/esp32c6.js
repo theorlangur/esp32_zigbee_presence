@@ -234,6 +234,8 @@ const orlangurOccupactionExtended = {
 
         const exposes = e.text(exp_entity, ea.STATE_GET)
                             .withLabel(prefix + ' energy ' + suffix)
+                            .withUnit('%')
+                            .withCategory('diagnostic')
                             .withDescription(descr);
 
         const fromZigbee = [{
@@ -477,6 +479,8 @@ const definition = {
             valueMin: 0,
             valueMax: 255,
             access: 'STATE',
+            unit: 'lx',
+            entityCategory: 'diagnostic',
         }),
         numeric({
             name: 'illuminance_threshold',
