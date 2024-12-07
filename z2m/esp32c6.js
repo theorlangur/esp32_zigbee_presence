@@ -133,8 +133,8 @@ const orlangurOccupactionExtended = {
     },
     distanceConfig: () => {
         const exposes = [
-            e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
-            e.numeric('max_distance', ea.ALL).withLabel("Maximum detection distance").withUnit("m").withValueMin(1).withValueMax(12),
+            e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12).withCategory('config'),
+            e.numeric('max_distance', ea.ALL).withLabel("Maximum detection distance").withUnit("m").withValueMin(1).withValueMax(12).withCategory('config'),
         ];
 
         const fromZigbee = [
@@ -187,8 +187,8 @@ const orlangurOccupactionExtended = {
         const attrDistance = prefix + 'Distance'
         const attrEnergy = prefix + 'Energy'
         const exposes = [
-            e.numeric(attrDistance, ea.STATE),
-            e.numeric(attrEnergy, ea.STATE),
+            e.numeric(attrDistance, ea.STATE).withCategory('diagnostic'),
+            e.numeric(attrEnergy, ea.STATE).withCategory('diagnostic'),
         ];
 
         const fromZigbee = [
@@ -278,7 +278,7 @@ const orlangurOccupactionExtended = {
         const attr = prefix + 'Sensitivity'
         const exp_entity = prefix + '_sensitivity'
         const exposes = e.composite(attr, exp_entity, ea.ALL)
-                            .withLabel(prefix + ' Sensitivity')
+                            .withLabel(prefix + ' Sensitivity').withCategory('config')
                             .withDescription('Configure sensitivity for ' + descr);
         for(var i = 0; i < 14; ++i)
             exposes.withFeature(e.numeric('gate'+i, ea.STATE_SET).withValueMin(0).withValueMax(100));
@@ -420,6 +420,7 @@ const definition = {
             valueMin: 2,
             valueMax: 120,
             access: 'ALL',
+            entityCategory: 'config',
         }),
         enumLookup({
             name: 'presence_state',
@@ -428,6 +429,7 @@ const definition = {
             attribute: 'state',
             description: 'Presence state',
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
+            entityCategory: 'config',
         }),
         enumLookup({
             name: 'pir_presence',
@@ -436,6 +438,7 @@ const definition = {
             attribute: 'pir_presence',
             description: 'PIR Presence',
             lookup: {Clear: 0, Detected: 1},
+            entityCategory: 'config',
         }),
         enumLookup({
             name: 'extended_state',
@@ -453,6 +456,7 @@ const definition = {
             attribute: 'presence_detection_mode',
             description: 'Presence Detection Mode',
             lookup: {Combined: 0, mmWaveOnly: 1, PIROnly: 2, PIRDriven: 3},
+            entityCategory: 'config',
         }),
         enumLookup({
             name: 'on_off_mode',
@@ -461,6 +465,7 @@ const definition = {
             attribute: 'on_off_mode',
             description: 'On/Off Command Mode',
             lookup: {OnOff: 0, OnOnly: 1, OffOnly: 2, TimedOn: 3, TimedOnLocal: 4, Nothing: 5},
+            entityCategory: 'config',
         }),
         numeric({
             name: 'on_off_timeout',
@@ -470,6 +475,7 @@ const definition = {
             valueMin: 0,
             valueMax: 1000,
             access: 'ALL',
+            entityCategory: 'config',
         }),
         numeric({
             name: 'measured_light',
@@ -490,6 +496,7 @@ const definition = {
             valueMin: 0,
             valueMax: 255,
             access: 'ALL',
+            entityCategory: 'config',
         }),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
@@ -524,30 +531,30 @@ const definition = {
             },
         ]);
         await endpoint.configureReporting('customOccupationConfig', [
-            {//skip for final version
-                attribute: 'moveDistance',
-                minimumReportInterval: 1,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
-            {//skip for final version
-                attribute: 'stillDistance',
-                minimumReportInterval: 5,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
-            {//skip for final version
-                attribute: 'moveEnergy',
-                minimumReportInterval: 1,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
-            {//skip for final version
-                attribute: 'stillEnergy',
-                minimumReportInterval: 5,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
+            //{//skip for final version
+            //    attribute: 'moveDistance',
+            //    minimumReportInterval: 1,
+            //    maximumReportInterval: constants.repInterval.HOUR,
+            //    reportableChange: null,
+            //},
+            //{//skip for final version
+            //    attribute: 'stillDistance',
+            //    minimumReportInterval: 5,
+            //    maximumReportInterval: constants.repInterval.HOUR,
+            //    reportableChange: null,
+            //},
+            //{//skip for final version
+            //    attribute: 'moveEnergy',
+            //    minimumReportInterval: 1,
+            //    maximumReportInterval: constants.repInterval.HOUR,
+            //    reportableChange: null,
+            //},
+            //{//skip for final version
+            //    attribute: 'stillEnergy',
+            //    minimumReportInterval: 5,
+            //    maximumReportInterval: constants.repInterval.HOUR,
+            //    reportableChange: null,
+            //},
             {
                 attribute: 'measured_light',
                 minimumReportInterval: 5,
