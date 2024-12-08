@@ -134,12 +134,12 @@ const orlangurOccupactionExtended = {
     },
     presenceModeDetectionConfig: () => {
         const exposes = [
-            e.binary('presence_detection_edge_mm_wave'     , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by mmWave'),
-            e.binary('presence_detection_edge_pir_internal', ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by internal PIR'),
-            e.binary('presence_detection_edge_external'    , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by external signal'),
-            e.binary('presence_detection_keep_mm_wave'     , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by mmWave'),
-            e.binary('presence_detection_keep_pir_internal', ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by internal PIR'),
-            e.binary('presence_detection_keep_external'    , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by external'),
+            e.binary('presence_detection_edge_mm_wave'     , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be detected by mmWave'),
+            e.binary('presence_detection_edge_pir_internal', ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be detected by internal PIR'),
+            e.binary('presence_detection_edge_external'    , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be detected by external signal'),
+            e.binary('presence_detection_keep_mm_wave'     , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by mmWave'),
+            e.binary('presence_detection_keep_pir_internal', ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by internal PIR'),
+            e.binary('presence_detection_keep_external'    , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by external'),
         ];
 
         const fromZigbee = [
@@ -173,7 +173,7 @@ const orlangurOccupactionExtended = {
             }
         ];
 
-        const toZigbee = [
+        const toZigbee = [{
             key: ['presence_detection_edge_mm_wave', 'presence_detection_edge_pir_internal', 'presence_detection_edge_external'
                  ,'presence_detection_keep_mm_wave', 'presence_detection_keep_pir_internal', 'presence_detection_keep_external'],
             convertSet: async (entity, key, value, meta) => {
@@ -184,7 +184,7 @@ const orlangurOccupactionExtended = {
             convertGet: async (entity, key, meta) => {
                 await entity.read('customOccupationConfig', [key]);
             },
-        ];
+        }];
 
         return {
             exposes,
