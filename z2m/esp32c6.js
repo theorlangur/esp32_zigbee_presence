@@ -80,7 +80,7 @@ const orlangurOccupactionExtended = {
     },
     mode: () => {
         const exposes = [
-            e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode"),
+            e.enum('presence_mode', ea.ALL, ['Simple', 'Energy']).withLabel("Detection reporting mode").withCategory('config'),
         ];
 
         const lookup = {Simple: 2, Energy: 1};
@@ -235,7 +235,6 @@ const orlangurOccupactionExtended = {
 
         const exposes = e.text(exp_entity, ea.STATE_GET)
                             .withLabel(prefix + ' energy ' + suffix)
-                            .withUnit('%')
                             .withCategory('diagnostic')
                             .withDescription(descr);
 
@@ -430,7 +429,7 @@ const definition = {
             attribute: 'state',
             description: 'Presence state',
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
-            entityCategory: 'config',
+            entityCategory: 'diagnostic',
         }),
         enumLookup({
             name: 'pir_presence',
@@ -439,7 +438,7 @@ const definition = {
             attribute: 'pir_presence',
             description: 'PIR Presence',
             lookup: {Clear: 0, Detected: 1},
-            entityCategory: 'config',
+            entityCategory: 'diagnostic',
         }),
         enumLookup({
             name: 'extended_state',
