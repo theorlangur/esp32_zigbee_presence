@@ -406,7 +406,7 @@ const definition = {
                 },
                 switch_bluetooth: {
                     ID: 0x0003,
-                    parameters: [{name: 'on', type: Zcl.BuffaloZclDataType.BOOLEAN}],
+                    parameters: [{name: 'on', type: Zcl.DataType.BOOLEAN}],
                 },
             },
             commandsResponse: {},
