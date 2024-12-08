@@ -41,7 +41,8 @@ const orlangurOccupactionExtended = {
         const exposes = [
             e.enum('restart', ea.SET, ['Restart']).withLabel('Restart').withDescription('Restart LD2412 module'),
             e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
-            e.enum('switch_bluetooth', ea.SET, ['On','Off']).withLabel('Switch Bluetooth').withDescription('Turn Bluetooth On/Off'),
+            e.enum('switch_bluetooth_on', ea.SET, ['On']).withLabel('Switch Bluetooth On').withDescription('Turn Bluetooth On'),
+            e.enum('switch_bluetooth_off', ea.SET, ['Off']).withLabel('Switch Bluetooth Off').withDescription('Turn Bluetooth Off'),
         ];
 
         const fromZigbee = [];
@@ -62,10 +63,10 @@ const orlangurOccupactionExtended = {
                 },
             },
             {
-                key: ['switch_bluetooth'],
+                key: ['switch_bluetooth_on', 'switch_bluetooth_off'],
                 convertSet: async (entity, key, value, meta) => {
-                    const turn_on = value == 'On';
-                    await entity.command('customOccupationConfig', key, {on:turn_on}, {});
+                    const turn_on = value == 'switch_bluetooth_on';
+                    await entity.command('customOccupationConfig', 'switch_bluetooth', {on:turn_on}, {});
                 },
             },
         ];
