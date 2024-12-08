@@ -117,12 +117,18 @@ namespace zb
     /**********************************************************************/
     using LD2412OccupancyCluster_t = ZclServerCluster<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING>;
     using LD2412CustomCluster_t    = ZclServerCluster<PRESENCE_EP, CLUSTER_ID_LD2412>;
+    using ExternalOnOffCluster_t   = ZclServerCluster<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF>;
 
     /**********************************************************************/
     /* Attributes types for occupancy cluster                             */
     /**********************************************************************/
     using ZclAttributeOccupancy_t                   = LD2412OccupancyCluster_t::Attribute<ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID, esp_zb_zcl_occupancy_sensing_occupancy_t>;
     using ZclAttributeOccupiedToUnoccupiedTimeout_t = LD2412OccupancyCluster_t::Attribute<ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID , uint16_t>;
+
+    /**********************************************************************/
+    /* Attributes types for on/off server cluster                         */
+    /**********************************************************************/
+    using ZclAttributeExternalOnOff_t = ExternalOnOffCluster_t::Attribute<ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID , bool>;
 
     /**********************************************************************/
     /* Attributes types for a custom cluster                              */
@@ -161,6 +167,11 @@ namespace zb
     /**********************************************************************/
     static ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
     static ZclAttributeOccupancy_t g_OccupancyState;
+
+    /**********************************************************************/
+    /* Attributes for external signal on/off server cluster               */
+    /**********************************************************************/
+    static ZclAttributeExternalOnOff_t g_ExternalOnOff;
 
     /**********************************************************************/
     /* Attributes for a custom cluster                                    */
@@ -215,6 +226,29 @@ namespace zb
         bool m_LastPresencePIRInternal = false;
         bool m_LastPresenceExternal = false;
         esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        esp_zb_user_cb_handle_t m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+
+        void CancelLocalTimer()
+        {
+            if (m_RunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                //timer IS running already
+                //need to cancel it
+                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_RunningTimer));
+                m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+            }
+        }
+
+        void CancelExternalTimer()
+        {
+            if (m_ExternalRunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                //timer IS running already
+                //need to cancel it
+                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_ExternalRunningTimer));
+                m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+            }
+        }
     };
     RuntimeState g_State;
 
@@ -625,11 +659,66 @@ namespace zb
         return ESP_OK;
     }
 
+    esp_err_t cmd_on_off_external_on()
+    {
+        FMT_PRINT("Switching external on/off ON\n");
+        g_State.m_LastPresenceExternal = true;
+        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+        g_State.CancelExternalTimer();
+        if (update_presence_state())
+            send_on_off(g_State.m_LastPresence);
+        return ESP_OK;
+    }
+
+    esp_err_t cmd_on_off_external_off()
+    {
+        FMT_PRINT("Switching external on/off OFF {}...\n");
+        g_State.m_LastPresenceExternal = false;
+        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+        g_State.CancelExternalTimer();
+        if (update_presence_state())
+            send_on_off(g_State.m_LastPresence);
+        return ESP_OK;
+    }
+
+    void on_external_on_timer_finished(void* param)
+    {
+        g_State.m_LastPresenceExternal = false;
+        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+        g_State.m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        if (update_presence_state())
+            send_on_off(g_State.m_LastPresence);
+    }
+
+    struct OnWithTimedOffPayload{
+        uint8_t on_off_ctrl;
+        uint16_t on_time;
+        uint16_t off_wait_time;
+    };
+    esp_err_t cmd_on_off_external_on_with_timed_off(OnWithTimedOffPayload const& data)
+    {
+        FMT_PRINT("Switching external on/off ON with params: ctrl: {}; on time: {} (deci-seconds); off wait time: {} (deci-seconds)\n", data.on_off_ctrl, data.on_time, data.off_wait_time);
+        g_State.m_LastPresenceExternal = true;
+        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+        if (data.on_time > 0 && data.on_time < 0xfffe)
+        {
+            //(re-)start timer
+            g_State.CancelExternalTimer();
+            g_State.m_ExternalRunningTimer = esp_zb_scheduler_user_alarm(&on_external_on_timer_finished, nullptr, data.on_time * 100);
+        }
+        if (update_presence_state())
+            send_on_off(g_State.m_LastPresence);
+        return ESP_OK;
+    }
+
     static const ZbCmdHandler g_Commands[] = {
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESTART, &ld2412_cmd_restart>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_FACTORY_RESET, &ld2412_cmd_factory_reset>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_RESET_ENERGY_STAT, &ld2412_cmd_reset_energy_stat>{},
         CmdDescr<PRESENCE_EP, CLUSTER_ID_LD2412, LD2412_CMD_BLUETOOTH, &ld2412_cmd_switch_bluetooth, bool>{},
+        CmdDescr<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, &cmd_on_off_external_on>{},
+        CmdDescr<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, &cmd_on_off_external_off>{},
+        CmdDescr<PRESENCE_EP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, &cmd_on_off_external_on_with_timed_off, OnWithTimedOffPayload>{},
         {} //last, terminating one
     };
 
@@ -660,6 +749,19 @@ namespace zb
                 //FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
                 FMT_PRINT("Changing timeout to {}\n", to);
                 g_ld2412.ChangeTimeout(to);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeExternalOnOff_t, 
+            [](auto const& to, const auto *message)->esp_err_t
+            {
+                //FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
+                //uint8_t *pData = (uint8_t *)message->attribute.data.value;
+                //FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
+                FMT_PRINT("Changing external on/off state to {}\n", to);
+                g_State.m_LastPresenceExternal = to;
+                if (update_presence_state())
+                    send_on_off(g_State.m_LastPresence);
                 return ESP_OK;
             }
         >{},
@@ -892,12 +994,23 @@ namespace zb
         /**********************************************************************/
         create_presence_config_custom_cluster(cluster_list);
 
-        /**********************************************************************/
-        /* Client on/off cluster for direct binding purposes                  */
-        /**********************************************************************/
-        esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
-        esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+        {
+            /**********************************************************************/
+            /* Client on/off cluster for direct binding purposes                  */
+            /**********************************************************************/
+            esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
+            esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+        }
+
+        {
+            /*************************************************************************/
+            /* Server on/off cluster for direct binding purposes for external signal */
+            /*************************************************************************/
+            esp_zb_on_off_cluster_cfg_t on_off_cfg{.on_off = false};
+            esp_zb_attribute_list_t *on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        }
 
         /**********************************************************************/
         /* Endpoint configuration                                             */
