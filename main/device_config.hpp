@@ -27,8 +27,7 @@ namespace zb
         PresenceDetectionMode m_PresenceDetectionMode;
         LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
         uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
-        uint8_t m_Unused1;
-        uint8_t m_Unused2;
+        uint16_t m_ExternalOnOffTimeout = 1;
     public:
         auto GetVersion() const { return m_Version; }
         auto GetOnOffTimeout() const { return m_OnOffTimeout; }
@@ -36,6 +35,7 @@ namespace zb
         auto GetPresenceDetectionMode() const { return m_PresenceDetectionMode; }
         auto GetLD2412Mode() const { return m_LD2412Mode; }
         auto GetIlluminanceThreshold() const { return m_IlluminanceThreshold; }
+        auto GetExternalOnOffTimeout() const { return m_ExternalOnOffTimeout; }
 
         void SetVersion(uint32_t v);
         void SetOnOffTimeout(uint16_t v);
@@ -43,6 +43,7 @@ namespace zb
         void SetPresenceDetectionMode(PresenceDetectionMode v);
         void SetLD2412Mode(LD2412::SystemMode v);
         void SetIlluminanceThreshold(uint8_t v);
+        void SetExternalOnOffTimeout(uint16_t v);
 
         void FactoryReset();
 

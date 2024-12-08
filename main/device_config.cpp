@@ -111,6 +111,12 @@ namespace zb
         on_change();
     }
 
+    void LocalConfig::SetExternalOnOffTimeout(uint16_t v)
+    {
+        m_ExternalOnOffTimeout = v;
+        on_change();
+    }
+
     void LocalConfig::SetOnOffMode(OnOffMode v)
     {
         m_OnOffMode = v;

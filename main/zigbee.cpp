@@ -249,6 +249,12 @@ namespace zb
                 m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             }
         }
+
+        void StartExternalTimer(esp_zb_user_callback_t cb, uint32_t time)
+        {
+            CancelExternalTimer();
+            m_ExternalRunningTimer = esp_zb_scheduler_user_alarm(cb, nullptr, time);
+        }
     };
     RuntimeState g_State;
 
@@ -292,7 +298,7 @@ namespace zb
             esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
             cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
             cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-            cmd_req.on_off_control = ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID;
+            cmd_req.on_off_control = 0;//process unconditionally
             cmd_req.on_time = t * 10;
             esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
         }
@@ -659,12 +665,29 @@ namespace zb
         return ESP_OK;
     }
 
+    /**********************************************************************/
+    /* On/Off server cluster commands for external sensor                 */
+    /**********************************************************************/
+    void on_external_on_timer_finished(void* param)
+    {
+        g_State.m_LastPresenceExternal = false;
+        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+        g_State.m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        if (update_presence_state())
+            send_on_off(g_State.m_LastPresence);
+    }
+
     esp_err_t cmd_on_off_external_on()
     {
         FMT_PRINT("Switching external on/off ON\n");
         g_State.m_LastPresenceExternal = true;
         g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
-        g_State.CancelExternalTimer();
+
+        if (auto et = g_Config.GetExternalOnOffTimeout(); et > 0)
+            g_State.StartExternalTimer(&on_external_on_timer_finished, et * 1000);
+        else
+            g_State.CancelExternalTimer();
+
         if (update_presence_state())
             send_on_off(g_State.m_LastPresence);
         return ESP_OK;
@@ -681,19 +704,23 @@ namespace zb
         return ESP_OK;
     }
 
-    void on_external_on_timer_finished(void* param)
-    {
-        g_State.m_LastPresenceExternal = false;
-        g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
-        g_State.m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
-        if (update_presence_state())
-            send_on_off(g_State.m_LastPresence);
-    }
-
     struct OnWithTimedOffPayload{
         uint8_t on_off_ctrl;
         uint16_t on_time;
         uint16_t off_wait_time;
+
+        static std::optional<OnWithTimedOffPayload> from(const esp_zb_zcl_custom_cluster_command_message_t *message)
+        {
+            if (message->data.size == 5)
+            {
+                OnWithTimedOffPayload r;
+                std::memcpy(&r.on_off_ctrl, (const uint8_t*)message->data.value, 1);
+                std::memcpy(&r.on_time, (const uint8_t*)message->data.value + 1, 2);
+                std::memcpy(&r.off_wait_time, (const uint8_t*)message->data.value + 3, 2);
+                return r;
+            }
+            return std::nullopt;
+        }
     };
     esp_err_t cmd_on_off_external_on_with_timed_off(OnWithTimedOffPayload const& data)
     {
@@ -703,8 +730,10 @@ namespace zb
         if (data.on_time > 0 && data.on_time < 0xfffe)
         {
             //(re-)start timer
-            g_State.CancelExternalTimer();
-            g_State.m_ExternalRunningTimer = esp_zb_scheduler_user_alarm(&on_external_on_timer_finished, nullptr, data.on_time * 100);
+            uint32_t t = data.on_time * 100;
+            if (auto et = g_Config.GetExternalOnOffTimeout(); et > 0)
+                t = et * 1000;
+            g_State.StartExternalTimer(&on_external_on_timer_finished, t);
         }
         if (update_presence_state())
             send_on_off(g_State.m_LastPresence);
