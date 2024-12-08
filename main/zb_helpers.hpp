@@ -298,8 +298,8 @@ namespace zb
     template<class TargetType, auto CmdLambda>
     esp_err_t generic_zb_cmd_handler(const esp_zb_zcl_custom_cluster_command_message_t *message)
     {
-        if constexpr (requires{ CmdLambda(message); })//raw message access has prio
-            return CmdLambda(message);
+        if constexpr (requires{ CmdLambda(*message); })//raw message access has prio
+            return CmdLambda(*message);
         else if constexpr (requires{ CmdLambda(message->data); })//raw access but data only
             return CmdLambda(message->data);
         else if constexpr (requires{ CmdLambda(message->data.value, message->data.size); })//raw access but directly void* and size
@@ -335,6 +335,9 @@ namespace zb
                 }else
                     return ESP_ERR_INVALID_ARG;
             }(TargetType::decompose(message), std::make_index_sequence<std::tuple_size_v<TupleResult>>());
+        }else
+        {
+            static_assert(sizeof(CmdLambda) == 0, "Invalid callback");
         }
         return ESP_FAIL;
     }
