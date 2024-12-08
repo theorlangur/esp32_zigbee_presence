@@ -132,6 +132,67 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    presenceModeDetectionConfig: () => {
+        const exposes = [
+            e.binary('presence_detection_edge_mm_wave'     , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by mmWave'),
+            e.binary('presence_detection_edge_pir_internal', ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by internal PIR'),
+            e.binary('presence_detection_edge_external'    , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be detected by external signal'),
+            e.binary('presence_detection_keep_mm_wave'     , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by mmWave'),
+            e.binary('presence_detection_keep_pir_internal', ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by internal PIR'),
+            e.binary('presence_detection_keep_external'    , ea.ALL, true, false).withCategory('config').withDescription('Defines if presence should be kept by external'),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+
+                    //edge
+                    if (data['presence_detection_edge_mm_wave'] !== undefined) 
+                        result['presence_detection_edge_mm_wave'] = data['presence_detection_edge_mm_wave'];
+                    if (data['presence_detection_edge_pir_internal'] !== undefined) 
+                        result['presence_detection_edge_pir_internal'] = data['presence_detection_edge_pir_internal'];
+                    if (data['presence_detection_edge_external'] !== undefined) 
+                        result['presence_detection_edge_external'] = data['presence_detection_edge_external'];
+                    //keep
+                    if (data['presence_detection_keep_mm_wave'] !== undefined) 
+                        result['presence_detection_keep_mm_wave'] = data['presence_detection_keep_mm_wave'];
+                    if (data['presence_detection_keep_pir_internal'] !== undefined) 
+                        result['presence_detection_keep_pir_internal'] = data['presence_detection_keep_pir_internal'];
+                    if (data['presence_detection_keep_external'] !== undefined) 
+                        result['presence_detection_keep_external'] = data['presence_detection_keep_external'];
+
+                    if (Object.keys(result).length == 0) 
+                        return;
+
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            key: ['presence_detection_edge_mm_wave', 'presence_detection_edge_pir_internal', 'presence_detection_edge_external'
+                 ,'presence_detection_keep_mm_wave', 'presence_detection_keep_pir_internal', 'presence_detection_keep_external'],
+            convertSet: async (entity, key, value, meta) => {
+                const payload = {[key]: value}
+                await entity.write('customOccupationConfig', payload);
+                return {state: {[key]: value}};
+            },
+            convertGet: async (entity, key, meta) => {
+                await entity.read('customOccupationConfig', [key]);
+            },
+        ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     distanceConfig: () => {
         const exposes = [
             e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12).withCategory('config'),
@@ -388,8 +449,13 @@ const definition = {
                 pir_presence: {ID: 0x0012, type: Zcl.DataType.BOOLEAN},
                 on_off_mode: {ID: 0x0013, type: Zcl.DataType.ENUM8},
                 on_off_timeout: {ID: 0x0014, type: Zcl.DataType.UINT16},
-                presence_detection_mode: {ID: 0x0015, type: Zcl.DataType.ENUM8},
-                illuminance_threshold: {ID: 0x0016, type: Zcl.DataType.UINT8},
+                illuminance_threshold: {ID: 0x0015, type: Zcl.DataType.UINT8},
+                presence_detection_edge_mm_wave: {ID: 0x0016, type: Zcl.DataType.BOOLEAN},
+                presence_detection_edge_pir_internal: {ID: 0x0017, type: Zcl.DataType.BOOLEAN},
+                presence_detection_edge_external: {ID: 0x0018, type: Zcl.DataType.BOOLEAN},
+                presence_detection_keep_mm_wave: {ID: 0x0019, type: Zcl.DataType.BOOLEAN},
+                presence_detection_keep_pir_internal: {ID: 0x001a, type: Zcl.DataType.BOOLEAN},
+                presence_detection_keep_external: {ID: 0x001b, type: Zcl.DataType.BOOLEAN},
             },
             commands: {
                 restart: {
@@ -450,15 +516,6 @@ const definition = {
         }),
         orlangurOccupactionExtended.mode(),
         enumLookup({
-            name: 'detection_mode',
-            access: 'ALL',
-            cluster: 'customOccupationConfig',
-            attribute: 'presence_detection_mode',
-            description: 'Presence Detection Mode',
-            lookup: {Combined: 0, mmWaveOnly: 1, PIROnly: 2, PIRDriven: 3},
-            entityCategory: 'config',
-        }),
-        enumLookup({
             name: 'on_off_mode',
             access: 'ALL',
             cluster: 'customOccupationConfig',
@@ -498,6 +555,7 @@ const definition = {
             access: 'ALL',
             entityCategory: 'config',
         }),
+        orlangurOccupactionExtended.presenceModeDetectionConfig(),
         orlangurOccupactionExtended.presenceInfo('move'),
         orlangurOccupactionExtended.presenceInfo('still'),
         orlangurOccupactionExtended.distanceConfig(),
@@ -522,6 +580,14 @@ const definition = {
         await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
         await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
+        await endpoint.read('customOccupationConfig', [
+                                                         'presence_detection_edge_mm_wave'
+                                                        ,'presence_detection_edge_pir_internal'
+                                                        ,'presence_detection_edge_external'
+                                                        ,'presence_detection_keep_mm_wave'
+                                                        ,'presence_detection_keep_pir_internal'
+                                                        ,'presence_detection_keep_external'
+                                                    ]);
         await endpoint.configureReporting('msOccupancySensing', [
             {
                 attribute: 'occupancy',

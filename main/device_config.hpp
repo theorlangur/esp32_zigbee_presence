@@ -11,11 +11,20 @@ namespace zb
         static constexpr uint32_t kActualStreamingVersion = 1;
         static constexpr uint8_t kMaxIlluminance = 255;
 
+        struct PresenceDetectionMode
+        {
+            uint8_t m_Edge_mmWave      : 1 = 1;
+            uint8_t m_Edge_PIRInternal : 1 = 1;
+            uint8_t m_Edge_External    : 1 = 1;
+            uint8_t m_Keep_mmWave      : 1 = 1;
+            uint8_t m_Keep_PIRInternal : 1 = 1;
+            uint8_t m_Keep_External    : 1 = 1;
+        };
     private:
         uint32_t m_Version = kActualStreamingVersion;
         uint16_t m_OnOffTimeout = 10;//seconds
         OnOffMode m_OnOffMode = OnOffMode::TimedOnLocal;
-        PresenceDetectionMode m_PresenceDetectionMode = PresenceDetectionMode::Combined;
+        PresenceDetectionMode m_PresenceDetectionMode;
         LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
         uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
         uint8_t m_Unused1;

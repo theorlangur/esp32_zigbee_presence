@@ -96,8 +96,13 @@ namespace zb
     static constexpr const uint16_t LD2412_ATTRIB_PIR_PRESENCE = 18;
     static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
-    static constexpr const uint16_t LD2412_ATTRIB_PRESENCE_DETECTION_MODE = 21;
-    static constexpr const uint16_t PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD = 22;
+    static constexpr const uint16_t PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD = 21;
+    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_MM_WAVE = 22;
+    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_PIR_INTERNAL = 23;
+    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_EXTERNAL = 24;
+    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_MM_WAVE = 25;
+    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL = 26;
+    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL = 27;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -143,8 +148,13 @@ namespace zb
     using ZclAttributePIRPresence_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
     using ZclAttributeOnOffCommandMode_t                      = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
     using ZclAttributeOnOffCommandTimeout_t                   = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
-    using ZclAttributePresenceDetectionMode_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PRESENCE_DETECTION_MODE, PresenceDetectionMode>;
     using ZclAttributePresenceDetectionIlluminanceThreshold_t = LD2412CustomCluster_t::Attribute<PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD, uint8_t>;
+    using ZclAttributePresenceEdgeDetectionMMWave_t           = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_MM_WAVE, bool>;
+    using ZclAttributePresenceEdgeDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_PIR_INTERNAL, bool>;
+    using ZclAttributePresenceEdgeDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_EXTERNAL, bool>;
+    using ZclAttributePresenceKeepDetectionMMWave_t           = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_MM_WAVE, bool>;
+    using ZclAttributePresenceKeepDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL, bool>;
+    using ZclAttributePresenceKeepDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL, bool>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -176,8 +186,13 @@ namespace zb
     static ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
     static ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     static ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
-    static ZclAttributePresenceDetectionMode_t                 g_PresenceDetectionMode;
     static ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
+    static ZclAttributePresenceEdgeDetectionMMWave_t           g_PresenceEdgeDetectionMMWave;
+    static ZclAttributePresenceEdgeDetectionPIRInternal_t      g_PresenceEdgeDetectionPIRInternal;
+    static ZclAttributePresenceEdgeDetectionExternal_t         g_PresenceEdgeDetectionExternal;
+    static ZclAttributePresenceKeepDetectionMMWave_t           g_PresenceKeepDetectionMMWave;
+    static ZclAttributePresenceKeepDetectionPIRInternal_t      g_PresenceKeepDetectionPIRInternal;
+    static ZclAttributePresenceKeepDetectionExternal_t         g_PresenceKeepDetectionExternal;
 
     /**********************************************************************/
     /* Storable data                                                      */
@@ -196,6 +211,9 @@ namespace zb
         bool m_FirstRun = true;
         bool m_LastPresence = false;
         bool m_SuppressedByIllulminance = false;
+        bool m_LastPresenceMMWave = false;
+        bool m_LastPresencePIRInternal = false;
+        bool m_LastPresenceExternal = false;
         esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
     };
     RuntimeState g_State;
@@ -275,31 +293,34 @@ namespace zb
         }
     }
 
-    static void on_movement_callback(bool presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    //returns 'true' if changed
+    bool update_presence_state()
     {
-        switch(g_Config.GetPresenceDetectionMode())
+        bool changed = false;
+        auto cfg = g_Config.GetPresenceDetectionMode();
+        if (g_State.m_FirstRun || !g_State.m_LastPresence)
         {
-            case PresenceDetectionMode::PIROnly: presence = p.pirPresence; break;
-            case PresenceDetectionMode::mmWaveOnly: presence = p.mmPresence; break;
-            case PresenceDetectionMode::PIRDriven: 
-            {
-                if (g_State.m_FirstRun || !g_State.m_LastPresence)
-                    presence = p.pirPresence;//only PIR dictates if presence is detected 
-                //otherwise 'presence' as-is is ok, since it comes combined
-            }
-            break;
-            case PresenceDetectionMode::Combined:
-            //nothing, presence is good as-is
-            break;
+            //edge detection
+            g_State.m_LastPresence = 
+                   (cfg.m_Edge_mmWave && g_State.m_LastPresenceMMWave)
+                || (cfg.m_Edge_PIRInternal && g_State.m_LastPresencePIRInternal)
+                || (cfg.m_Edge_External && g_State.m_LastPresenceExternal);
+            changed = g_State.m_LastPresence;
+            g_State.m_FirstRun = false;
+        }else if (!g_State.m_FirstRun && g_State.m_LastPresence)
+        {
+            //keep detection
+            g_State.m_LastPresence = 
+                   (cfg.m_Keep_mmWave && g_State.m_LastPresenceMMWave)
+                || (cfg.m_Keep_PIRInternal && g_State.m_LastPresencePIRInternal)
+                || (cfg.m_Keep_External && g_State.m_LastPresenceExternal);
+            changed = !g_State.m_LastPresence;
         }
-        bool presence_changed = !g_State.m_FirstRun && (g_State.m_LastPresence != presence);
-        g_State.m_FirstRun = false;
-        g_State.m_LastPresence = presence;
 
         /**********************************************************************/
         /* Illuminance threshold logic                                        */
         /**********************************************************************/
-        if (presence_changed && presence)//react only to the 'front', or 'clear->detected' event
+        if (changed && g_State.m_LastPresence)//react only to the 'front', or 'clear->detected' event
         {
             //only if threshold is set to something below kMaxIlluminance we might have a change in the logic
             //otherwise - no effect
@@ -309,13 +330,23 @@ namespace zb
                 g_State.m_SuppressedByIllulminance = false;
         }
 
+        return changed;
+    }
+
+    static void on_movement_callback(bool _presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    {
+        g_State.m_LastPresenceMMWave = p.mmPresence;
+        g_State.m_LastPresencePIRInternal = p.pirPresence;
+
+        bool presence_changed = update_presence_state();
+
         if (g_State.m_SuppressedByIllulminance)
             return;
 
         /**********************************************************************/
         /* Zigbee attributes update                                           */
         /**********************************************************************/
-        esp_zb_zcl_occupancy_sensing_occupancy_t val = presence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
+        esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         {
             APILock l;
             if (auto status = g_OccupancyState.Set(val); !status)
@@ -350,12 +381,13 @@ namespace zb
             {
                 FMT_PRINT("Failed to set PIR presence attribute with error {:x}\n", (int)status.error());
             }
+
             if (presence_changed)
             {
-                send_on_off(presence);
+                send_on_off(g_State.m_LastPresence);
             }
         }
-        FMT_PRINT("Presence: {}; Data: {}\n", (int)presence, p);
+        FMT_PRINT("Presence: {}; Data: {}\n", (int)g_State.m_LastPresence, p);
     }
 
     static void on_measurements_callback()
@@ -489,13 +521,35 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial on-off timeout {:x}\n", (int)status.error());
             }
-            if (auto status = g_PresenceDetectionMode.Set(g_Config.GetPresenceDetectionMode()); !status)
-            {
-                FMT_PRINT("Failed to set initial presence detection mode {:x}\n", (int)status.error());
-            }
             if (auto status = g_PresenceDetectionIlluminanceThreshold.Set(g_Config.GetIlluminanceThreshold()); !status)
             {
                 FMT_PRINT("Failed to set initial illuminance threshold {:x}\n", (int)status.error());
+            }
+
+            auto presenceDetectionMode = g_Config.GetPresenceDetectionMode();
+            if (auto status = g_PresenceEdgeDetectionMMWave.Set(presenceDetectionMode.m_Edge_mmWave); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode edge mmWave {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceEdgeDetectionPIRInternal.Set(presenceDetectionMode.m_Edge_PIRInternal); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode edge PIR Internal {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceEdgeDetectionExternal.Set(presenceDetectionMode.m_Edge_External); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode edge external {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceKeepDetectionMMWave.Set(presenceDetectionMode.m_Keep_mmWave); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode keep mmWave {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceKeepDetectionPIRInternal.Set(presenceDetectionMode.m_Keep_PIRInternal); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode keep PIR internal {:x}\n", (int)status.error());
+            }
+            if (auto status = g_PresenceKeepDetectionExternal.Set(presenceDetectionMode.m_Keep_External); !status)
+            {
+                FMT_PRINT("Failed to set initial detection mode keep external {:x}\n", (int)status.error());
             }
         }
 
@@ -657,19 +711,71 @@ namespace zb
                 return ESP_OK;
             }
         >{},
-        AttrDescr<ZclAttributePresenceDetectionMode_t, 
-            [](const PresenceDetectionMode &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence detection mode to {}\n", to);
-                g_Config.SetPresenceDetectionMode(to);
-                return ESP_OK;
-            }
-        >{},
         AttrDescr<ZclAttributePresenceDetectionIlluminanceThreshold_t, 
             [](const uint8_t &to, const auto *message)->esp_err_t
             {
                 FMT_PRINT("Changing presence detection illuminance threshold to {}\n", to);
                 g_Config.SetIlluminanceThreshold(to);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceEdgeDetectionMMWave_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence edge detection mmWave to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Edge_mmWave = to;
+                g_Config.SetPresenceDetectionMode(c);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceEdgeDetectionPIRInternal_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence edge detection PIR Internal to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Edge_PIRInternal = to;
+                g_Config.SetPresenceDetectionMode(c);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceEdgeDetectionExternal_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence edge detection external to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Edge_External = to;
+                g_Config.SetPresenceDetectionMode(c);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceKeepDetectionMMWave_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence Keep detection mmWave to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Keep_mmWave = to;
+                g_Config.SetPresenceDetectionMode(c);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceKeepDetectionPIRInternal_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence Keep detection PIR Internal to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Keep_PIRInternal = to;
+                g_Config.SetPresenceDetectionMode(c);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributePresenceKeepDetectionExternal_t, 
+            [](const bool &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing presence Keep detection external to {}\n", to);
+                auto c = g_Config.GetPresenceDetectionMode();
+                c.m_Keep_External = to;
+                g_Config.SetPresenceDetectionMode(c);
                 return ESP_OK;
             }
         >{},
@@ -722,8 +828,13 @@ namespace zb
         ESP_ERROR_CHECK(g_OnOffCommandMode.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_OnOffCommandTimeout.AddToCluster(custom_cluster, Access::RW));
 
-        ESP_ERROR_CHECK(g_PresenceDetectionMode.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_PresenceDetectionIlluminanceThreshold.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceEdgeDetectionMMWave.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceEdgeDetectionPIRInternal.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceEdgeDetectionExternal.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceKeepDetectionMMWave.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceKeepDetectionPIRInternal.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_PresenceKeepDetectionExternal.AddToCluster(custom_cluster, Access::RW));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
