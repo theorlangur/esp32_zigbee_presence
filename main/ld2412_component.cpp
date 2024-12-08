@@ -597,8 +597,8 @@ namespace ld2412
             gpio_config_t ld2412_presence_pin_cfg = {
                 .pin_bit_mask = 1ULL << m_PresencePin,
                 .mode = GPIO_MODE_INPUT,
-                .pull_up_en = GPIO_PULLUP_ENABLE,
-                .pull_down_en = GPIO_PULLDOWN_DISABLE,
+                .pull_up_en = GPIO_PULLUP_DISABLE,
+                .pull_down_en = GPIO_PULLDOWN_ENABLE,
                 .intr_type = GPIO_INTR_ANYEDGE,
                 .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
             };
@@ -611,8 +611,8 @@ namespace ld2412
             gpio_config_t ld2412_presence_pin_cfg = {
                 .pin_bit_mask = 1ULL << m_PIRPresencePin,
                 .mode = GPIO_MODE_INPUT,
-                .pull_up_en = GPIO_PULLUP_ENABLE,
-                .pull_down_en = GPIO_PULLDOWN_DISABLE,
+                .pull_up_en = GPIO_PULLUP_DISABLE,
+                .pull_down_en = GPIO_PULLDOWN_ENABLE,
                 .intr_type = GPIO_INTR_ANYEDGE,
                 .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
             };
