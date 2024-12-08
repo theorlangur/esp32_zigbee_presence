@@ -527,6 +527,14 @@ namespace zb
             }
 
             auto presenceDetectionMode = g_Config.GetPresenceDetectionMode();
+            //FMT_PRINT("initial detection mode: edge: {} {} {}; keep: {} {} {}\n"
+            //        , (bool)presenceDetectionMode.m_Edge_mmWave
+            //        , (bool)presenceDetectionMode.m_Edge_PIRInternal
+            //        , (bool)presenceDetectionMode.m_Edge_External
+            //        , (bool)presenceDetectionMode.m_Keep_mmWave
+            //        , (bool)presenceDetectionMode.m_Keep_PIRInternal
+            //        , (bool)presenceDetectionMode.m_Keep_External
+            //        );
             if (auto status = g_PresenceEdgeDetectionMMWave.Set(presenceDetectionMode.m_Edge_mmWave); !status)
             {
                 FMT_PRINT("Failed to set initial detection mode edge mmWave {:x}\n", (int)status.error());
