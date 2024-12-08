@@ -577,9 +577,9 @@ const definition = {
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance', 'illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
-        await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
-        await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
-        await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
+        //await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
+        //await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
+        //await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
         await endpoint.read('customOccupationConfig', [
                                                          'presence_detection_edge_mm_wave'
                                                         ,'presence_detection_edge_pir_internal'
