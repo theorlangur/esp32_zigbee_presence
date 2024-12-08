@@ -557,9 +557,9 @@ const definition = {
             //},
             {
                 attribute: 'measured_light',
-                minimumReportInterval: 5,
+                minimumReportInterval: 30,
                 maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
+                reportableChange: 10,
             },
             {
                 attribute: 'ex_state',
