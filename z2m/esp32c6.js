@@ -132,6 +132,56 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    onOff: () => {
+        const exposes = [
+            e.binary('external_on_off', ea.ALL, "ON", "OFF").withLabel("External On/Off state"),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'genOnOff',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    if (data['onOff'] !== undefined) 
+                    {
+                        //logger.debug(`on/off report: ${util.inspect(data)};`, NS);
+                        result['external_on_off'] = data['onOff'] == 1 ? "ON" : "OFF";
+                    }
+                    else 
+                    {
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            {
+                key: ['external_on_off'],
+                convertSet: async (entity, key, value, meta) => {
+                    const state = value.toLowerCase();
+                    //const payload = {onOff: value == "ON"}
+                    //const endpoint = meta.device.getEndpoint(1);
+                    //await entity.write('genOnOff', payload);
+                    await entity.command('genOnOff', state, {});
+                    return {state: {[key]: value}};
+                },
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('genOnOff', ['onOff']);
+                },
+            }
+        ]
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     presenceModeDetectionConfig: () => {
         const exposes = [
             e.binary('presence_detection_edge_mm_wave'     , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be detected by mmWave'),
@@ -456,6 +506,7 @@ const definition = {
                 presence_detection_keep_mm_wave: {ID: 0x0019, type: Zcl.DataType.BOOLEAN},
                 presence_detection_keep_pir_internal: {ID: 0x001a, type: Zcl.DataType.BOOLEAN},
                 presence_detection_keep_external: {ID: 0x001b, type: Zcl.DataType.BOOLEAN},
+                external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16}
             },
             commands: {
                 restart: {
@@ -497,7 +548,17 @@ const definition = {
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
             entityCategory: 'diagnostic',
         }),
-        onOff(),
+        orlangurOccupactionExtended.onOff(),
+        numeric({
+            name: 'external_on_time',
+            cluster: 'customOccupationConfig',
+            attribute: 'external_on_time',
+            description: 'On Time for external signal',
+            valueMin: 0,
+            valueMax: 120,
+            access: 'ALL',
+            entityCategory: 'config',
+        }),
         enumLookup({
             name: 'pir_presence',
             access: 'STATE_GET',
@@ -595,6 +656,14 @@ const definition = {
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
+            },
+        ]);
+        await endpoint.configureReporting('genOnOff', [
+            {
+                attribute: 'onOff',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: 1,
             },
         ]);
         await endpoint.configureReporting('customOccupationConfig', [
