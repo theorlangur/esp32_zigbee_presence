@@ -773,9 +773,6 @@ namespace zb
         AttrDescr<ZclAttributeOccupiedToUnoccupiedTimeout_t, 
             [](auto const& to, const auto *message)->esp_err_t
             {
-                //FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
-                //uint8_t *pData = (uint8_t *)message->attribute.data.value;
-                //FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
                 FMT_PRINT("Changing timeout to {}\n", to);
                 g_ld2412.ChangeTimeout(to);
                 return ESP_OK;
@@ -784,13 +781,23 @@ namespace zb
         AttrDescr<ZclAttributeExternalOnOff_t, 
             [](auto const& to, const auto *message)->esp_err_t
             {
-                //FMT_PRINT("Changing timeout to. Attr type: {}\n", (int)message->attribute.data.type);
-                //uint8_t *pData = (uint8_t *)message->attribute.data.value;
-                //FMT_PRINT("Changing timeout to. b1={:x}; b2={:x}\n", pData[0], pData[1]);
                 FMT_PRINT("Changing external on/off state to {}\n", to);
                 g_State.m_LastPresenceExternal = to;
                 if (update_presence_state())
+                {
                     send_on_off(g_State.m_LastPresence);
+
+                    if (to)//use external timeout if provided
+                    {
+                        auto ex_timeout = g_Config.GetExternalOnOffTimeout();
+                        if (ex_timeout)
+                            g_State.StartExternalTimer(&on_external_on_timer_finished, ex_timeout * 1000);
+                        else
+                            g_State.CancelExternalTimer();
+                    }
+                }
+
+
                 return ESP_OK;
             }
         >{},
