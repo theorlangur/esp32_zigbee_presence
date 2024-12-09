@@ -1129,6 +1129,7 @@ namespace zb
         uint32_t *p_sg_p     = signal_struct->p_app_signal;
         esp_err_t err_status = signal_struct->esp_err_status;
         esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
+        static int failed_counter = 0;
         switch (sig_type) {
         case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
             ESP_LOGI(TAG, "Initialize Zigbee stack");
@@ -1137,6 +1138,7 @@ namespace zb
         case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
+                failed_counter = 0;
                 led::blink(false, {});
                 //async setup
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
@@ -1152,6 +1154,11 @@ namespace zb
                 }
             } else {
                 /* commissioning failed */
+                if (++failed_counter > 4)
+                {
+                    failed_counter = 0;
+                    esp_restart();
+                }
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
                 led::blink_pattern(kBlinkPatternZStackError, kZStackError, duration_ms_t(1000));
                 led::blink(true, kSteering);
@@ -1160,6 +1167,7 @@ namespace zb
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {
+                failed_counter = 0;
                 led::blink(false, {});
                 esp_zb_ieee_addr_t extended_pan_id;
                 esp_zb_get_extended_pan_id(extended_pan_id);
@@ -1170,6 +1178,11 @@ namespace zb
 
                 esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
             } else {
+                if (++failed_counter > 4)
+                {
+                    failed_counter = 0;
+                    esp_restart();
+                }
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 led::blink_pattern(kBlinkPatternSteeringError, kSteeringError, duration_ms_t(1000));
                 led::blink(true, kSteering);
