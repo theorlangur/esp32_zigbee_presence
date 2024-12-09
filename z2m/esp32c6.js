@@ -1,7 +1,7 @@
 const { Buffer } = require('node:buffer');
 const util = require('node:util');
 const {Zcl} = require('zigbee-herdsman');
-const {enumLookup,numeric,deviceAddCustomCluster} = require('zigbee-herdsman-converters/lib/modernExtend');
+const {enumLookup,numeric,deviceAddCustomCluster,onOff} = require('zigbee-herdsman-converters/lib/modernExtend');
 const fz = require('zigbee-herdsman-converters/converters/fromZigbee');
 const tz = require('zigbee-herdsman-converters/converters/toZigbee');
 const exposes = require('zigbee-herdsman-converters/lib/exposes');
@@ -497,6 +497,7 @@ const definition = {
             lookup: {Clear: 0, Move: 1, Still: 2, MoveStill: 3, Configuring: 0x80, Failed: 0x81},
             entityCategory: 'diagnostic',
         }),
+        onOff(),
         enumLookup({
             name: 'pir_presence',
             access: 'STATE_GET',
