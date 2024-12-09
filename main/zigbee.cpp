@@ -1274,7 +1274,7 @@ namespace zb
     void setup()
     {
 #ifdef NDEBUG
-        esp_log_set_level_master(ESP_LOG_NONE); 
+        //esp_log_level_set(ESP_LOG_NONE); 
 #endif
 
         led::setup();
