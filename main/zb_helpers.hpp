@@ -362,6 +362,26 @@ namespace zb
         typeless_cmd_handler handler = nullptr;
     };
 
+    struct ZbCmdResponse
+    {
+        //returns true - auto remove from registered callbacks, false - leave in callbacks
+        using cmd_resp_handler_t = bool(*)(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *);
+        inline static cmd_resp_handler_t g_RegisteredResponseCallbacks[256] = {};
+    public:
+        static cmd_resp_handler_t Register(uint8_t cmd, cmd_resp_handler_t cb)
+        {
+            auto prev = g_RegisteredResponseCallbacks[cmd];
+            g_RegisteredResponseCallbacks[cmd] = cb;
+            return prev;
+        }
+
+        static cmd_resp_handler_t Unregister(uint8_t cmd)
+        {
+            auto prev = g_RegisteredResponseCallbacks[cmd];
+            g_RegisteredResponseCallbacks[cmd] = nullptr;
+            return prev;
+        }
+    };
 
 
     /**********************************************************************/
@@ -436,8 +456,30 @@ namespace zb
                     return pAttributeHandlers->defaultHandler(pSetAttr);
             }
             break;
+        case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
+            {
+                auto *pCmdRespMsg = (esp_zb_zcl_cmd_default_resp_message_t *)message;
+                auto cb = ZbCmdResponse::g_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd];
+                if (cb)
+                {
+                    if (!cb(pCmdRespMsg->resp_to_cmd, pCmdRespMsg->status_code, &pCmdRespMsg->info))
+                        ZbCmdResponse::g_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] = nullptr;
+                }else
+                {
+                    using clock_t = std::chrono::system_clock;
+                    auto now = clock_t::now();
+                    auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
+                    FMT_PRINT("{} Response to Zigbee command ({:x}) with no callback to handle. Status: {:x}\n", _n, pCmdRespMsg->resp_to_cmd, pCmdRespMsg->status_code);
+                }
+            }
+            break;
         default:
-            FMT_PRINT("Receive Zigbee action({:x}) callback\n", (int)callback_id);
+            {
+            using clock_t = std::chrono::system_clock;
+            auto now = clock_t::now();
+            auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
+            FMT_PRINT("{} Receive Zigbee action({:x}) callback\n", _n, (int)callback_id);
+            }
             break;
         }
         return ESP_OK;

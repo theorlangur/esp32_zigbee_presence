@@ -273,7 +273,11 @@ namespace zb
         }
         else
         {
+            using clock_t = std::chrono::system_clock;
+            auto now = clock_t::now();
+            auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
             //no presence. send 'off' command, no timer reset
+            FMT_PRINT("{} Sending off command on timer\n", _n);
             g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             esp_zb_zcl_on_off_cmd_t cmd_req;
             cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
@@ -307,6 +311,10 @@ namespace zb
         }
         else if (m == OnOffMode::TimedOnLocal)
         {
+            using clock_t = std::chrono::system_clock;
+            auto now = clock_t::now();
+            auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
+
             if (t)//makes sense only for non-0
             {
                 //set/reset the local timer
@@ -318,7 +326,7 @@ namespace zb
                 }
                 g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, t * 1000);
             }
-            FMT_PRINT("Sending ON (timed-on-local) command to binded\n");
+            FMT_PRINT("{} Sending ON (timed-on-local) command to binded\n", _n);
             esp_zb_zcl_on_off_cmd_t cmd_req;
             cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
             cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
