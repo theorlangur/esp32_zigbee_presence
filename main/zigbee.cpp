@@ -219,7 +219,9 @@ namespace zb
     //storable configuration
     LocalConfig g_Config;
 
+    //forward decl
     void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code);
+    bool is_coordinator(esp_zb_zcl_addr_t &addr);
 
     template<int CmdId, int Retries, auto CmdSender>
     struct CmdWithRetries
@@ -243,8 +245,14 @@ namespace zb
         }
 
     private:
-        static bool OnResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *, void *user_ctx)
+        static bool OnResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *pInfo, void *user_ctx)
         {
+            if (is_coordinator(pInfo->src_address))
+            {
+                FMT_PRINT("Response from coordinator on Cmd {:x}; status: {:x}\n", cmd_id, (int)status_code);
+                return true;//skipping coordinator
+            }
+
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
             if (status_code != ESP_ZB_ZCL_STATUS_SUCCESS)
             {
@@ -388,6 +396,16 @@ namespace zb
         }
     };
     RuntimeState g_State;
+
+    bool is_coordinator(esp_zb_zcl_addr_t &addr)
+    {
+        if (addr.addr_type == ESP_ZB_ZCL_ADDR_TYPE_SHORT)
+            return addr.u.short_addr == 0;
+        if (addr.addr_type == ESP_ZB_ZCL_ADDR_TYPE_IEEE)
+            return std::memcmp(addr.u.ieee_addr, g_State.m_CoordinatorIeee, sizeof(esp_zb_ieee_addr_t)) == 0;
+        //anything else is not supported
+        return false;
+    }
 
     void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code)
     {
