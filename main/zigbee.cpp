@@ -104,6 +104,8 @@ namespace zb
     static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL = 26;
     static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL = 27;
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
+    static constexpr const uint16_t ATTRIB_FAILURE_COUNT = 29;
+    static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 30;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -163,6 +165,8 @@ namespace zb
     using ZclAttributePresenceKeepDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL, bool>;
     using ZclAttributePresenceKeepDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL, bool>;
     using ZclAttributeExternalOnTime_t                        = LD2412CustomCluster_t::Attribute<EXTERNAL_ON_TIME , uint16_t>;
+    using ZclAttributeFailureCount_t                          = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_COUNT , uint16_t>;
+    using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -206,6 +210,8 @@ namespace zb
     static ZclAttributePresenceKeepDetectionPIRInternal_t      g_PresenceKeepDetectionPIRInternal;
     static ZclAttributePresenceKeepDetectionExternal_t         g_PresenceKeepDetectionExternal;
     static ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
+    static ZclAttributeFailureCount_t                          g_FailureCount;
+    static ZclAttributeFailureStatus_t                         g_FailureStatus;
 
     /**********************************************************************/
     /* Storable data                                                      */
@@ -213,6 +219,124 @@ namespace zb
     //storable configuration
     LocalConfig g_Config;
 
+    void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code);
+
+    template<int CmdId, int Retries, auto CmdSender>
+    struct CmdWithRetries
+    {
+        static constexpr uint32_t kCmdResponseWait = 500;//ms
+        esp_zb_user_cb_handle_t m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        int m_RetriesLeft = Retries;
+        int m_FailureCount = 0;
+
+        void SendRaw() { CmdSender(); }
+        void Send()
+        {
+            m_RetriesLeft = Retries;
+            if constexpr (Retries) //register response
+                ZbCmdResponse::Register(CmdId, &OnResponse, this);
+
+            SendRaw();
+
+            if constexpr (Retries)
+                StartTimer();
+        }
+
+    private:
+        static bool OnResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *, void *user_ctx)
+        {
+            CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
+            if (status_code != ESP_ZB_ZCL_STATUS_SUCCESS)
+            {
+                ++pCmd->m_FailureCount;
+                cmd_failure(cmd_id, status_code);
+
+                FMT_PRINT("Cmd {:x} failed with status: {:x}\n", cmd_id, (int)status_code);
+                if (!pCmd->m_RetriesLeft)
+                {
+                    //failure
+                    FMT_PRINT("Cmd {:x} completely failed\n", cmd_id);
+                    return false;//unregister
+                }
+                //try again
+                --pCmd->m_RetriesLeft;
+                FMT_PRINT("Retry: Cmd {:x} (left: {})\n", cmd_id, pCmd->m_RetriesLeft);
+                pCmd->SendRaw();
+                pCmd->StartTimer();
+                return true;//leave registered
+            }
+            //all good
+            pCmd->CancelTimer();
+            return false;//unregister
+        }
+
+        static void OnTimer(void *p)
+        {
+            CmdWithRetries *pCmd = (CmdWithRetries *)p;
+            ++pCmd->m_FailureCount;
+            cmd_failure(CmdId, ESP_ZB_ZCL_STATUS_TIMEOUT);
+
+            if (pCmd->m_RetriesLeft)
+            {
+                //report timeout
+                --pCmd->m_RetriesLeft;
+                FMT_PRINT("Retry after timeout: Cmd {:x} (left: {})\n", CmdId, pCmd->m_RetriesLeft);
+                pCmd->SendRaw();
+                pCmd->StartTimer();
+                return;
+            }
+
+            FMT_PRINT("Cmd {:x} timed out and no retries left\n", CmdId);
+            //failure
+            pCmd->CancelTimer();
+        }
+
+        void CancelTimer()
+        {
+            if (m_WaitResponseTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                //timer IS running already
+                //need to cancel it
+                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_WaitResponseTimer));
+                m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+            }
+        }
+
+        void StartTimer()
+        {
+            CancelTimer();
+            m_WaitResponseTimer = esp_zb_scheduler_user_alarm(OnTimer, this, kCmdResponseWait);
+        }
+    };
+
+    void send_on_raw()
+    {
+        esp_zb_zcl_on_off_cmd_t cmd_req;
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+        esp_zb_zcl_on_off_cmd_req(&cmd_req);
+    }
+
+    void send_off_raw()
+    {
+        esp_zb_zcl_on_off_cmd_t cmd_req;
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+        esp_zb_zcl_on_off_cmd_req(&cmd_req);
+    }
+
+    void send_on_timed_raw()
+    {
+        auto t = g_Config.GetOnOffTimeout();
+        esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.on_off_control = 0;//process unconditionally
+        cmd_req.on_time = t * 10;
+        esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
+    }
     
     /**********************************************************************/
     /* Runtime data                                                       */
@@ -230,36 +354,93 @@ namespace zb
         esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
         esp_zb_user_cb_handle_t m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
 
-        void CancelLocalTimer()
+        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2, send_on_raw> m_OnSender;
+        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2, send_off_raw> m_OffSender;
+        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2, send_on_timed_raw> m_OnTimedSender;
+
+        uint16_t m_FailureCount = 0;
+        esp_zb_zcl_status_t m_LastFailedStatus = ESP_ZB_ZCL_STATUS_SUCCESS;
+
+        void CancelTimer(esp_zb_user_cb_handle_t &t)
         {
-            if (m_RunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
+            if (t != ESP_ZB_USER_CB_HANDLE_INVALID)
             {
                 //timer IS running already
                 //need to cancel it
-                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_RunningTimer));
-                m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(t));
+                t = ESP_ZB_USER_CB_HANDLE_INVALID;
             }
         }
 
-        void CancelExternalTimer()
+        void StartTimer(esp_zb_user_cb_handle_t &t, esp_zb_user_callback_t cb, uint32_t time)
         {
-            if (m_ExternalRunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
-            {
-                //timer IS running already
-                //need to cancel it
-                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_ExternalRunningTimer));
-                m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
-            }
+            CancelTimer(t);
+            t = esp_zb_scheduler_user_alarm(cb, nullptr, time);
         }
+
+        void CancelLocalTimer() { CancelTimer(m_RunningTimer); }
+        void CancelExternalTimer() { CancelTimer(m_ExternalRunningTimer); }
 
         void StartExternalTimer(esp_zb_user_callback_t cb, uint32_t time)
         {
             FMT_PRINT("Starting external timer for {} ms\n", time);
-            CancelExternalTimer();
-            m_ExternalRunningTimer = esp_zb_scheduler_user_alarm(cb, nullptr, time);
+            StartTimer(m_ExternalRunningTimer, cb, time);
         }
     };
     RuntimeState g_State;
+
+    void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code)
+    {
+        ++g_State.m_FailureCount;
+        g_State.m_LastFailedStatus = status_code;
+
+        if (auto status = g_FailureCount.Set(g_State.m_FailureCount); !status)
+        {
+            FMT_PRINT("Failed to set initial failure count {:x}\n", (int)status.error());
+        }
+        if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
+        {
+            FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
+        }
+    }
+
+    bool check_own_binds_for_cluster(esp_zb_zcl_cluster_id_t id)
+    {        
+        esp_zb_zdo_mgmt_bind_param_t cmd_req;
+        cmd_req.dst_addr = esp_zb_get_short_address();
+        cmd_req.start_index = 0;
+        struct LocalCtx
+        {
+            esp_zb_zcl_cluster_id_t id;
+            bool found;
+        }ctx{id, false};
+        ESP_LOGI(TAG, "Sending request to self to get our current binds");
+        esp_zb_zdo_binding_table_req(&cmd_req, 
+            [](const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
+            {
+                LocalCtx *pCtx = (LocalCtx *)user_ctx;
+                auto *pRec = table_info->record;
+                while(pRec)
+                {
+                    if (pRec->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
+                    {
+                        if (std::memcmp(pRec->dst_address.addr_long, g_State.m_CoordinatorIeee, sizeof(esp_zb_ieee_addr_t)) != 0)
+                        {
+                            if (pRec->cluster_id == pCtx->id)//got it. at least one
+                            {
+                                pCtx->found = true;
+                                break;
+                            }
+                        }
+                    }
+                    pRec = pRec->next;
+                }
+            },
+            &ctx
+        );
+        ESP_LOGI(TAG, "Check own binds: finish");
+        return ctx.found;
+    }
 
     void on_local_on_timer_finished(void* param)
     {
@@ -279,11 +460,8 @@ namespace zb
             //no presence. send 'off' command, no timer reset
             FMT_PRINT("{} Sending off command on timer\n", _n);
             g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
-            esp_zb_zcl_on_off_cmd_t cmd_req;
-            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
-            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+            if (check_own_binds_for_cluster(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF))
+                g_State.m_OffSender.Send();
         }
     }
 
@@ -298,16 +476,13 @@ namespace zb
         if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
             return;//nothing
 
+        if (!check_own_binds_for_cluster(ESP_ZB_ZCL_CLUSTER_ID_ON_OFF))
+            return;//no bound devices with on/off cluster, no reason to send a command
 
         if (m == OnOffMode::TimedOn)
         {
             FMT_PRINT("Sending timed on command to binded with timeout: {};\n", t);
-            esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
-            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-            cmd_req.on_off_control = 0;//process unconditionally
-            cmd_req.on_time = t * 10;
-            esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
+            g_State.m_OnTimedSender.Send();
         }
         else if (m == OnOffMode::TimedOnLocal)
         {
@@ -327,20 +502,15 @@ namespace zb
                 g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, t * 1000);
             }
             FMT_PRINT("{} Sending ON (timed-on-local) command to binded\n", _n);
-            esp_zb_zcl_on_off_cmd_t cmd_req;
-            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
-            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+            g_State.m_OnSender.Send();
         }
         else
         {
             FMT_PRINT("Sending command to binded: {};\n", (int)on);
-            esp_zb_zcl_on_off_cmd_t cmd_req;
-            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-            cmd_req.on_off_cmd_id = on ? ESP_ZB_ZCL_CMD_ON_OFF_ON_ID : ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
-            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+            if (on)
+                g_State.m_OnSender.Send();
+            else
+                g_State.m_OffSender.Send();
         }
     }
 
@@ -581,6 +751,14 @@ namespace zb
             if (auto status = g_ExternalOnTime.Set(g_Config.GetExternalOnOffTimeout()); !status)
             {
                 FMT_PRINT("Failed to set initial on time for external {:x}\n", (int)status.error());
+            }
+            if (auto status = g_FailureCount.Set(g_State.m_FailureCount); !status)
+            {
+                FMT_PRINT("Failed to set initial failure count {:x}\n", (int)status.error());
+            }
+            if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
+            {
+                FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
             }
             
             auto presenceDetectionMode = g_Config.GetPresenceDetectionMode();
@@ -1043,6 +1221,8 @@ namespace zb
         ESP_ERROR_CHECK(g_PresenceKeepDetectionPIRInternal.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_PresenceKeepDetectionExternal.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_ExternalOnTime.AddToCluster(custom_cluster, Access::RW));
+        ESP_ERROR_CHECK(g_FailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_FailureStatus.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
