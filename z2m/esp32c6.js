@@ -506,7 +506,9 @@ const definition = {
                 presence_detection_keep_mm_wave: {ID: 0x0019, type: Zcl.DataType.BOOLEAN},
                 presence_detection_keep_pir_internal: {ID: 0x001a, type: Zcl.DataType.BOOLEAN},
                 presence_detection_keep_external: {ID: 0x001b, type: Zcl.DataType.BOOLEAN},
-                external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16}
+                external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
+                failure_count: {ID:0x001d, type: Zcl.DataType.UINT16},
+                failure_status: {ID:0x001e, type: Zcl.DataType.UINT16}
             },
             commands: {
                 restart: {
@@ -616,6 +618,32 @@ const definition = {
             valueMax: 255,
             access: 'ALL',
             entityCategory: 'config',
+        }),
+        numeric({
+            name: 'failure_count',
+            cluster: 'customOccupationConfig',
+            attribute: 'failure_count',
+            description: 'Amount of cmd failures',
+            valueMin: 0,
+            valueMax: 65535,
+            access: 'STATE',
+            entityCategory: 'diagnostic',
+        }),
+        enumLookup({
+            name: 'failure_status',
+            access: 'STATE',
+            cluster: 'customOccupationConfig',
+            attribute: 'failure_status',
+            description: 'Last Cmd failed status',
+            lookup: {
+                    Ok: 0, Fail: 1, UnAuth: 0x07e, MalformedCmd: 0x080, UnsClustCmd: 0x081, UnsGenCmd: 0x082,
+                    UnsManClustCmd: 0x083, UnsManGenCmd: 0x084, InvField: 0x085, UnsAttr: 0x086, InvVal: 0x087, ReadOnly: 0x088,
+                    InsuffSpace: 0x089, DupeExists: 0x08a, NotFound: 0x08b, UnrepAttr: 0x08c, InvType: 0x08d, WriteOnly: 0x08f,
+                    Inconsistent: 0x092, ActDenied: 0x093, Timeout: 0x094, Abort: 0x095, InvImage: 0x096, WaitForData: 0x097,
+                    NoImg: 0x098, ReqMoreImg: 0x099, NotifPend: 0x09a, HwFail: 0x0c0, SwFail: 0x0c1, CalibErr: 0x0c2,
+                    UnsClust: 0x0c3, Limit: 0x0c4
+                },
+            entityCategory: 'diagnostics',
         }),
         orlangurOccupactionExtended.presenceModeDetectionConfig(),
         orlangurOccupactionExtended.presenceInfo('move'),
