@@ -508,7 +508,7 @@ const definition = {
                 presence_detection_keep_external: {ID: 0x001b, type: Zcl.DataType.BOOLEAN},
                 external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
                 failure_count: {ID:0x001d, type: Zcl.DataType.UINT16},
-                failure_status: {ID:0x001e, type: Zcl.DataType.UINT16}
+                failure_status: {ID:0x001e, type: Zcl.DataType.UINT16},
                 total_failure_count: {ID:0x001f, type: Zcl.DataType.UINT16},
             },
             commands: {
@@ -677,7 +677,7 @@ const definition = {
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance', 'illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
-        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
+        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state', 'failure_count', 'total_failure_count', 'failure_status']);
         //await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         //await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
         //await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
@@ -750,6 +750,24 @@ const definition = {
             },
             {
                 attribute: 'pir_presence',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'failure_status',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'failure_count',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'total_failure_count',
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
