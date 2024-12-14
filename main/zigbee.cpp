@@ -1491,7 +1491,7 @@ namespace zb
                 }
             } else {
                 /* commissioning failed */
-                if (++failed_counter > 4)
+                if (++failed_counter > 6)
                 {
                     failed_counter = 0;
                     esp_restart();
