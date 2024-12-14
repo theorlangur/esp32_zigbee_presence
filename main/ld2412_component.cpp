@@ -796,8 +796,8 @@ namespace ld2412
             xQueueSend(m_ManagingQueue.load(std::memory_order_relaxed), &msg, 0);
         }
 
-        thread::start_task({.pName="LD2412_Manage", .stackSize = 2*4096, .prio=thread::kPrioElevated}, &manage_loop, this).detach();
-        thread::start_task({.pName="LD2412_Fast", .stackSize = 4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
+        thread::start_task({.pName="LD2412_Manage", .stackSize = 4*4096, .prio=thread::kPrioElevated}, &manage_loop, this).detach();
+        thread::start_task({.pName="LD2412_Fast", .stackSize = 8*4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
 
         FMT_PRINT("ld2412 component: configuring isr\n");
         fflush(stdout);
