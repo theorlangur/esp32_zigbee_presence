@@ -509,6 +509,7 @@ const definition = {
                 external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
                 failure_count: {ID:0x001d, type: Zcl.DataType.UINT16},
                 failure_status: {ID:0x001e, type: Zcl.DataType.UINT16}
+                total_failure_count: {ID:0x001f, type: Zcl.DataType.UINT16},
             },
             commands: {
                 restart: {
@@ -624,6 +625,16 @@ const definition = {
             cluster: 'customOccupationConfig',
             attribute: 'failure_count',
             description: 'Amount of cmd failures',
+            valueMin: 0,
+            valueMax: 65535,
+            access: 'STATE',
+            entityCategory: 'diagnostic',
+        }),
+        numeric({
+            name: 'total_failure_count',
+            cluster: 'customOccupationConfig',
+            attribute: 'total_failure_count',
+            description: 'Amount of irrecoverable cmd failures',
             valueMin: 0,
             valueMax: 65535,
             access: 'STATE',

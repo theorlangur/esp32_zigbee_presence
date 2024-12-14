@@ -109,6 +109,7 @@ namespace zb
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
     static constexpr const uint16_t ATTRIB_FAILURE_COUNT = 29;
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 30;
+    static constexpr const uint16_t ATTRIB_TOTAL_FAILURE_COUNT = 31;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -170,6 +171,7 @@ namespace zb
     using ZclAttributeExternalOnTime_t                        = LD2412CustomCluster_t::Attribute<EXTERNAL_ON_TIME , uint16_t>;
     using ZclAttributeFailureCount_t                          = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_COUNT , uint16_t>;
     using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
+    using ZclAttributeTotalFailureCount_t                     = LD2412CustomCluster_t::Attribute<ATTRIB_TOTAL_FAILURE_COUNT , uint16_t>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -215,6 +217,7 @@ namespace zb
     static ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
     static ZclAttributeFailureCount_t                          g_FailureCount;
     static ZclAttributeFailureStatus_t                         g_FailureStatus;
+    static ZclAttributeTotalFailureCount_t                     g_TotalFailureCount;
 
     /**********************************************************************/
     /* Storable data                                                      */
@@ -449,6 +452,7 @@ namespace zb
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2, send_on_timed_raw> m_OnTimedSender;
 
         uint16_t m_FailureCount = 0;
+        uint16_t m_TotalFailureCount = 0;
         esp_zb_zcl_status_t m_LastFailedStatus = ESP_ZB_ZCL_STATUS_SUCCESS;
 
         static constexpr esp_zb_zcl_cluster_id_t g_RelevantBoundClusters[] = {ESP_ZB_ZCL_CLUSTER_ID_ON_OFF};
@@ -519,11 +523,11 @@ namespace zb
 
         if (auto status = g_FailureCount.Set(g_State.m_FailureCount); !status)
         {
-            FMT_PRINT("Failed to set initial failure count {:x}\n", (int)status.error());
+            FMT_PRINT("Failed to inc failure count {:x}\n", (int)status.error());
         }
         if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
         {
-            FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
+            FMT_PRINT("Failed to set failure status {:x}\n", (int)status.error());
         }
     }
 
@@ -531,6 +535,11 @@ namespace zb
     {
         led::blink_pattern(kBlinkPatternCmdError, kCmdError, duration_ms_t(1000));
         led::blink(false, {});
+        ++g_State.m_TotalFailureCount;
+        if (auto status = g_TotalFailureCount.Set(g_State.m_TotalFailureCount); !status)
+        {
+            FMT_PRINT("Failed to inc total failure count {:x}\n", (int)status.error());
+        }
     }
 
     void update_info_on_own_binds()
@@ -890,6 +899,10 @@ namespace zb
             if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
             {
                 FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
+            }
+            if (auto status = g_TotalFailureCount.Set(g_State.m_TotalFailureCount); !status)
+            {
+                FMT_PRINT("Failed to set initial total failure count {:x}\n", (int)status.error());
             }
             
             auto presenceDetectionMode = g_Config.GetPresenceDetectionMode();
@@ -1354,6 +1367,7 @@ namespace zb
         ESP_ERROR_CHECK(g_ExternalOnTime.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_FailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_FailureStatus.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_TotalFailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
