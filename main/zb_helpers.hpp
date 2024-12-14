@@ -388,6 +388,45 @@ namespace zb
         }
     };
 
+    using seq_nr_t = uint8_t;
+    struct ZbCmdSend
+    {
+        //returns true - auto remove from registered callbacks, false - leave in callbacks
+        using cmd_send_handler_t = void(*)(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
+        struct SendHandlers
+        {
+            cmd_send_handler_t h;
+            void *user_ctx;
+        };
+        inline static SendHandlers g_RegisteredSendCallbacks[256] = {};
+    public:
+        static SendHandlers Register(uint8_t seqNr, cmd_send_handler_t cb, void *user_ctx)
+        {
+            auto prev = g_RegisteredSendCallbacks[seqNr];
+            g_RegisteredSendCallbacks[seqNr] = {cb, user_ctx};
+            return prev;
+        }
+
+        static void Unregister(uint8_t seqNr)
+        {
+            g_RegisteredSendCallbacks[seqNr] = {nullptr, nullptr};
+        }
+
+        static void handler(esp_zb_zcl_command_send_status_message_t message)
+        {
+            auto &entry = g_RegisteredSendCallbacks[message.tsn];
+            if (entry.h)
+            {
+                auto e = entry;
+                entry = {nullptr, nullptr};
+                e.h(&message, e.user_ctx);
+            }else
+            {
+                FMT_PRINT("Send status: seqNr={}; dst={},  Receive Zigbee action({:x}) callback\n", message.tsn, message.dst_addr);
+            }
+        }
+    };
+
 
     /**********************************************************************/
     /* generic_zb_action_handler                                          */
@@ -474,7 +513,13 @@ namespace zb
                     using clock_t = std::chrono::system_clock;
                     auto now = clock_t::now();
                     auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
-                    FMT_PRINT("{} Response to Zigbee command ({:x}) with no callback to handle. Status: {:x}\n", _n, pCmdRespMsg->resp_to_cmd, (uint16_t)pCmdRespMsg->status_code);
+                    FMT_PRINT("{} Response to Zigbee command ({:x}) with no callback to handle. Status: {:x}; From: addr={:x}; ep={}; cluster={:x}\n"
+                            , _n, pCmdRespMsg->resp_to_cmd
+                            , (uint16_t)pCmdRespMsg->status_code
+                            , pCmdRespMsg->info.src_address
+                            , pCmdRespMsg->info.src_endpoint
+                            , pCmdRespMsg->info.cluster
+                            );
                 }
             }
             break;
@@ -489,5 +534,26 @@ namespace zb
         }
         return ESP_OK;
     }
+
+    struct ieee_addr
+    {
+        const esp_zb_ieee_addr_t &a;
+        bool operator==(ieee_addr const& rhs) const { return std::memcmp(a, rhs.a, sizeof(esp_zb_ieee_addr_t)) == 0; }
+    };
 }
+
+template<>
+struct tools::formatter_t<esp_zb_zcl_addr_t>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, esp_zb_zcl_addr_t const& a)
+    {
+        if (a.addr_type == ESP_ZB_ZCL_ADDR_TYPE_SHORT)
+            return tools::format_to(std::forward<Dest>(dst), "[short={:x}]" , a.u.short_addr);
+        if (a.addr_type == ESP_ZB_ZCL_ADDR_TYPE_IEEE)
+            return tools::format_to(std::forward<Dest>(dst), "[ieee={}]" , a.u.ieee_addr);
+        return tools::format_to(std::forward<Dest>(dst), "[src_id={:x}]" , a.u.src_id);
+    }
+};
+
 #endif
