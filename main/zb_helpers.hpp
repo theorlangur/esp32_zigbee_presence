@@ -371,22 +371,60 @@ namespace zb
             cmd_resp_handler_t h;
             void *user_ctx;
         };
-        inline static RespHandlers g_RegisteredResponseCallbacks[256] = {};
+        RespHandlers m_RegisteredResponseCallbacks[256] = {};
+        uint16_t m_ClusterId = 0xffff;
+
+        static constexpr size_t kMaxClusters = 2;
+        static ZbCmdResponse g_CmdResponseRegistry[kMaxClusters];
     public:
-        static RespHandlers Register(uint8_t cmd, cmd_resp_handler_t cb, void *user_ctx)
+        static ZbCmdResponse* FindOrAquireRegistry(uint16_t clusterId)
         {
-            auto prev = g_RegisteredResponseCallbacks[cmd];
-            g_RegisteredResponseCallbacks[cmd] = {cb, user_ctx};
+            for(auto &r : g_CmdResponseRegistry)
+            {
+                if (r.m_ClusterId == clusterId)
+                    return &r;
+                if (r.m_ClusterId == 0xffff)
+                {
+                    //free
+                    r.m_ClusterId = clusterId;
+                    return &r;
+                }
+            }
+            return nullptr;
+        }
+        static ZbCmdResponse* FindRegistry(uint16_t clusterId)
+        {
+            for(auto &r : g_CmdResponseRegistry)
+            {
+                if (r.m_ClusterId == clusterId)
+                    return &r;
+            }
+            return nullptr;
+        }
+
+        static RespHandlers Register(uint16_t clusterId, uint8_t cmd, cmd_resp_handler_t cb, void *user_ctx)
+        {
+            auto *pR = FindOrAquireRegistry(clusterId);
+            if (!pR) return {};
+
+            auto prev = pR->m_RegisteredResponseCallbacks[cmd];
+            pR->m_RegisteredResponseCallbacks[cmd] = {cb, user_ctx};
             return prev;
         }
 
-        static RespHandlers Unregister(uint8_t cmd)
+        static RespHandlers Unregister(uint16_t clusterId, uint8_t cmd)
         {
-            auto prev = g_RegisteredResponseCallbacks[cmd];
-            g_RegisteredResponseCallbacks[cmd] = {nullptr, nullptr};
-            return prev;
+            auto *pR = FindRegistry(clusterId);
+            if (pR)
+            {
+                auto prev = pR->m_RegisteredResponseCallbacks[cmd];
+                pR->m_RegisteredResponseCallbacks[cmd] = {nullptr, nullptr};
+                return prev;
+            }
+            return {};
         }
     };
+    inline ZbCmdResponse ZbCmdResponse::g_CmdResponseRegistry[kMaxClusters];
 
     using seq_nr_t = uint8_t;
     struct ZbCmdSend
@@ -503,11 +541,12 @@ namespace zb
         case ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID:
             {
                 auto *pCmdRespMsg = (esp_zb_zcl_cmd_default_resp_message_t *)message;
-                auto cb = ZbCmdResponse::g_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd];
+                auto *pR = ZbCmdResponse::FindRegistry(pCmdRespMsg->info.cluster);
+                auto cb = pR ? pR->m_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] : ZbCmdResponse::RespHandlers{nullptr, nullptr};
                 if (cb.h)
                 {
                     if (!cb.h(pCmdRespMsg->resp_to_cmd, pCmdRespMsg->status_code, &pCmdRespMsg->info, cb.user_ctx))
-                        ZbCmdResponse::g_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] = {nullptr, nullptr};
+                        pR->m_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] = {nullptr, nullptr};
                 }else
                 {
                     using clock_t = std::chrono::system_clock;

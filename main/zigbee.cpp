@@ -223,7 +223,7 @@ namespace zb
     void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code);
     bool is_coordinator(esp_zb_zcl_addr_t &addr);
 
-    template<int CmdId, int Retries, auto CmdSender>
+    template<uint16_t ClusterId, int CmdId, int Retries, auto CmdSender>
     struct CmdWithRetries
     {
         static constexpr uint32_t kCmdResponseWait = 500;//ms
@@ -248,7 +248,7 @@ namespace zb
         {
             m_SeqNr = SendRaw();
             ZbCmdSend::Register(m_SeqNr, &OnSendStatus, this);
-            ZbCmdResponse::Register(CmdId, &OnCmdResponse, this);
+            ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, this);
             StartTimer();
         }
     private:
@@ -341,6 +341,7 @@ namespace zb
         static void OnTimer(void *p)
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)p;
+            pCmd->m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             ++pCmd->m_FailureCount;
             if (pCmd->m_SeqNr != kInvalidSeqNr)
             {
@@ -360,7 +361,7 @@ namespace zb
 
             FMT_PRINT("Cmd {:x} timed out and no retries left\n", CmdId);
             //failure
-            pCmd->CancelTimer();
+            ZbCmdResponse::Unregister(ClusterId, CmdId);
         }
 
         void CancelTimer()
@@ -428,9 +429,9 @@ namespace zb
         esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
         esp_zb_user_cb_handle_t m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
 
-        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2, send_on_raw> m_OnSender;
-        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2, send_off_raw> m_OffSender;
-        CmdWithRetries<ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2, send_on_timed_raw> m_OnTimedSender;
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2, send_on_raw> m_OnSender;
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2, send_off_raw> m_OffSender;
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2, send_on_timed_raw> m_OnTimedSender;
 
         uint16_t m_FailureCount = 0;
         esp_zb_zcl_status_t m_LastFailedStatus = ESP_ZB_ZCL_STATUS_SUCCESS;
