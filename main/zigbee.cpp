@@ -257,12 +257,17 @@ namespace zb
         void SendAgain()
         {
             m_SeqNr = SendRaw();
+            m_SendCallbackProcessed = m_RespCallbackProcessed = false;
             ZbCmdSend::Register(m_SeqNr, &OnSendStatus, this);
+            ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, this);
             StartTimer();
         }
     private:
+        bool m_SendCallbackProcessed = false;
+        bool m_RespCallbackProcessed = false;
         void OnFailed()
         {
+            m_SendCallbackProcessed = m_RespCallbackProcessed = false;
             if (m_SeqNr != kInvalidSeqNr)
             {
                 ZbCmdSend::Unregister(m_SeqNr);
@@ -281,6 +286,7 @@ namespace zb
                 return true;//keep response handler
             }
 
+            pCmd->m_RespCallbackProcessed = true;
 #ifndef NDEBUG
             {
                 using clock_t = std::chrono::system_clock;
@@ -324,6 +330,13 @@ namespace zb
                 FMT_PRINT("Response from coordinator on Cmd {:x}; status: {:x}\n", CmdId, (int)status_code);
                 return;//skipping coordinator
             }
+            pCmd->m_SendCallbackProcessed = true;
+            if (pCmd->m_RespCallbackProcessed)//we got already a resp callback?
+            {
+                //nevermind then
+                FMT_PRINT("Send Cmd {:x} with status {:x}, But already got response earlier\n", CmdId, status_code);
+                return;
+            }
 
 #ifndef NDEBUG
             {
@@ -353,7 +366,6 @@ namespace zb
                 return;
             }
             //sending was ok, now we expect a response
-            ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, pCmd);
         }
 
         static void OnTimer(void *p)
