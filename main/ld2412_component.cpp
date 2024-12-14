@@ -101,9 +101,15 @@ namespace ld2412
 
     void Component::presence_pir_pin_isr(void *param)
     {
+        static int g_last = -1;
         Component &c = *static_cast<Component*>(param);
-        QueueMsg msg{.m_Type=QueueMsg::Type::PIRPresenceIntr, .m_Dummy=false};
-        xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
+        int l = gpio_get_level(gpio_num_t(c.m_PIRPresencePin));
+        if (l != g_last)
+        {
+            g_last = l;
+            QueueMsg msg{.m_Type=QueueMsg::Type::PIRPresenceIntr, .m_Dummy=bool(l)};
+            xQueueSendFromISR(c.m_FastQueue, &msg, nullptr);
+        }
     }
 
     void Component::HandleMessage(QueueMsg &msg)
