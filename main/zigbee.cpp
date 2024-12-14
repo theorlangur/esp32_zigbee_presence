@@ -594,11 +594,13 @@ namespace zb
         }
         else
         {
+#ifndef NDEBUG
             using clock_t = std::chrono::system_clock;
             auto now = clock_t::now();
             auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
             //no presence. send 'off' command, no timer reset
             FMT_PRINT("{} Sending off command on timer\n", _n);
+#endif
             g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             if (g_State.m_BoundDevices)
                 g_State.m_OffSender.Send();
@@ -626,9 +628,12 @@ namespace zb
         }
         else if (m == OnOffMode::TimedOnLocal)
         {
+#ifndef NDEBUG
             using clock_t = std::chrono::system_clock;
             auto now = clock_t::now();
             auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
+            FMT_PRINT("{} Sending ON (timed-on-local) command to binded\n", _n);
+#endif
 
             if (t)//makes sense only for non-0
             {
@@ -641,7 +646,6 @@ namespace zb
                 }
                 g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, t * 1000);
             }
-            FMT_PRINT("{} Sending ON (timed-on-local) command to binded\n", _n);
             g_State.m_OnSender.Send();
         }
         else

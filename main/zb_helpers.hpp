@@ -9,7 +9,9 @@
 #include <utility>
 #include "generic_helpers.hpp"
 
+#ifndef NDEBUG
 #define ZB_DBG
+#endif
 
 namespace zb
 {
@@ -549,6 +551,7 @@ namespace zb
                         pR->m_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] = {nullptr, nullptr};
                 }else
                 {
+#ifndef NDEBUG
                     using clock_t = std::chrono::system_clock;
                     auto now = clock_t::now();
                     auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
@@ -559,15 +562,18 @@ namespace zb
                             , pCmdRespMsg->info.src_endpoint
                             , pCmdRespMsg->info.cluster
                             );
+#endif
                 }
             }
             break;
         default:
             {
+#ifndef NDEBUG
             using clock_t = std::chrono::system_clock;
             auto now = clock_t::now();
             auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
             FMT_PRINT("{} Receive Zigbee action({:x}) callback\n", _n, (int)callback_id);
+#endif
             }
             break;
         }
