@@ -62,16 +62,19 @@ namespace zb
     static constexpr led::Color kColorError{255, 0, 0};
     static constexpr led::Color kColorError2{255, 0, 255};
     static constexpr led::Color kColorSpecial{0, 255, 255};
+    static constexpr led::Color kColorWhite{255, 255, 255};
 
     static constexpr uint32_t kBlinkPatternFactoryReset = 0x0F00F00F;
     static constexpr uint32_t kBlinkPatternZStackError = 0x0F00F00F;
     static constexpr uint32_t kBlinkPatternSteeringError = 0x0000F00F;
+    static constexpr uint32_t kBlinkPatternCmdError = 0b00000111000111000111000111000111;//5 pulses
 
     static constexpr led::Color kColorSteering = kColorInfo;
     static constexpr led::Color kSteeringError = kColorError;
     static constexpr led::Color kSteering = kColorInfo;
     static constexpr led::Color kZStackError = kColorError2;
     static constexpr led::Color kLD2412ConfigError = kColorError;
+    static constexpr led::Color kCmdError = kColorWhite;
     /**********************************************************************/
     /* Custom attributes IDs                                              */
     /**********************************************************************/
@@ -221,6 +224,7 @@ namespace zb
 
     //forward decl
     void cmd_failure(uint8_t cmd_id, esp_zb_zcl_status_t status_code);
+    void cmd_total_failure(uint16_t clusterId, uint8_t cmd_id);
     bool is_coordinator(esp_zb_zcl_addr_t &addr);
 
     template<uint16_t ClusterId, int CmdId, int Retries, auto CmdSender>
@@ -236,22 +240,35 @@ namespace zb
         zb::seq_nr_t SendRaw() { return CmdSender(); }
         void Send()
         {
+            if (m_SeqNr != kInvalidSeqNr)//another command is already in flight
+                return;//TODO: log? inc failure count?
+
             m_RetriesLeft = Retries;
 
             if constexpr (Retries) //register response
                 SendAgain();
             else
-                m_SeqNr = SendRaw();
+                SendRaw();
         }
 
         void SendAgain()
         {
             m_SeqNr = SendRaw();
             ZbCmdSend::Register(m_SeqNr, &OnSendStatus, this);
-            ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, this);
             StartTimer();
         }
     private:
+        void OnFailed()
+        {
+            if (m_SeqNr != kInvalidSeqNr)
+            {
+                ZbCmdSend::Unregister(m_SeqNr);
+                m_SeqNr = kInvalidSeqNr;
+            }
+            ZbCmdResponse::Unregister(ClusterId, CmdId);
+            cmd_total_failure(ClusterId, CmdId);
+        }
+
         static bool OnCmdResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *pInfo, void *user_ctx)
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
@@ -261,19 +278,14 @@ namespace zb
                 return true;//keep response handler
             }
 
-            if (pCmd->m_SeqNr != kInvalidSeqNr)
-            {
-                //if we're here, send was ok
-                ZbCmdSend::Unregister(pCmd->m_SeqNr);
-                pCmd->m_SeqNr = kInvalidSeqNr;
-            }
-
+#ifndef NDEBUG
             {
                 using clock_t = std::chrono::system_clock;
                 auto now = clock_t::now();
                 auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
                 FMT_PRINT("{} Response on Cmd {:x} from {}; status: {:x}\n", _n, CmdId, pInfo->src_address, (int)status_code);
             }
+#endif
             if (status_code != ESP_ZB_ZCL_STATUS_SUCCESS)
             {
                 ++pCmd->m_FailureCount;
@@ -284,6 +296,7 @@ namespace zb
                 {
                     //failure
                     FMT_PRINT("Cmd {:x} completely failed\n", CmdId);
+                    pCmd->OnFailed();
                     return false;//no need to keep.
                 }
                 //try again
@@ -293,6 +306,7 @@ namespace zb
                 return true;//leave registered
             }
 
+            pCmd->m_SeqNr = kInvalidSeqNr;
             //all good
             pCmd->CancelTimer();
             return false;
@@ -301,8 +315,6 @@ namespace zb
         static void OnSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
-            pCmd->m_SeqNr = kInvalidSeqNr;
-
             auto status_code = pSendStatus->status;
             if (is_coordinator(pSendStatus->dst_addr))
             {
@@ -310,32 +322,35 @@ namespace zb
                 return;//skipping coordinator
             }
 
+#ifndef NDEBUG
             {
                 using clock_t = std::chrono::system_clock;
                 auto now = clock_t::now();
                 auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
                 FMT_PRINT("{} Send Cmd {:x} seqNr={:x} to {}; status: {:x}\n", _n, CmdId, pSendStatus->tsn, pSendStatus->dst_addr, (int)status_code);
             }
+#endif
             if (status_code != ESP_ZB_ZCL_STATUS_SUCCESS)
             {
                 ++pCmd->m_FailureCount;
-                cmd_failure(CmdId, esp_zb_zcl_status_t(status_code));
+                cmd_failure(CmdId, ESP_ZB_ZCL_STATUS_FAIL);
 
                 FMT_PRINT("Cmd {:x} failed with status: {:x}\n", CmdId, (int)status_code);
                 if (!pCmd->m_RetriesLeft)
                 {
                     //failure
                     FMT_PRINT("Cmd {:x} completely failed\n", CmdId);
+                    pCmd->OnFailed();
                     return;
                 }
                 //try again
                 --pCmd->m_RetriesLeft;
                 FMT_PRINT("Retry: Cmd {:x} (left: {})\n", CmdId, pCmd->m_RetriesLeft);
                 pCmd->SendAgain();
+                return;
             }
-            //all good, but we need also a command response
-            //pCmd->CancelTimer();
-            //return;
+            //sending was ok, now we expect a response
+            ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, pCmd);
         }
 
         static void OnTimer(void *p)
@@ -348,6 +363,7 @@ namespace zb
                 ZbCmdSend::Unregister(pCmd->m_SeqNr);
                 pCmd->m_SeqNr = kInvalidSeqNr;
             }
+            ZbCmdResponse::Unregister(ClusterId, CmdId);
             cmd_failure(CmdId, ESP_ZB_ZCL_STATUS_TIMEOUT);
 
             if (pCmd->m_RetriesLeft)
@@ -360,8 +376,7 @@ namespace zb
             }
 
             FMT_PRINT("Cmd {:x} timed out and no retries left\n", CmdId);
-            //failure
-            ZbCmdResponse::Unregister(ClusterId, CmdId);
+            pCmd->OnFailed();
         }
 
         void CancelTimer()
@@ -510,6 +525,12 @@ namespace zb
         {
             FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
         }
+    }
+
+    void cmd_total_failure(uint16_t clusterId, uint8_t cmd_id)
+    {
+        led::blink_pattern(kBlinkPatternCmdError, kCmdError, duration_ms_t(1000));
+        led::blink(false, {});
     }
 
     void update_info_on_own_binds()
