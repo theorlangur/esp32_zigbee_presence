@@ -256,23 +256,26 @@ namespace zb
 
         void SendAgain()
         {
-            m_SeqNr = SendRaw();
+            SetSeqNr(SendRaw());
             m_SendCallbackProcessed = m_RespCallbackProcessed = false;
-            ZbCmdSend::Register(m_SeqNr, &OnSendStatus, this);
             ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, this);
             StartTimer();
         }
     private:
+        void SetSeqNr(uint16_t nr = kInvalidSeqNr)
+        {
+            if (m_SeqNr != kInvalidSeqNr)
+                ZbCmdSend::Unregister(m_SeqNr);
+            m_SeqNr = nr;
+            if (m_SeqNr != kInvalidSeqNr)
+                ZbCmdSend::Register(m_SeqNr, &OnSendStatus, this);
+        }
         bool m_SendCallbackProcessed = false;
         bool m_RespCallbackProcessed = false;
         void OnFailed()
         {
             m_SendCallbackProcessed = m_RespCallbackProcessed = false;
-            if (m_SeqNr != kInvalidSeqNr)
-            {
-                ZbCmdSend::Unregister(m_SeqNr);
-                m_SeqNr = kInvalidSeqNr;
-            }
+            SetSeqNr();
             ZbCmdResponse::Unregister(ClusterId, CmdId);
             cmd_total_failure(ClusterId, CmdId);
         }
@@ -287,6 +290,8 @@ namespace zb
             }
 
             pCmd->m_RespCallbackProcessed = true;
+            pCmd->SetSeqNr();//reset
+
 #ifndef NDEBUG
             {
                 using clock_t = std::chrono::system_clock;
@@ -315,7 +320,6 @@ namespace zb
                 return true;//leave registered
             }
 
-            pCmd->m_SeqNr = kInvalidSeqNr;
             //all good
             pCmd->CancelTimer();
             return false;
@@ -373,11 +377,7 @@ namespace zb
             CmdWithRetries *pCmd = (CmdWithRetries *)p;
             pCmd->m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             ++pCmd->m_FailureCount;
-            if (pCmd->m_SeqNr != kInvalidSeqNr)
-            {
-                ZbCmdSend::Unregister(pCmd->m_SeqNr);
-                pCmd->m_SeqNr = kInvalidSeqNr;
-            }
+            pCmd->SetSeqNr();//reset
             ZbCmdResponse::Unregister(ClusterId, CmdId);
             cmd_failure(CmdId, ESP_ZB_ZCL_STATUS_TIMEOUT);
 
