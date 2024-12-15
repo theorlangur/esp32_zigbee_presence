@@ -233,7 +233,7 @@ namespace zb
     template<uint16_t ClusterId, int CmdId, int Retries, auto CmdSender>
     struct CmdWithRetries
     {
-        static constexpr uint32_t kCmdResponseWait = 500;//ms
+        static constexpr uint32_t kCmdResponseWait = 700;//ms
         static constexpr uint16_t kInvalidSeqNr = 0xffff;
         esp_zb_user_cb_handle_t m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
         uint16_t m_SeqNr = kInvalidSeqNr;
@@ -274,6 +274,7 @@ namespace zb
         bool m_RespCallbackProcessed = false;
         void OnFailed()
         {
+            CancelTimer();
             m_SendCallbackProcessed = m_RespCallbackProcessed = false;
             SetSeqNr();
             ZbCmdResponse::Unregister(ClusterId, CmdId);
