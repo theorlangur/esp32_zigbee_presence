@@ -11,7 +11,7 @@ namespace ld2412
 {
     struct Component::QueueMsg
     {
-        enum class Type: std::size_t 
+        enum class Type: uint8_t 
         {
             //commands
             Stop,
@@ -43,7 +43,6 @@ namespace ld2412
         union
         {
             uint8_t m_Dummy;
-            int64_t m_TimeStamp;
             struct{
                 uint16_t m_DistanceStill;
                 uint16_t m_DistanceMove;
@@ -803,7 +802,7 @@ namespace ld2412
         }
 
         thread::start_task({.pName="LD2412_Manage", .stackSize = 4*4096, .prio=thread::kPrioElevated}, &manage_loop, this).detach();
-        thread::start_task({.pName="LD2412_Fast", .stackSize = 4*4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
+        thread::start_task({.pName="LD2412_Fast", .stackSize = 8*4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
 
         FMT_PRINT("ld2412 component: configuring isr\n");
         fflush(stdout);
