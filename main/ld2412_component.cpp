@@ -794,7 +794,7 @@ namespace ld2412
         }
 
         m_FastQueue = xQueueCreate(256, sizeof(QueueMsg));
-        m_ManagingQueue.store(xQueueCreate(10, sizeof(QueueMsg)), std::memory_order_relaxed);
+        m_ManagingQueue.store(xQueueCreate(16, sizeof(QueueMsg)), std::memory_order_relaxed);
         {
             //enque reading data first
             QueueMsg msg{.m_Type = QueueMsg::Type::ReadData, .m_Dummy = true};
