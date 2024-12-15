@@ -794,7 +794,7 @@ namespace ld2412
             FMT_PRINT("Gate {} Thresholds: Move={} Still={}\n", i, m_Sensor.GetMoveThreshold(i), m_Sensor.GetStillThreshold(i));
         }
 
-        m_FastQueue = xQueueCreate(10, sizeof(QueueMsg));
+        m_FastQueue = xQueueCreate(256, sizeof(QueueMsg));
         m_ManagingQueue.store(xQueueCreate(10, sizeof(QueueMsg)), std::memory_order_relaxed);
         {
             //enque reading data first
@@ -803,7 +803,7 @@ namespace ld2412
         }
 
         thread::start_task({.pName="LD2412_Manage", .stackSize = 4*4096, .prio=thread::kPrioElevated}, &manage_loop, this).detach();
-        thread::start_task({.pName="LD2412_Fast", .stackSize = 8*4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
+        thread::start_task({.pName="LD2412_Fast", .stackSize = 4*4096, .prio=thread::kPrioHigh}, &fast_loop, this).detach();
 
         FMT_PRINT("ld2412 component: configuring isr\n");
         fflush(stdout);
