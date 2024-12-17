@@ -475,9 +475,10 @@ namespace zb
         esp_zb_zcl_on_off_cmd_t cmd_req;
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -485,11 +486,11 @@ namespace zb
     {
         esp_zb_zcl_on_off_cmd_t cmd_req;
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -500,10 +501,10 @@ namespace zb
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_control = 0;//process unconditionally
         cmd_req.on_time = t * 10;
-        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
     }
 
