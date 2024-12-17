@@ -295,6 +295,84 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    internals: () => {
+        const exposes = [
+            e.numeric('last_bind_response_status', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic'),
+            e.enum('last_send_on_off_status', ea.STATE_GET, 
+                ['Initial'
+                    ,'ReturnOnNothing'
+                    ,'ReturnOnOffOnly'
+                    ,'ReturnOnOnTimedOnTimedLocal'
+                    ,'ReturnOnNoBoundDevices'
+                    ,'SentTimedOn'
+                    ,'SentTimedOnLocal'
+                    ,'SentOn'
+                    ,'SentOff'
+                ]
+            ).withCategory('diagnostic'),
+            e.enum('last_local_timer_state', ea.STATE_GET, 
+                ['Initial'
+                    ,'PresenceResetTimer'
+                    ,'PresenceNoTimeout'
+                    ,'NoPresenceSentOff'
+                    ,'NoPresenceNoBoundDevices'
+                ]
+            ).withCategory('diagnostic'),
+            e.enum('last_external_timer_state', ea.STATE_GET, 
+                ['Initial'
+                    ,'FinishedNoPresenceChange'
+                    ,'FinishedPresenceChangeSentOnOff'
+                ]
+            ).withCategory('diagnostic'),
+            e.numeric('has_running_timer', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('has_external_timer', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('bind_req_active', ea.STATE_GET).withCategory('diagnostic'),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${util.inspect(data)};`, NS);
+                    if (data['internals'] !== undefined) 
+                    {
+                        const buffer = Buffer.alloc(4);
+                        buffer.writeUInt32LE(data['internals']);
+                        result['last_bind_response_status'] = buffer.readUInt8(0);
+                        const boundDevsSendOff = buffer.readUInt8(1);
+                        result['bound_devices'] = boundDevsSendOff & 0x0f;
+                        result['last_send_on_off_status'] = exposes[2].values[(boundDevsSendOff >> 4) & 0x0f];
+                        const lastTimerStates = buffer.readUInt8(2);
+                        result['last_local_timer_state'] = exposes[3].values[lastTimerStates & 0x0f];
+                        result['last_external_timer_state'] = exposes[4].values[(lastTimerStates >> 4) & 0x0f];
+                        const miscBits = buffer.readUInt8(3);
+                        result['has_running_timer'] = miscBits & 1;
+                        result['has_external_timer'] = (miscBits >> 1) & 1;
+                        result['bind_req_active'] = (miscBits >> 2) & 1;
+                    }
+                    else 
+                    {
+                        //logger.debug(`presenceInfo fZ nothing to process`, NS);
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     presenceInfo: (prefix) => {
         const attrDistance = prefix + 'Distance'
         const attrEnergy = prefix + 'Energy'
@@ -510,6 +588,7 @@ const definition = {
                 failure_count: {ID:0x001d, type: Zcl.DataType.UINT16},
                 failure_status: {ID:0x001e, type: Zcl.DataType.UINT16},
                 total_failure_count: {ID:0x001f, type: Zcl.DataType.UINT16},
+                internals: {ID:0x0020, type: Zcl.DataType.UINT32},
             },
             commands: {
                 restart: {
@@ -669,6 +748,7 @@ const definition = {
         orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
         orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
         orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
+        orlangurOccupactionExtended.internals(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
@@ -768,6 +848,12 @@ const definition = {
             },
             {
                 attribute: 'total_failure_count',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'internals',
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
