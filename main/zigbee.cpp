@@ -114,6 +114,7 @@ namespace zb
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 30;
     static constexpr const uint16_t ATTRIB_TOTAL_FAILURE_COUNT = 31;
     static constexpr const uint16_t ATTRIB_INTERNALS = 32;
+    static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 33;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -177,6 +178,7 @@ namespace zb
     using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
     using ZclAttributeTotalFailureCount_t                     = LD2412CustomCluster_t::Attribute<ATTRIB_TOTAL_FAILURE_COUNT , uint16_t>;
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
+    using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -224,6 +226,7 @@ namespace zb
     static ZclAttributeFailureStatus_t                         g_FailureStatus;
     static ZclAttributeTotalFailureCount_t                     g_TotalFailureCount;
     static ZclAttributeInternals_t                             g_Internals;
+    static ZclAttributeRestartsCount_t                         g_RestartsCount;
 
     struct ZbAlarm
     {
@@ -1140,6 +1143,10 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial internals {:x}\n", (int)status.error());
             }
+            if (auto status = g_RestartsCount.Set(g_Config.GetRestarts()); !status)
+            {
+                FMT_PRINT("Failed to set initial internals {:x}\n", (int)status.error());
+            }
             
             auto presenceDetectionMode = g_Config.GetPresenceDetectionMode();
             //FMT_PRINT("initial detection mode: edge: {} {} {}; keep: {} {} {}\n"
@@ -1607,6 +1614,7 @@ namespace zb
         ESP_ERROR_CHECK(g_FailureStatus.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_TotalFailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_Internals.AddToCluster(custom_cluster, Access::Read | Access::Report));
+        ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }

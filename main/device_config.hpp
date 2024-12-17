@@ -28,6 +28,7 @@ namespace zb
         LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
         uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
         uint16_t m_ExternalOnOffTimeout = 1;
+        uint16_t m_Restarts = 0;
     public:
         auto GetVersion() const { return m_Version; }
         auto GetOnOffTimeout() const { return m_OnOffTimeout; }
@@ -36,6 +37,7 @@ namespace zb
         auto GetLD2412Mode() const { return m_LD2412Mode; }
         auto GetIlluminanceThreshold() const { return m_IlluminanceThreshold; }
         auto GetExternalOnOffTimeout() const { return m_ExternalOnOffTimeout; }
+        auto GetRestarts() const { return m_Restarts; }
 
         void SetVersion(uint32_t v);
         void SetOnOffTimeout(uint16_t v);

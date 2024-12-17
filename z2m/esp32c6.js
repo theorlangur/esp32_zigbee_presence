@@ -589,6 +589,7 @@ const definition = {
                 failure_status: {ID:0x001e, type: Zcl.DataType.UINT16},
                 total_failure_count: {ID:0x001f, type: Zcl.DataType.UINT16},
                 internals: {ID:0x0020, type: Zcl.DataType.UINT32},
+                restarts_count: {ID:0x0021, type: Zcl.DataType.UINT16},
             },
             commands: {
                 restart: {
@@ -708,6 +709,7 @@ const definition = {
             valueMax: 65535,
             access: 'STATE',
             entityCategory: 'diagnostic',
+            unit: 'times',
         }),
         numeric({
             name: 'total_failure_count',
@@ -718,6 +720,18 @@ const definition = {
             valueMax: 65535,
             access: 'STATE',
             entityCategory: 'diagnostic',
+            unit: 'times',
+        }),
+        numeric({
+            name: 'restarts_count',
+            cluster: 'customOccupationConfig',
+            attribute: 'restarts_count',
+            description: 'Amount of restarts',
+            valueMin: 0,
+            valueMax: 65535,
+            access: 'STATE',
+            entityCategory: 'diagnostic',
+            unit: 'times',
         }),
         enumLookup({
             name: 'failure_status',
@@ -859,6 +873,16 @@ const definition = {
                 reportableChange: null,
             },
         ]);
+
+        await endpoint.read('customOccupationConfig', ['restarts_count']);
+        //await endpoint.configureReporting('customOccupationConfig', [
+        //    {
+        //        attribute: 'restarts_count',
+        //        minimumReportInterval: 0,
+        //        maximumReportInterval: constants.repInterval.HOUR,
+        //        reportableChange: null,
+        //    },
+        //]);
     },
 
 };

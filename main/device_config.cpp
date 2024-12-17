@@ -53,6 +53,7 @@ namespace zb
                 ESP_LOGE(TAG, "Read: %d; File size: %d", r, (size_t)st.st_size);
                 fclose(f);
                 f = nullptr;
+                ++m_Restarts;
                 return on_change();//we must always write the up-to-date version after conversion
             }
 
@@ -64,7 +65,9 @@ namespace zb
                     ESP_LOGE(TAG, "Failed to read rest from existing config file %s (read: %d)", kConfigFilePath, r);
                     return ESP_ERR_INVALID_SIZE;
                 }
-                return ESP_OK;
+
+                ++m_Restarts;
+                return on_change();
             }else
             {
                 //here be dragons. I mean streaming conversion
