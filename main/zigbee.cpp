@@ -17,6 +17,9 @@
 
 #include "board_led.hpp"
 
+#define zb_start_timer esp_zb_scheduler_user_alarm
+#define zb_cancel_timer esp_zb_scheduler_user_alarm_cancel
+
 namespace zb
 {
     enum class LD2412State: std::underlying_type_t<LD2412::TargetState>
@@ -222,6 +225,66 @@ namespace zb
     static ZclAttributeTotalFailureCount_t                     g_TotalFailureCount;
     static ZclAttributeInternals_t                             g_Internals;
 
+    struct ZbAlarm
+    {
+        static uint8_t g_TimerHandles[256];
+        const char *pDescr = nullptr;
+        esp_zb_user_callback_t cb;
+        void *param;
+        esp_zb_user_cb_handle_t h = ESP_ZB_USER_CB_HANDLE_INVALID;
+
+        bool IsRunning() const { return h != ESP_ZB_USER_CB_HANDLE_INVALID; }
+
+        void Cancel()
+        {
+            if (h != ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                if (g_TimerHandles[h] != 1)
+                {
+                    ESP_ERROR_CHECK(ESP_FAIL);
+                }
+                zb_cancel_timer(h);
+                g_TimerHandles[h] = 0;
+                h = ESP_ZB_USER_CB_HANDLE_INVALID;
+            }
+        }
+
+        void Setup(esp_zb_user_callback_t cb, void *param, uint32_t time)
+        {
+            Cancel();
+            this->cb = cb;
+            this->param = param;
+            h = zb_start_timer(on_timer, this, time);
+            if (pDescr)
+            {
+                FMT_PRINT("[task={}; lock={}]{}: {:x}\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, pDescr, (uint8_t)h);
+            }
+            esp_err_t e = h == ESP_ZB_USER_CB_HANDLE_INVALID ? ESP_FAIL : ESP_OK;
+            if (h == ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                esp_restart();
+            }
+            ESP_ERROR_CHECK(e);
+            if (h != ESP_ZB_USER_CB_HANDLE_INVALID)
+            {
+                if (g_TimerHandles[h] != 0)
+                {
+                    ESP_ERROR_CHECK(ESP_FAIL);
+                }
+                g_TimerHandles[h] = 1;
+            }
+        }
+
+        static void on_timer(void* param)
+        {
+            ZbAlarm *pAlarm = (ZbAlarm *)param;
+            g_TimerHandles[pAlarm->h] = 0;
+            pAlarm->h = ESP_ZB_USER_CB_HANDLE_INVALID;
+            pAlarm->cb(pAlarm->param);
+        }
+    };
+    uint8_t ZbAlarm::g_TimerHandles[256] = {0};
+
     /**********************************************************************/
     /* Storable data                                                      */
     /**********************************************************************/
@@ -238,21 +301,28 @@ namespace zb
     {
         static constexpr uint32_t kCmdResponseWait = 700;//ms
         static constexpr uint16_t kInvalidSeqNr = 0xffff;
-        esp_zb_user_cb_handle_t m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        ZbAlarm m_WaitResponseTimer{"m_WaitResponseTimer", nullptr, nullptr};
         uint16_t m_SeqNr = kInvalidSeqNr;
         int m_RetriesLeft = Retries;
         int m_FailureCount = 0;
+        bool fake = false;
 
-        zb::seq_nr_t SendRaw() { return CmdSender(); }
-        void Send()
+        zb::seq_nr_t SendRaw() { return fake ? kInvalidSeqNr : CmdSender(); }
+        void Send(bool fake = false)
         {
             if (m_SeqNr != kInvalidSeqNr)//another command is already in flight
+            {
+                ESP_ERROR_CHECK(ESP_FAIL);
                 return;//TODO: log? inc failure count?
+            }
 
+            this->fake = fake;
             m_RetriesLeft = Retries;
 
             if constexpr (Retries) //register response
+            {
                 SendAgain();
+            }
             else
                 SendRaw();
         }
@@ -262,7 +332,7 @@ namespace zb
             SetSeqNr(SendRaw());
             m_SendCallbackProcessed = m_RespCallbackProcessed = false;
             ZbCmdResponse::Register(ClusterId, CmdId, &OnCmdResponse, this);
-            StartTimer();
+            m_WaitResponseTimer.Setup(OnTimer, this, kCmdResponseWait);
         }
     private:
         void SetSeqNr(uint16_t nr = kInvalidSeqNr)
@@ -277,7 +347,7 @@ namespace zb
         bool m_RespCallbackProcessed = false;
         void OnFailed()
         {
-            CancelTimer();
+            m_WaitResponseTimer.Cancel();
             m_SendCallbackProcessed = m_RespCallbackProcessed = false;
             SetSeqNr();
             ZbCmdResponse::Unregister(ClusterId, CmdId);
@@ -325,7 +395,7 @@ namespace zb
             }
 
             //all good
-            pCmd->CancelTimer();
+            pCmd->m_WaitResponseTimer.Cancel();
             return false;
         }
 
@@ -379,7 +449,6 @@ namespace zb
         static void OnTimer(void *p)
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)p;
-            pCmd->m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             ++pCmd->m_FailureCount;
             pCmd->SetSeqNr();//reset
             ZbCmdResponse::Unregister(ClusterId, CmdId);
@@ -397,31 +466,18 @@ namespace zb
             FMT_PRINT("Cmd {:x} timed out and no retries left\n", CmdId);
             pCmd->OnFailed();
         }
-
-        void CancelTimer()
-        {
-            if (m_WaitResponseTimer != ESP_ZB_USER_CB_HANDLE_INVALID)
-            {
-                //timer IS running already
-                //need to cancel it
-                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(m_WaitResponseTimer));
-                m_WaitResponseTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
-            }
-        }
-
-        void StartTimer()
-        {
-            CancelTimer();
-            m_WaitResponseTimer = esp_zb_scheduler_user_alarm(OnTimer, this, kCmdResponseWait);
-        }
     };
 
+    uint16_t g_BoundAddr = 0;
+    uint8_t g_EndP = 0;
     zb::seq_nr_t send_on_raw()
     {
         esp_zb_zcl_on_off_cmd_t cmd_req;
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -429,8 +485,11 @@ namespace zb
     {
         esp_zb_zcl_on_off_cmd_t cmd_req;
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -439,9 +498,12 @@ namespace zb
         auto t = g_Config.GetOnOffTimeout();
         esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
         cmd_req.on_off_control = 0;//process unconditionally
         cmd_req.on_time = t * 10;
+        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+        cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
     }
 
@@ -514,8 +576,8 @@ namespace zb
         bool m_LastPresenceMMWave = false;
         bool m_LastPresencePIRInternal = false;
         bool m_LastPresenceExternal = false;
-        esp_zb_user_cb_handle_t m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
-        esp_zb_user_cb_handle_t m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
+        ZbAlarm m_RunningTimer{"m_RunningTimer", nullptr, nullptr};
+        ZbAlarm m_ExternalRunningTimer{"m_ExternalRunningTimer", nullptr, nullptr};
 
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2, send_on_raw> m_OnSender;
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2, send_off_raw> m_OffSender;
@@ -542,36 +604,16 @@ namespace zb
             return false;
         }
 
-        void CancelTimer(esp_zb_user_cb_handle_t &t)
-        {
-            if (t != ESP_ZB_USER_CB_HANDLE_INVALID)
-            {
-                //timer IS running already
-                //need to cancel it
-                ESP_ERROR_CHECK(esp_zb_scheduler_user_alarm_cancel(t));
-                t = ESP_ZB_USER_CB_HANDLE_INVALID;
-            }
-        }
-
-        void StartTimer(esp_zb_user_cb_handle_t &t, esp_zb_user_callback_t cb, uint32_t time)
-        {
-            CancelTimer(t);
-            t = esp_zb_scheduler_user_alarm(cb, nullptr, time);
-        }
-
-        void CancelLocalTimer() { CancelTimer(m_RunningTimer); }
-        void CancelExternalTimer() { CancelTimer(m_ExternalRunningTimer); }
-
         void StartExternalTimer(esp_zb_user_callback_t cb, uint32_t time)
         {
             FMT_PRINT("Starting external timer for {} ms\n", time);
-            StartTimer(m_ExternalRunningTimer, cb, time);
+            m_ExternalRunningTimer.Setup(cb, nullptr, time);
         }
 
         void StartLocalTimer(esp_zb_user_callback_t cb, uint32_t time)
         {
             FMT_PRINT("Starting local timer for {} ms\n", time);
-            StartTimer(m_RunningTimer, cb, time);
+            m_RunningTimer.Setup(cb, nullptr, time);
         }
 
         void RunBindsChecking()
@@ -584,20 +626,22 @@ namespace zb
             else
                 m_LastFailedStatus = (esp_zb_zcl_status_t)ExtendedFailureStatus::BindRequestIncomplete;
 
-            m_BindsCheck = esp_zb_scheduler_user_alarm([](void *p){
+            m_BindsCheck = zb_start_timer([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
                         pState->m_BindsCheck = ESP_ZB_USER_CB_HANDLE_INVALID;
                         pState->RunBindsChecking();
                     }, this, 2000);
+            FMT_PRINT("m_BindsCheck: {:x}\n", (uint8_t)m_BindsCheck);
         }
 
         void RunInternalsReporting()
         {
-            m_Internals.m_HasRunningTimer = m_RunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID;
-            m_Internals.m_HasExternalTimer = m_ExternalRunningTimer != ESP_ZB_USER_CB_HANDLE_INVALID;
+            m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
+            m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
             m_Internals.Update();//send to zigbee
             
-            esp_zb_scheduler_user_alarm([](void *p){
+            static ZbAlarm rep{"InternalsReporting", nullptr, nullptr};
+            rep.Setup([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
                         pState->m_BindsCheck = ESP_ZB_USER_CB_HANDLE_INVALID;
                         pState->RunInternalsReporting();
@@ -656,6 +700,8 @@ namespace zb
                 g_State.m_Internals.m_BindRequestActive = false;
                 g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
                 int foundBinds = 0;
+                uint16_t firstShortAddr = 0;
+                uint8_t firstEndP = 0;
                 //ESP_LOGI(TAG, "Binds callback");
                 auto *pRec = table_info->record;
                 while(pRec)
@@ -671,11 +717,18 @@ namespace zb
                             if (RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
                             {
                                 ++foundBinds;
+                                if (foundBinds == 1)
+                                {
+                                    firstEndP = pRec->dst_endp;
+                                    firstShortAddr = esp_zb_address_short_by_ieee(pRec->dst_address.addr_long);
+                                }
                             }
                         }
                     }
                     pRec = pRec->next;
                 }
+                g_BoundAddr = firstShortAddr;
+                g_EndP = firstEndP;
                 g_State.m_Internals.m_BoundDevices = foundBinds;
                 //FMT_PRINT("Binds found: {}\n", foundBinds);
             },
@@ -692,12 +745,14 @@ namespace zb
             if (g_Config.GetOnOffTimeout())//still valid timeout?
             {
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::StillPresenceResetTimer;
-                g_State.m_RunningTimer = esp_zb_scheduler_user_alarm(&on_local_on_timer_finished, nullptr, g_Config.GetOnOffTimeout() * 1000);
+                g_State.m_RunningTimer.Setup(&on_local_on_timer_finished, nullptr, g_Config.GetOnOffTimeout() * 1000);
+                //let's see
+                //FMT_PRINT("Non-Fake On\n");
+                //g_State.m_OnSender.Send(false);
             }
             else
             {
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::StillPresenceNoTimeout;
-                g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             }
         }
         else
@@ -709,7 +764,6 @@ namespace zb
             //no presence. send 'off' command, no timer reset
             FMT_PRINT("{} Sending off command on timer\n", _n);
 #endif
-            g_State.m_RunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
             if (g_State.m_Internals.m_BoundDevices)
             {
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::NoPresenceSentOff;
@@ -747,7 +801,7 @@ namespace zb
             return;//no bound devices with on/off cluster, no reason to send a command
         }
 
-        g_State.CancelLocalTimer();
+        g_State.m_RunningTimer.Cancel();
         if (m == OnOffMode::TimedOn)
         {
             g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOn;
@@ -1147,7 +1201,6 @@ namespace zb
     void on_external_on_timer_finished(void* param)
     {
         FMT_PRINT("External timer finished\n");
-        g_State.m_ExternalRunningTimer = ESP_ZB_USER_CB_HANDLE_INVALID;
         g_State.m_LastPresenceExternal = false;
         if (auto status = g_ExternalOnOff.Set(g_State.m_LastPresenceExternal); !status)
         {
@@ -1176,7 +1229,7 @@ namespace zb
         if (auto et = g_Config.GetExternalOnOffTimeout(); et > 0)
             g_State.StartExternalTimer(&on_external_on_timer_finished, et * 1000);
         else
-            g_State.CancelExternalTimer();
+            g_State.m_ExternalRunningTimer.Cancel();
 
         if (update_presence_state())
         {
@@ -1194,7 +1247,7 @@ namespace zb
     {
         FMT_PRINT("Switching external on/off OFF {}...\n");
         g_State.m_LastPresenceExternal = false;
-        g_State.CancelExternalTimer();
+        g_State.m_ExternalRunningTimer.Cancel();
         g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         if (update_presence_state())
         {
@@ -1230,7 +1283,7 @@ namespace zb
     {
         FMT_PRINT("Switching external on/off ON with params: ctrl: {}; on time: {} (deci-seconds); off wait time: {} (deci-seconds)\n", data.on_off_ctrl, data.on_time, data.off_wait_time);
         g_State.m_LastPresenceExternal = true;
-        g_State.CancelExternalTimer();
+        g_State.m_ExternalRunningTimer.Cancel();
         g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         if (data.on_time > 0 && data.on_time < 0xfffe)
         {
@@ -1301,7 +1354,7 @@ namespace zb
                     if (ex_timeout)
                         g_State.StartExternalTimer(&on_external_on_timer_finished, ex_timeout * 1000);
                     else
-                        g_State.CancelExternalTimer();
+                        g_State.m_ExternalRunningTimer.Cancel();
                 }
 
                 if (update_presence_state())

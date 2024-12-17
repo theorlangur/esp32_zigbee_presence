@@ -84,9 +84,11 @@ namespace zb
 
     struct APILock
     {
-        APILock() { esp_zb_lock_acquire(portMAX_DELAY); }
-        ~APILock() { esp_zb_lock_release(); }
+        static bool g_State;
+        APILock() { esp_zb_lock_acquire(portMAX_DELAY); g_State = true; }
+        ~APILock() { g_State = false; esp_zb_lock_release(); }
     };
+    inline bool APILock::g_State = false;
 
     struct DestAddr
     {
@@ -462,7 +464,7 @@ namespace zb
                 e.h(&message, e.user_ctx);
             }else
             {
-                FMT_PRINT("Send status: seqNr={}; dst={},  Receive Zigbee action({:x}) callback\n", message.tsn, message.dst_addr);
+                FMT_PRINT("[task={}; lock={}]Send status(no callback): seqNr={}; dst={},  status={:x}\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, message.tsn, message.dst_addr, message.status);
             }
         }
     };
@@ -569,10 +571,10 @@ namespace zb
         default:
             {
 #ifndef NDEBUG
-            using clock_t = std::chrono::system_clock;
-            auto now = clock_t::now();
-            auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
-            FMT_PRINT("{} Receive Zigbee action({:x}) callback\n", _n, (int)callback_id);
+            //using clock_t = std::chrono::system_clock;
+            //auto now = clock_t::now();
+            //auto _n = std::chrono::time_point_cast<std::chrono::milliseconds>(now).time_since_epoch().count();
+            FMT_PRINT("task={}; lock={} Receive Zigbee action({:x}) callback\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, (int)callback_id);
 #endif
             }
             break;
