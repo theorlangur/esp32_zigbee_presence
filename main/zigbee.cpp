@@ -811,6 +811,9 @@ namespace zb
             {
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::NoPresenceNoBoundDevices;
             }
+
+            if (ZbAlarm::g_RunningOutOfHandles)
+                ZbAlarm::activate_counter_of_death();
         }
     }
 
@@ -910,7 +913,7 @@ namespace zb
             {
                 if (g_State.m_LastPresence)
                     ZbAlarm::deactivate_counter_of_death();
-                else
+                else if (!g_State.m_RunningTimer.IsRunning())
                     ZbAlarm::activate_counter_of_death();
             }
         }
