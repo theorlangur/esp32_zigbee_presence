@@ -222,8 +222,13 @@ namespace zb
 
         static auto AddToCluster(esp_zb_attribute_list_t *custom_cluster, Access a)
         {
-            constexpr static const auto MY_TYPE_ID = TypeDescr<T>::kID;
             auto def = Default::default_value();
+            return AddToCluster(custom_cluster, a, def);
+        }
+
+        static auto AddToCluster(esp_zb_attribute_list_t *custom_cluster, Access a, auto def)
+        {
+            constexpr static const auto MY_TYPE_ID = TypeDescr<T>::kID;
             return esp_zb_custom_cluster_add_custom_attr(custom_cluster, MY_ATTRIBUTE_ID, MY_TYPE_ID, std::to_underlying(a), Default::to_void(def));
         }
     };
