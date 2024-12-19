@@ -9,6 +9,7 @@
 #include "driver/gpio.h"
 
 #include "zb_helpers.hpp"
+#include "zb_alarm.hpp"
 
 #include "ld2412_component.hpp"
 
@@ -16,9 +17,8 @@
 #include "device_config.hpp"
 
 #include "board_led.hpp"
+#include "zboss_api.h"
 
-#define zb_start_timer esp_zb_scheduler_user_alarm
-#define zb_cancel_timer esp_zb_scheduler_user_alarm_cancel
 
 namespace zb
 {
@@ -228,89 +228,6 @@ namespace zb
     static ZclAttributeInternals_t                             g_Internals;
     static ZclAttributeRestartsCount_t                         g_RestartsCount;
 
-    struct ZbAlarm
-    {
-        static constexpr uint8_t kCounterOfDeathInactive = 0xff;
-        static constexpr uint8_t kCounterOfDeathValue = 6;
-        static constexpr uint8_t kLowOnHandlesThreshold = 0x33;
-
-        static bool g_RunningOutOfHandles;
-        static uint8_t g_CounterOfDeath;
-
-        //static uint8_t g_TimerHandles[256];
-        const char *pDescr = nullptr;
-        esp_zb_user_callback_t cb;
-        void *param;
-        esp_zb_user_cb_handle_t h = ESP_ZB_USER_CB_HANDLE_INVALID;
-
-        bool IsRunning() const { return h != ESP_ZB_USER_CB_HANDLE_INVALID; }
-
-        void Cancel()
-        {
-            if (h != ESP_ZB_USER_CB_HANDLE_INVALID)
-            {
-                //if (g_TimerHandles[h] != 1)
-                //{
-                //    ESP_ERROR_CHECK(ESP_FAIL);
-                //}
-                zb_cancel_timer(h);
-                //g_TimerHandles[h] = 0;
-                h = ESP_ZB_USER_CB_HANDLE_INVALID;
-            }
-        }
-
-        void Setup(esp_zb_user_callback_t cb, void *param, uint32_t time)
-        {
-            Cancel();
-            this->cb = cb;
-            this->param = param;
-            h = zb_start_timer(on_timer, this, time);
-            if (pDescr)
-            {
-                FMT_PRINT("[task={}; lock={}]{}: {:x}\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, pDescr, (uint8_t)h);
-            }
-            esp_err_t e = h == ESP_ZB_USER_CB_HANDLE_INVALID ? ESP_FAIL : ESP_OK;
-            if (h >= kLowOnHandlesThreshold)
-            {
-                FMT_PRINT("Got back handle {:x} >= threshold of {:x}. Prepare to die\n", h, kLowOnHandlesThreshold);
-                //soon we'll be out of handles - let's restart at a convenient moment
-                g_RunningOutOfHandles = true;
-            }
-
-            ESP_ERROR_CHECK(e);
-            if (h != ESP_ZB_USER_CB_HANDLE_INVALID)
-            {
-                //if (g_TimerHandles[h] != 0)
-                //{
-                //    ESP_ERROR_CHECK(ESP_FAIL);
-                //}
-                //g_TimerHandles[h] = 1;
-            }
-        }
-
-        static void on_timer(void* param)
-        {
-            ZbAlarm *pAlarm = (ZbAlarm *)param;
-            //g_TimerHandles[pAlarm->h] = 0;
-            pAlarm->h = ESP_ZB_USER_CB_HANDLE_INVALID;
-            pAlarm->cb(pAlarm->param);
-        }
-
-        static void deactivate_counter_of_death()
-        {
-            FMT_PRINT("Low on handles: Counter of death deactivated\n");
-            g_CounterOfDeath = kCounterOfDeathInactive;
-        }
-
-        static void activate_counter_of_death()
-        {
-            g_CounterOfDeath = kCounterOfDeathValue;
-            FMT_PRINT("Low on handles: Counter of death activated: {} iterations left\n", g_CounterOfDeath);
-        }
-    };
-    //uint8_t ZbAlarm::g_TimerHandles[256] = {0};
-    bool ZbAlarm::g_RunningOutOfHandles = false;
-    uint8_t ZbAlarm::g_CounterOfDeath = kCounterOfDeathInactive;
 
     /**********************************************************************/
     /* Storable data                                                      */
@@ -328,7 +245,7 @@ namespace zb
     {
         static constexpr uint32_t kCmdResponseWait = 700;//ms
         static constexpr uint16_t kInvalidSeqNr = 0xffff;
-        ZbAlarm m_WaitResponseTimer{"m_WaitResponseTimer", nullptr, nullptr};
+        ZbAlarm m_WaitResponseTimer{"m_WaitResponseTimer"};
         uint16_t m_SeqNr = kInvalidSeqNr;
         int m_RetriesLeft = Retries;
         int m_FailureCount = 0;
@@ -604,8 +521,8 @@ namespace zb
         bool m_LastPresenceMMWave = false;
         bool m_LastPresencePIRInternal = false;
         bool m_LastPresenceExternal = false;
-        ZbAlarm m_RunningTimer{"m_RunningTimer", nullptr, nullptr};
-        ZbAlarm m_ExternalRunningTimer{"m_ExternalRunningTimer", nullptr, nullptr};
+        ZbAlarm m_RunningTimer{"m_RunningTimer"};
+        ZbAlarm m_ExternalRunningTimer{"m_ExternalRunningTimer"};
 
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2, send_on_raw> m_OnSender;
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2, send_off_raw> m_OffSender;
@@ -622,7 +539,7 @@ namespace zb
         static constexpr esp_zb_zcl_cluster_id_t g_RelevantBoundClusters[] = {ESP_ZB_ZCL_CLUSTER_ID_ON_OFF};
 
         Internals m_Internals;
-        esp_zb_user_cb_handle_t m_BindsCheck = ESP_ZB_USER_CB_HANDLE_INVALID;
+        ZbAlarm m_BindsCheck{"BindsCheck"};
 
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
         {
@@ -654,35 +571,23 @@ namespace zb
             else
                 m_LastFailedStatus = (esp_zb_zcl_status_t)ExtendedFailureStatus::BindRequestIncomplete;
 
-            m_BindsCheck = zb_start_timer([](void *p){
+            m_BindsCheck.Setup([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
-                        pState->m_BindsCheck = ESP_ZB_USER_CB_HANDLE_INVALID;
                         pState->RunBindsChecking();
                     }, this, 2000);
-            FMT_PRINT("m_BindsCheck: {:x}\n", (uint8_t)m_BindsCheck);
         }
 
         void RunInternalsReporting()
         {
-            if (ZbAlarm::g_RunningOutOfHandles && ZbAlarm::g_CounterOfDeath != ZbAlarm::kCounterOfDeathInactive)
-            {
-                if (!(--ZbAlarm::g_CounterOfDeath))
-                {
-                    //boom
-                    FMT_PRINT("Low on handles: time to die and reborn\n");
-                    esp_restart();
-                    return;
-                }
-                FMT_PRINT("Low on handles: tick-tock: {} iterations left\n", ZbAlarm::g_CounterOfDeath);
-            }
+            ZbAlarm::check_death_count();
+
             m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
             m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
             m_Internals.Update();//send to zigbee
             
-            static ZbAlarm rep{"InternalsReporting", nullptr, nullptr};
+            static ZbAlarm rep{"InternalsReporting"};
             rep.Setup([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
-                        pState->m_BindsCheck = ESP_ZB_USER_CB_HANDLE_INVALID;
                         pState->RunInternalsReporting();
                     }, this, 1000);
         }
@@ -812,8 +717,7 @@ namespace zb
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::NoPresenceNoBoundDevices;
             }
 
-            if (ZbAlarm::g_RunningOutOfHandles)
-                ZbAlarm::activate_counter_of_death();
+            ZbAlarm::check_counter_of_death();
         }
     }
 
@@ -914,7 +818,7 @@ namespace zb
                 if (g_State.m_LastPresence)
                     ZbAlarm::deactivate_counter_of_death();
                 else if (!g_State.m_RunningTimer.IsRunning())
-                    ZbAlarm::activate_counter_of_death();
+                    ZbAlarm::check_counter_of_death();
             }
         }
 
