@@ -5,6 +5,7 @@
 #include <thread>
 #include <chrono>
 #include "formatter.h"
+#include "spinlock.h"
 
 #define CHECK_STACK(sz) /*\
     {\
@@ -27,6 +28,21 @@ struct ScopeExit
     ~ScopeExit(){ m_CB(); }
 private:
     CB m_CB;
+};
+
+class SpinLock
+{
+public:
+    SpinLock()
+    {
+        spinlock_initialize(&m_Lock);
+    }
+
+    void lock() { spinlock_acquire(&m_Lock, SPINLOCK_WAIT_FOREVER); }
+    void unlock() { spinlock_release(&m_Lock); }
+
+private:
+    spinlock_t m_Lock;
 };
 
 class ILockable
