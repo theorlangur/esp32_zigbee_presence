@@ -510,6 +510,8 @@ namespace zb
 
     static_assert(sizeof(Internals) == sizeof(uint32_t));
 
+    esp_err_t read_reporting_cfg_response_handler(const void *message);
+
     //initialized at start
     struct RuntimeState
     {
@@ -611,6 +613,20 @@ namespace zb
         }
     };
     RuntimeState g_State;
+
+    esp_err_t read_reporting_cfg_response_handler(const void *message)
+    {
+        esp_zb_zcl_cmd_read_report_config_resp_message_t *pResp = (esp_zb_zcl_cmd_read_report_config_resp_message_t *)message;
+        FMT_PRINT("Read report resp:\n");
+        auto *pVar = pResp->variables;
+        while(pVar)
+        {
+            
+            FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, (int)pVar->status, pVar->report_direction);
+            pVar = pVar->next;
+        }
+        return ESP_OK;
+    }
 
     bool is_coordinator(esp_zb_zcl_addr_t &addr)
     {
@@ -1740,6 +1756,7 @@ namespace zb
                 generic_zb_action_handler<
                     ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
                     ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
+                    ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, read_reporting_cfg_response_handler},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
         );
