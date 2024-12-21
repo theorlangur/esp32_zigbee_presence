@@ -589,6 +589,25 @@ namespace zb
                         RuntimeState *pState = (RuntimeState *)p;
                         pState->RunInternalsReporting();
                     }, this, 1000);
+
+            static int g_cnt = 1;
+            if (((++g_cnt) % 10) == 0)
+            {
+                esp_zb_zcl_read_report_config_cmd_t rr;
+                rr.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+                rr.direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV;
+                rr.manuf_code = 0;
+                rr.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+                rr.zcl_basic_cmd.dst_endpoint = g_EndP;
+                rr.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+                rr.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+                rr.record_number = 1;
+                esp_zb_zcl_attribute_record_t on_off_r;
+                on_off_r.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
+                on_off_r.report_direction = 0;
+                rr.record_field = &on_off_r;
+                esp_zb_zcl_read_report_config_cmd_req(&rr);
+            }
         }
     };
     RuntimeState g_State;
@@ -1717,7 +1736,13 @@ namespace zb
         /* Register the device */
         esp_zb_device_register(ep_list);
         //here we install our handler for attributes and commands
-        esp_zb_core_action_handler_register(generic_zb_action_handler<&g_AttributeHandlingDesc, &g_CommandsDesc>);
+        esp_zb_core_action_handler_register(
+                generic_zb_action_handler<
+                    ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
+                    ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
+                    ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
+                >
+        );
         esp_zb_zcl_command_send_status_handler_register(&zb::ZbCmdSend::handler);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
