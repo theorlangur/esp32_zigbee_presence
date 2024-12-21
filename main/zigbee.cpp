@@ -8,8 +8,7 @@
 #include "esp_zigbee_core.h"
 #include "driver/gpio.h"
 
-#include "zb_helpers.hpp"
-#include "zb_alarm.hpp"
+#include "zb_helpers/zbh_helpers.hpp"
 
 #include "ld2412_component.hpp"
 

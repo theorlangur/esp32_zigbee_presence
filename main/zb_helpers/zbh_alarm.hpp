@@ -1,8 +1,8 @@
-#ifndef ZB_ALARM_H_
-#define ZB_ALARM_H_
+#ifndef ZBH_ALARM_HPP_
+#define ZBH_ALARM_HPP_
 #include "esp_zigbee_core.h"
 #include <cstdint>
-#include "generic_helpers.hpp"
+#include "../generic_helpers.hpp"
 
 namespace zb
 {
