@@ -194,6 +194,98 @@ struct is_expected_type<std::expected<V,E>>
 template<class C>
 constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::value;
 
+template<class T, size_t N>
+class ArrayCount
+{
+public:
+    using ref_t = std::reference_wrapper<T>;
+    using iterator_t = T*;
+    using const_iterator_t = const T*;
+
+    ArrayCount():m_Size(0)
+    {
+    }
+
+    size_t size() const { return m_Size; }
+
+    iterator_t begin() { return m_Data; }
+    iterator_t end() { return m_Data + m_Size; }
+
+    const_iterator_t begin() const { return m_Data; }
+    const_iterator_t end() const { return m_Data + m_Size; }
+
+    iterator_t find(T const& r)
+    {
+        for(auto i = begin(), e = end(); i != e; ++i)
+            if (*i == r)
+                return i;
+        return end();
+    }
+
+    template<class X, class M>
+    iterator_t find(X const& r, M T::*pMem)
+    {
+        for(auto i = begin(), e = end(); i != e; ++i)
+            if ((i->*pMem) == r)
+                return i;
+        return end();
+    }
+
+    std::optional<ref_t> push_back(const T &v) 
+    {
+        if (m_Size >= N)
+            return std::nullopt;
+        T *pRef = new (&m_Data[m_Size++]) T(v);
+        return *pRef;
+    }
+
+    template<class... X>
+    std::optional<ref_t> emplace_back(X&&... args) 
+    {
+        if (m_Size >= N)
+            return std::nullopt;
+        T *pRef = new (&m_Data[m_Size++]) T{std::forward<X>(args)...};
+        return *pRef;
+    }
+
+    void erase(iterator_t i)
+    {
+        if (i < end()) return;
+        if constexpr (!std::is_trivially_destructible_v<T>)
+            i->~T();
+
+        if ((i + 1) == end())
+        {
+            --m_Size;
+            return;
+        }
+
+
+        if constexpr (std::is_trivially_move_constructible_v<T>)
+        {
+            std::memmove(i, i + 1, (end() - i) * sizeof(T));
+            --m_Size;
+        }else
+        {
+            new (i) T(std::move(*(i + 1)));
+            for(auto s = i + 1, e = end() - 1; s != e; ++s)
+            {
+                *s = std::move(*(s + 1));
+            }
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                (end()-1)->~T();
+            --m_Size;
+        }
+    }
+
+private:
+    union
+    {
+        T m_Data[N];
+    };
+    size_t m_Size = 0;
+};
+
 #define CALL_ESP_EXPECTED(location, f) \
     if (auto err = f; err != ESP_OK) \
         return std::unexpected(Err{location, err})
