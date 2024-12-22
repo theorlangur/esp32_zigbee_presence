@@ -1643,6 +1643,36 @@ namespace zb
         ,g_AttributeHandlers
     };
 
+
+    /**********************************************************************/
+    /* ReportAttributeHandler's                                           */
+    /**********************************************************************/
+    static const ReportAttributeHandler g_ReportHandlers[] = {
+        ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+            [](const esp_zb_zcl_report_attr_message_t *message)->esp_err_t
+            {
+                FMT_PRINT("Got report on on/off attribute from {}; State={}\n", message->src_address, *(bool*)message->attribute.data.value);
+                return ESP_OK;
+            }
+            ),
+
+        {}//last one
+    };
+    static const ReportAttributesHandlingDesc g_ReportHandlingDesc = {
+        /*default*/[](const esp_zb_zcl_report_attr_message_t *message)->esp_err_t
+        {
+            esp_err_t ret = ESP_OK;
+
+            ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
+            ESP_RETURN_ON_FALSE(message->status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
+                                message->status);
+            ESP_LOGI(TAG, "Received report message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d), data type(%d)", message->dst_endpoint, message->cluster,
+                     message->attribute.id, message->attribute.data.size, message->attribute.data.type);
+            return ret;
+        }
+        ,g_ReportHandlers
+    };
+
     /**********************************************************************/
     /* Registering ZigBee device with clusters and attributes             */
     /**********************************************************************/
@@ -1888,7 +1918,7 @@ namespace zb
                     ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
                     ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
                     ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, read_reporting_cfg_response_handler},
-                    ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attributes_handler},
+                    ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attr_cb<g_ReportHandlingDesc>},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
         );
