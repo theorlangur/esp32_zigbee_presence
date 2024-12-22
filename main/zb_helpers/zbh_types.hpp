@@ -102,6 +102,8 @@ namespace zb
     {
         const esp_zb_ieee_addr_t &a;
         bool operator==(ieee_addr const& rhs) const { return std::memcmp(a, rhs.a, sizeof(esp_zb_ieee_addr_t)) == 0; }
+        friend bool operator==(const esp_zb_ieee_addr_t &lhs, ieee_addr const& rhs) { return std::memcmp(lhs, rhs.a, sizeof(esp_zb_ieee_addr_t)) == 0; }
+        friend bool operator==(ieee_addr const& rhs, const esp_zb_ieee_addr_t &lhs) { return lhs == rhs; }
     };
 }
 
