@@ -29,6 +29,27 @@ namespace zb
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
 
+    struct BindInfo
+    {
+        static constexpr uint16_t kMaxConfigAttempts = 3;
+        BindInfo(esp_zb_ieee_addr_t &a, uint16_t sh):m_ShortAddr(sh)
+        {
+            std::memcpy(m_IEEE, a, sizeof(esp_zb_ieee_addr_t));
+        }
+
+        esp_zb_ieee_addr_t m_IEEE;
+        uint16_t m_ShortAddr;
+        struct{
+            uint16_t m_ReportConfigured: 1 = 0;
+            uint16_t m_BoundToMe: 1 = 0;
+            uint16_t m_BindChecked: 1 = 0;
+            uint16_t m_AttemptsLeft: 3 = 0;
+            uint16_t m_EP : 8 = 0;
+        };
+    };
+    constexpr size_t kMaxBinds = 6;
+    using BindArray = ArrayCount<BindInfo, kMaxBinds>;
+
     /**********************************************************************/
     /*Device basic parameters                                             */
     /**********************************************************************/
@@ -411,8 +432,6 @@ namespace zb
         }
     };
 
-    uint16_t g_BoundAddr = 0;
-    uint8_t g_EndP = 0;
     zb::seq_nr_t send_on_raw()
     {
         esp_zb_zcl_on_off_cmd_t cmd_req;
@@ -542,6 +561,10 @@ namespace zb
         Internals m_Internals;
         ZbAlarm m_BindsCheck{"BindsCheck"};
 
+        BindArray m_TrackedBinds;
+        uint8_t m_ValidBinds = 0;
+        uint8_t m_BindStates = 0;//on/off, bit per bind
+
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
         {
             for(auto _i : g_RelevantBoundClusters)
@@ -592,24 +615,74 @@ namespace zb
                         pState->RunInternalsReporting();
                     }, this, 1000);
 
-            static int g_cnt = 1;
-            if (((++g_cnt) % 10) == 0)
-            {
-                esp_zb_zcl_read_report_config_cmd_t rr;
-                rr.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-                rr.direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV;
-                rr.manuf_code = 0;
-                rr.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-                rr.zcl_basic_cmd.dst_endpoint = g_EndP;
-                rr.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-                rr.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-                rr.record_number = 1;
-                esp_zb_zcl_attribute_record_t on_off_r;
-                on_off_r.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
-                on_off_r.report_direction = 0;
-                rr.record_field = &on_off_r;
-                esp_zb_zcl_read_report_config_cmd_req(&rr);
-            }
+            //static int g_cnt = 1;
+            //if (g_cnt == 8)
+            //{
+            //    /* Send "configure report attribute" command to the bound sensor */
+            //    esp_zb_zcl_config_report_cmd_t report_cmd;
+            //    report_cmd.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+            //    report_cmd.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+            //    report_cmd.zcl_basic_cmd.dst_endpoint = g_EndP;
+            //    report_cmd.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            //    report_cmd.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+            //
+            //    int16_t report_change = 1; /* report on each 2 degree changes */
+            //    esp_zb_zcl_config_report_record_t records[] = {
+            //        {
+            //            .direction = ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
+            //            .attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+            //            .attrType = ESP_ZB_ZCL_ATTR_TYPE_BOOL,
+            //            .min_interval = 0,
+            //            .max_interval = 5,
+            //            .reportable_change = &report_change,
+            //        },
+            //    };
+            //    report_cmd.record_number = std::size(records);
+            //    report_cmd.record_field = records;
+            //    auto tsn = esp_zb_zcl_config_report_cmd_req(&report_cmd);
+            //    FMT_PRINT("Sent config report for On/Off; TSN={:x}\n", tsn);
+            //}
+            //if (((++g_cnt) % 10) == 0)
+            //{
+            //    esp_zb_zcl_report_attr_cmd_t req;
+            //    req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+            //    req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+            //    req.zcl_basic_cmd.dst_endpoint = g_EndP;
+            //    req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            //    req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+            //    req.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
+            //    auto tsn = esp_zb_zcl_report_attr_cmd_req(&req);
+            //    FMT_PRINT("Report cmd issued with tsn {:x} for {:x}, ep {:x}\n", tsn, g_BoundAddr, g_EndP);
+            //    //esp_zb_zcl_read_report_config_cmd_t rr;
+            //    //rr.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+            //    //rr.direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV;
+            //    //rr.manuf_code = 0;
+            //    //rr.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            //    //rr.zcl_basic_cmd.dst_endpoint = g_EndP;
+            //    //rr.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+            //    //rr.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+            //    //rr.record_number = 1;
+            //    //esp_zb_zcl_attribute_record_t on_off_r;
+            //    //on_off_r.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
+            //    //on_off_r.report_direction = 0;
+            //    //rr.record_field = &on_off_r;
+            //    //auto tsn = esp_zb_zcl_read_report_config_cmd_req(&rr);
+            //    //FMT_PRINT("Read report config cmd sent. TSN: {:x}\n", tsn);
+            //}
+            //if (((g_cnt) % 15) == 0)
+            //{
+            //    esp_zb_zcl_read_attr_cmd_t read_req;
+            //    read_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+            //    read_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
+            //    read_req.zcl_basic_cmd.dst_endpoint = g_EndP;
+            //    read_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            //    read_req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+            //    uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID };
+            //    read_req.attr_number = 1;
+            //    read_req.attr_field = attributes;
+            //    auto tsn = esp_zb_zcl_read_attr_cmd_req(&read_req);
+            //    FMT_PRINT("Sent read req with tsn {:x}\n", tsn);
+            //}
         }
     };
     RuntimeState g_State;
@@ -625,6 +698,20 @@ namespace zb
             FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, (int)pVar->status, pVar->report_direction);
             pVar = pVar->next;
         }
+        return ESP_OK;
+    }
+
+    esp_err_t report_attributes_handler(const void *message)
+    {
+        esp_zb_zcl_report_attr_message_t *pReport = (esp_zb_zcl_report_attr_message_t *)message;
+        FMT_PRINT("Got report from {:x}, cluster {:x}, status {:x}; attr: {:x}; Data type: {:x}; Size: {}\n"
+                , (int)pReport->src_address.u.short_addr
+                , pReport->cluster
+                , (int)pReport->status
+                , pReport->attribute.id
+                , (int)pReport->attribute.data.type
+                , (int)pReport->attribute.data.size
+                );
         return ESP_OK;
     }
 
@@ -670,45 +757,89 @@ namespace zb
         cmd_req.dst_addr = esp_zb_get_short_address();
         cmd_req.start_index = 0;
 
-        //ESP_LOGI(TAG, "Sending request to self to get our current binds");
-        //FMT_PRINT("My short addr: {:x}\n", cmd_req.dst_addr);
+        ESP_LOGI(TAG, "Sending request to self to get our current binds");
+        FMT_PRINT("My short addr: {:x}\n", cmd_req.dst_addr);
         esp_zb_zdo_binding_table_req(&cmd_req, 
             [](const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
             {
+                BindArray newBinds;
                 g_State.m_Internals.m_BindRequestActive = false;
                 g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
+                for(BindInfo &bi : g_State.m_TrackedBinds)
+                    bi.m_BindChecked = false;
                 int foundBinds = 0;
-                uint16_t firstShortAddr = 0;
-                uint8_t firstEndP = 0;
-                //ESP_LOGI(TAG, "Binds callback");
+                ESP_LOGI(TAG, "Binds callback");
                 auto *pRec = table_info->record;
+                int recs = 0;
+                int foundExisting = 0;
                 while(pRec)
                 {
                     esp_zb_zcl_addr_t addr;
                     addr.addr_type = pRec->dst_addr_mode;
                     std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
-                    //FMT_PRINT("Bind {}. Addr={} to cluster {:x}, ep={}\n", recs, addr, pRec->cluster_id, pRec->dst_endp);
+                    FMT_PRINT("Bind {}. Addr={} to cluster {:x}, ep={}\n", recs, addr, pRec->cluster_id, pRec->dst_endp);
                     if (pRec->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
                     {
                         if (zb::ieee_addr{pRec->dst_address.addr_long} != zb::ieee_addr{g_State.m_CoordinatorIeee})
                         {
                             if (RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
                             {
-                                ++foundBinds;
-                                if (foundBinds == 1)
+                                auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
+                                if (existingI == g_State.m_TrackedBinds.end())
                                 {
-                                    firstEndP = pRec->dst_endp;
-                                    firstShortAddr = esp_zb_address_short_by_ieee(pRec->dst_address.addr_long);
+                                    FMT_PRINT("This is a new bind\n");
+                                    auto r = newBinds.emplace_back(pRec->dst_address.addr_long, esp_zb_address_short_by_ieee(pRec->dst_address.addr_long));
+                                    if (r)
+                                    {
+                                        BindInfo &bi = *r;
+                                        bi.m_BindChecked = true;
+                                        bi.m_EP = pRec->dst_endp;
+                                        bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                                    }
+                                }else
+                                {
+                                    FMT_PRINT("This is a existing bind\n");
+                                    ++foundExisting;
+                                    existingI->m_BindChecked = true;
+                                    existingI->m_EP = pRec->dst_endp;
                                 }
+                                ++foundBinds;
                             }
                         }
                     }
                     pRec = pRec->next;
+                    ++recs;
                 }
-                g_BoundAddr = firstShortAddr;
-                g_EndP = firstEndP;
-                g_State.m_Internals.m_BoundDevices = foundBinds;
-                //FMT_PRINT("Binds found: {}\n", foundBinds);
+
+                uint8_t newStates = 0;
+                uint8_t newValidity = 0;
+                if (foundExisting != g_State.m_TrackedBinds.size())
+                {
+                    int nextOldIdx = 0, nextNewIdx = 0;
+                    for(auto i = g_State.m_TrackedBinds.begin(); i != g_State.m_TrackedBinds.end(); ++i, ++nextOldIdx)
+                    {
+                        if (!i->m_BindChecked)
+                            g_State.m_TrackedBinds.erase(i--);
+                        else
+                        {
+                            newStates |= (g_State.m_BindStates & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
+                            newValidity |= (g_State.m_ValidBinds & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
+                            ++nextNewIdx;
+                        }
+                    }
+                }else
+                {
+                    newStates = g_State.m_BindStates;
+                    newValidity = g_State.m_ValidBinds;
+                }
+
+                for(auto &bi : newBinds)
+                    g_State.m_TrackedBinds.push_back(std::move(bi));
+
+                g_State.m_BindStates = newStates;
+                g_State.m_ValidBinds = newValidity;
+                g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
+                FMT_PRINT("Binds found: {}\n", foundBinds);
             },
             nullptr
         );
@@ -1757,6 +1888,7 @@ namespace zb
                     ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
                     ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
                     ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, read_reporting_cfg_response_handler},
+                    ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attributes_handler},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
         );
