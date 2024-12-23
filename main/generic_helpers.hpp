@@ -194,10 +194,14 @@ struct is_expected_type<std::expected<V,E>>
 template<class C>
 constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::value;
 
+template<class T>
+using deref_t = std::remove_cvref_t<decltype(*std::declval<T>())>;
+
 template<class T, size_t N>
 class ArrayCount
 {
 public:
+    using naked_t = std::remove_pointer_t<std::remove_cvref_t<T>>;
     using ref_t = std::reference_wrapper<T>;
     using iterator_t = T*;
     using const_iterator_t = const T*;
@@ -206,6 +210,8 @@ public:
     {
     }
 
+    ~ArrayCount() { clear(); }
+
     size_t size() const { return m_Size; }
 
     iterator_t begin() { return m_Data; }
@@ -213,6 +219,16 @@ public:
 
     const_iterator_t begin() const { return m_Data; }
     const_iterator_t end() const { return m_Data + m_Size; }
+    
+    void clear()
+    {
+        if constexpr (!std::is_trivially_destructible_v<T>)
+        {
+            for(auto i = begin(), e = end(); i != e; ++i)
+                i->~T();
+        }
+        m_Size = 0;
+    }
 
     iterator_t find(T const& r)
     {
@@ -226,8 +242,21 @@ public:
     iterator_t find(X const& r, M T::*pMem)
     {
         for(auto i = begin(), e = end(); i != e; ++i)
+        {
             if ((i->*pMem) == r)
                 return i;
+        }
+        return end();
+    }
+
+    template<class X, class M> requires requires(T& t) { *t; }//supports deref
+    iterator_t find(X const& r, M deref_t<T>::*pMem)
+    {
+        for(auto i = begin(), e = end(); i != e; ++i)
+        {
+            if (((**i).*pMem) == r)
+                return i;
+        }
         return end();
     }
 
@@ -236,6 +265,14 @@ public:
         if (m_Size >= N)
             return std::nullopt;
         T *pRef = new (&m_Data[m_Size++]) T(v);
+        return *pRef;
+    }
+
+    std::optional<ref_t> push_back(T &&v) 
+    {
+        if (m_Size >= N)
+            return std::nullopt;
+        T *pRef = new (&m_Data[m_Size++]) T(std::move(v));
         return *pRef;
     }
 
@@ -284,6 +321,73 @@ private:
         T m_Data[N];
     };
     size_t m_Size = 0;
+};
+
+template<class T, size_t N>
+class ObjectPool
+{
+public:
+    template<ObjectPool<T,N> &staticPool>
+    class Ptr
+    {
+    public:
+        template<class... Args>
+        Ptr(Args&&... args):m_pPtr(staticPool.Acquire(std::forward<Args>(args)...)) { }
+        ~Ptr() { staticPool.Release(m_pPtr); }
+
+        Ptr(const Ptr&) = delete;//no copy
+        Ptr& operator=(const Ptr &rhs) = delete;
+
+        //move ok
+        Ptr(Ptr &&rhs): m_pPtr(rhs.m_pPtr) { rhs.m_pPtr = nullptr; }
+        Ptr& operator=(Ptr &&rhs)
+        { 
+            m_pPtr = rhs.m_pPtr;
+            rhs.m_pPtr = nullptr; 
+            return *this;
+        }
+
+        auto operator->() const { return m_pPtr; }
+        operator T*() const { return m_pPtr; }
+        T& operator *() const { return *m_pPtr; }
+    private:
+        T *m_pPtr = nullptr;
+    };
+
+    ObjectPool()
+    {
+        for(size_t i = 0; i < N; ++i) m_Data[i].m_NextFree = i + 1;
+    }
+
+    template<class... Args>
+    T* Acquire(Args&&... args)
+    {
+        if (m_FirstFree >= N) return nullptr;
+        auto i = m_FirstFree;
+        m_FirstFree = m_Data[m_FirstFree].m_NextFree;
+        return new (&m_Data[i].m_Object) T{std::forward<Args>(args)...};
+    }
+
+    void Release(T* pPtr)
+    {
+        if (pPtr)
+        {
+            assert(((Elem*)pPtr >= m_Data) && ((Elem*)pPtr < (m_Data + N)));
+            pPtr->~T();
+            size_t i = (Elem*)pPtr - m_Data;
+            m_Data[i].m_NextFree = m_FirstFree;
+            m_FirstFree = i;
+        }
+    }
+private:
+    union Elem
+    {
+        Elem():m_NextFree(0){}
+        uint8_t m_NextFree;
+        T m_Object;
+    };
+    Elem m_Data[N];
+    uint8_t m_FirstFree = 0;
 };
 
 #define CALL_ESP_EXPECTED(location, f) \
