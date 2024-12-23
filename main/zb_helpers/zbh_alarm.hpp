@@ -3,6 +3,7 @@
 #include "esp_zigbee_core.h"
 #include <cstdint>
 #include "../generic_helpers.hpp"
+#include "../generic_function.hpp"
 
 namespace zb
 {
@@ -212,5 +213,22 @@ namespace zb
             return ZbAlarm::Setup<callback_t, on_timer>(cb, param, time);
         }
     };
+
+    template<size_t FuncSZ = 16>
+    struct ZbTimerExt: ZbTimer
+    {
+        using generic_callback_t = FixedFunction<FuncSZ, bool()>;
+        generic_callback_t m_Callback;
+
+        static bool on_timer_ext(void *param) { return (*(generic_callback_t*)param)(); }
+
+        template<class callback_t>
+        esp_err_t Setup(callback_t &&cb, uint32_t time)
+        {
+            m_Callback = std::forward<callback_t>(cb);
+            return ZbTimer::Setup(on_timer_ext, &m_Callback, time);
+        }
+    };
+    using ZbTimerExt16 = ZbTimerExt<16>;
 }
 #endif
