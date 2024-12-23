@@ -1005,6 +1005,7 @@ namespace zb
 
     static void on_movement_callback(bool _presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
     {
+        APILock l;
         g_State.m_LastPresenceMMWave = p.mmPresence;
         g_State.m_LastPresencePIRInternal = p.pirPresence;
 
@@ -1018,7 +1019,6 @@ namespace zb
         /**********************************************************************/
         esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         {
-            APILock l;
             if (auto status = g_OccupancyState.Set(val); !status)
             {
                 FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
