@@ -26,7 +26,7 @@ namespace zb
             struct TimerEntry
             {
                 ZbAlarm *pAlarm;
-                esp_zb_user_callback_t cb;
+                void* cb;
                 void *param;
             };
 
@@ -84,30 +84,53 @@ namespace zb
         };
         constinit static TimerList g_TimerList;
 
+        using callback_t = esp_zb_user_callback_t;
+
+        static void on_alarm(TimerList::TimerEntry const& e)
+        {
+            ((callback_t)e.cb)(e.param);
+        }
+
+        template<auto CB = ZbAlarm::on_alarm>
+        static void on_scheduled_alarm(uint8_t param)
+        {
+            auto e = g_TimerList.GetEntry(param);
+            g_TimerList.Free(e.pAlarm->h);
+            e.pAlarm->h = TimerList::kInvalidHandle;
+            CB(e);
+        }
+
         const char *pDescr = nullptr;
         TimerList::handle_t h = TimerList::kInvalidHandle;
 
         bool IsRunning() const { return h != TimerList::kInvalidHandle; }
+        void Cancel() { Cancel<on_alarm>(); }
+        esp_err_t Setup(callback_t cb, void *param, uint32_t time) { return Setup<callback_t, on_alarm>(cb, param, time); }
 
+    protected:
+
+        template<auto CB>
         void Cancel()
         {
             if (IsRunning())
             {
                 //REMOVE_ME:a workaround for esp zigbee sdk memory leak:
-                esp_zb_scheduler_alarm_cancel(on_timer, h);
+                esp_zb_scheduler_alarm_cancel(on_scheduled_alarm<CB>, h);
                 g_TimerList.Free(h);
                 h = TimerList::kInvalidHandle;
             }
         }
 
-        esp_err_t Setup(esp_zb_user_callback_t cb, void *param, uint32_t time)
+        template<class callback_t, auto CB>
+        esp_err_t Setup(callback_t cb, void *param, uint32_t time)
         {
-            Cancel();
+            Cancel<CB>();
             if (auto r = g_TimerList.Allocate())
             {
                 auto &v = *r;
                 h = v.h;
-                v.entry.cb = cb;
+                static_assert(sizeof(void*) == sizeof(callback_t));
+                v.entry.cb = (void*)cb;
                 v.entry.param = param;
                 v.entry.pAlarm = this;
 
@@ -117,20 +140,13 @@ namespace zb
                     //soon we'll be out of handles - let's restart at a convenient moment
                     g_RunningOutOfHandles = true;
                 }
-                esp_zb_scheduler_alarm(on_timer, h, time);
+                esp_zb_scheduler_alarm(on_scheduled_alarm<CB>, h, time);
                 return ESP_OK;
             }else
                 return ESP_ERR_NO_MEM;
         }
 
-        static void on_timer(uint8_t param)
-        {
-            auto e = g_TimerList.GetEntry(param);
-            g_TimerList.Free(e.pAlarm->h);
-            e.pAlarm->h = TimerList::kInvalidHandle;
-            e.cb(e.param);
-        }
-
+    public:
         static void deactivate_counter_of_death()
         {
             FMT_PRINT("Low on handles: Counter of death deactivated\n");
@@ -166,5 +182,35 @@ namespace zb
     inline uint8_t ZbAlarm::g_CounterOfDeath = kCounterOfDeathInactive;
     inline SpinLock ZbAlarm::TimerList::g_AlarmLock;
     inline constinit ZbAlarm::TimerList ZbAlarm::g_TimerList = ZbAlarm::TimerList::Create();
+
+    struct ZbTimer: ZbAlarm
+    {
+        //return 'true' if timer should go on, false - if timer should stop
+        using callback_t = bool (*)(void* param);
+
+        uint32_t m_Interval = 0;
+
+        static void on_timer(TimerList::TimerEntry const& e)
+        {
+            if (callback_t(e.cb)(e.param))
+            {
+                ZbTimer *pT = static_cast<ZbTimer*>(e.pAlarm);
+                //re-schedule
+                auto res = pT->Setup(callback_t(e.cb), e.param, pT->m_Interval);
+                if (res != ESP_OK)
+                {
+                    FMT_PRINT("Could not re-register timer with error {:x}\n", res);
+                }
+            }
+        }
+
+        void Cancel() { ZbAlarm::Cancel<on_timer>(); }
+
+        esp_err_t Setup(callback_t cb, void *param, uint32_t time)
+        {
+            m_Interval = time;
+            return ZbAlarm::Setup<callback_t, on_timer>(cb, param, time);
+        }
+    };
 }
 #endif
