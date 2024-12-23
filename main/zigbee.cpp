@@ -601,7 +601,7 @@ namespace zb
                     }, this, 2000);
         }
 
-        void RunInternalsReporting()
+        void RunService()
         {
             ZbAlarm::check_death_count();
 
@@ -612,7 +612,7 @@ namespace zb
             static ZbAlarm rep{"InternalsReporting"};
             rep.Setup([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
-                        pState->RunInternalsReporting();
+                        pState->RunService();
                     }, this, 1000);
 
             //static int g_cnt = 1;
@@ -1824,7 +1824,7 @@ namespace zb
                 led::blink(false, {});
                 //async setup
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
-                g_State.RunInternalsReporting();
+                g_State.RunService();
                 g_State.RunBindsChecking();
 
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
