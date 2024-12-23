@@ -2,6 +2,7 @@
 #define GENERIC_HELPERS_HPP_
 
 #include "esp_err.h"
+#include <bitset>
 #include <thread>
 #include <chrono>
 #include "formatter.h"
@@ -359,12 +360,24 @@ public:
         for(size_t i = 0; i < N; ++i) m_Data[i].m_NextFree = i + 1;
     }
 
+    bool IsValid(T *pPtr) const
+    {
+        if (pPtr)
+        {
+            assert(((Elem*)pPtr >= m_Data) && ((Elem*)pPtr < (m_Data + N)));
+            size_t i = (Elem*)pPtr - m_Data;
+            return m_Allocated.test(i);
+        }
+        return false;
+    }
+
     template<class... Args>
     T* Acquire(Args&&... args)
     {
         if (m_FirstFree >= N) return nullptr;
         auto i = m_FirstFree;
         m_FirstFree = m_Data[m_FirstFree].m_NextFree;
+        m_Allocated.set(i);
         return new (&m_Data[i].m_Object) T{std::forward<Args>(args)...};
     }
 
@@ -377,17 +390,19 @@ public:
             size_t i = (Elem*)pPtr - m_Data;
             m_Data[i].m_NextFree = m_FirstFree;
             m_FirstFree = i;
+            m_Allocated.reset(m_FirstFree);
         }
     }
 private:
+    std::bitset<N> m_Allocated;
+    size_t m_FirstFree = 0;
     union Elem
     {
         Elem():m_NextFree(0){}
-        uint8_t m_NextFree;
+        size_t m_NextFree;
         T m_Object;
     };
     Elem m_Data[N];
-    uint8_t m_FirstFree = 0;
 };
 
 #define CALL_ESP_EXPECTED(location, f) \
