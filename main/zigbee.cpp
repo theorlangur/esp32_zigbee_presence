@@ -16,7 +16,8 @@
 #include "device_config.hpp"
 
 #include "board_led.hpp"
-#include "zboss_api.h"
+
+#include "zb_binds.hpp"
 
 
 namespace zb
@@ -28,27 +29,6 @@ namespace zb
     };
     struct SensitivityBufType: ZigbeeOctetBuf<14> { SensitivityBufType(){sz=14;} };
     struct EnergyBufType: ZigbeeOctetBuf<14> { EnergyBufType(){sz=14;} };
-
-    struct BindInfo
-    {
-        static constexpr uint16_t kMaxConfigAttempts = 3;
-        BindInfo(esp_zb_ieee_addr_t &a, uint16_t sh):m_ShortAddr(sh)
-        {
-            std::memcpy(m_IEEE, a, sizeof(esp_zb_ieee_addr_t));
-        }
-
-        esp_zb_ieee_addr_t m_IEEE;
-        uint16_t m_ShortAddr;
-        struct{
-            uint16_t m_ReportConfigured: 1 = 0;
-            uint16_t m_BoundToMe: 1 = 0;
-            uint16_t m_BindChecked: 1 = 0;
-            uint16_t m_AttemptsLeft: 3 = 0;
-            uint16_t m_EP : 8 = 0;
-        };
-    };
-    constexpr size_t kMaxBinds = 6;
-    using BindArray = ArrayCount<BindInfo, kMaxBinds>;
 
     /**********************************************************************/
     /*Device basic parameters                                             */
@@ -765,8 +745,8 @@ namespace zb
                 BindArray newBinds;
                 g_State.m_Internals.m_BindRequestActive = false;
                 g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
-                for(BindInfo &bi : g_State.m_TrackedBinds)
-                    bi.m_BindChecked = false;
+                for(auto &bi : g_State.m_TrackedBinds)
+                    bi->m_BindChecked = false;
                 int foundBinds = 0;
                 ESP_LOGI(TAG, "Binds callback");
                 auto *pRec = table_info->record;
@@ -791,17 +771,21 @@ namespace zb
                                     auto r = newBinds.emplace_back(pRec->dst_address.addr_long, esp_zb_address_short_by_ieee(pRec->dst_address.addr_long));
                                     if (r)
                                     {
-                                        BindInfo &bi = *r;
-                                        bi.m_BindChecked = true;
-                                        bi.m_EP = pRec->dst_endp;
-                                        bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                                        BindInfoPtr &ptr = *r;
+                                        if (ptr)
+                                        {
+                                            BindInfo &bi = *ptr;
+                                            bi.m_BindChecked = true;
+                                            bi.m_EP = pRec->dst_endp;
+                                            bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                                        }
                                     }
                                 }else
                                 {
                                     FMT_PRINT("This is a existing bind\n");
                                     ++foundExisting;
-                                    existingI->m_BindChecked = true;
-                                    existingI->m_EP = pRec->dst_endp;
+                                    (*existingI)->m_BindChecked = true;
+                                    (*existingI)->m_EP = pRec->dst_endp;
                                 }
                                 ++foundBinds;
                             }
@@ -818,7 +802,7 @@ namespace zb
                     int nextOldIdx = 0, nextNewIdx = 0;
                     for(auto i = g_State.m_TrackedBinds.begin(); i != g_State.m_TrackedBinds.end(); ++i, ++nextOldIdx)
                     {
-                        if (!i->m_BindChecked)
+                        if (!(*i)->m_BindChecked)
                             g_State.m_TrackedBinds.erase(i--);
                         else
                         {

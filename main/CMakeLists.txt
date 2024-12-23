@@ -9,4 +9,6 @@ idf_component_register(SRCS
                     device_config.cpp
                     board_led.hpp
                     board_led.cpp
+                    zb_binds.hpp
+                    zb_binds.cpp
                     INCLUDE_DIRS "")
