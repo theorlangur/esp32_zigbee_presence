@@ -20,4 +20,7 @@ idf_component_register(SRCS
                     lib/thread.hpp
                     lib/thread_lock.hpp
                     lib/type_traits.hpp
+                    lib/linked_list.hpp
+                    lib/linked_list.cpp
                     INCLUDE_DIRS "")
+add_compile_options("-Wno-invalid-offsetof")

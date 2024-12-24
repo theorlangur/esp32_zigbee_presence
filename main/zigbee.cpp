@@ -666,19 +666,42 @@ namespace zb
     };
     RuntimeState g_State;
 
+    LinkedListT<ReadConfigResponseNode> g_ReadConfigResponseHandlers;
+    void RegisterReadConfigResponseHandler(ReadConfigResponseNode &n)
+    {
+        g_ReadConfigResponseHandlers += n;
+    }
+
     esp_err_t read_reporting_cfg_response_handler(const void *message)
     {
         esp_zb_zcl_cmd_read_report_config_resp_message_t *pResp = (esp_zb_zcl_cmd_read_report_config_resp_message_t *)message;
         FMT_PRINT("Read report resp:\n");
-        auto *pVar = pResp->variables;
-        while(pVar)
+        for(auto *pNode : g_ReadConfigResponseHandlers)
         {
-            
-            FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, (int)pVar->status, pVar->report_direction);
-            pVar = pVar->next;
+            if (pNode->Notify(pResp))
+                return ESP_OK;
         }
         return ESP_OK;
     }
+
+    LinkedListT<ConfigReportResponseNode> g_ConfigReportResponseHandlers;
+    void RegisterConfigReportResponseHandler(ConfigReportResponseNode &n)
+    {
+        g_ConfigReportResponseHandlers += n;
+    }
+
+    esp_err_t config_report_response_handler(const void *message)
+    {
+        esp_zb_zcl_cmd_config_report_resp_message_t *pResp = (esp_zb_zcl_cmd_config_report_resp_message_t *)message;
+        FMT_PRINT("Config Report Response:\n");
+        for(auto *pNode : g_ConfigReportResponseHandlers)
+        {
+            if (pNode->Notify(pResp))
+                return ESP_OK;
+        }
+        return ESP_OK;
+    }
+
 
     esp_err_t report_attributes_handler(const void *message)
     {
@@ -1901,6 +1924,7 @@ namespace zb
                     ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
                     ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
                     ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, read_reporting_cfg_response_handler},
+                    ActionHandler{ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID, config_report_response_handler},
                     ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attr_cb<g_ReportHandlingDesc>},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
