@@ -30,6 +30,9 @@ public:
 
     const_iterator_t begin() const { return m_Data; }
     const_iterator_t end() const { return m_Data + m_Size; }
+
+    T& operator[](size_t i) { return m_Data[i]; }
+    const T& operator[](size_t i) const { return m_Data[i]; }
     
     void clear()
     {
