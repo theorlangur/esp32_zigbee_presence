@@ -401,13 +401,23 @@ namespace tools
         }
     };
 
-    template<class T> requires (std::is_scoped_enum_v<T>)
+    template<class T> requires (std::is_enum_v<T>)
     struct formatter_t<T>
     {
         template<FormatDestination Dest>
         static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, T const&v)
         {
             return formatter_t<std::underlying_type_t<T>>::format_to(std::forward<Dest>(dst), fmtStr, std::underlying_type_t<T>(v));
+        }
+    };
+
+    template<class T>
+    struct formatter_t<T*>
+    {
+        template<FormatDestination Dest>
+        static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, T *v)
+        {
+            return formatter_t<size_t>::format_to(std::forward<Dest>(dst), fmtStr, std::size_t(v));
         }
     };
 
