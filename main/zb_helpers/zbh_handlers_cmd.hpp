@@ -228,7 +228,7 @@ namespace zb
     }
 
     //ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID
-    esp_err_t cmd_response_action_handler(const void *message)
+    inline esp_err_t cmd_response_action_handler(const void *message)
     {
         auto *pCmdRespMsg = (esp_zb_zcl_cmd_default_resp_message_t *)message;
         auto *pR = ZbCmdResponse::FindRegistry(pCmdRespMsg->info.cluster);
