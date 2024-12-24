@@ -541,6 +541,7 @@ namespace zb
         ZbAlarm m_BindsCheck{"BindsCheck"};
 
         BindArray m_TrackedBinds;
+        BindArray m_BindsToCleanup;
         uint8_t m_ValidBinds = 0;
         uint8_t m_BindStates = 0;//on/off, bit per bind
 
@@ -587,81 +588,30 @@ namespace zb
             m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
             m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
             m_Internals.Update();//send to zigbee
+
+            for(auto i = m_BindsToCleanup.begin(); i != m_BindsToCleanup.end(); ++i)
+            {
+                if ((*i)->GetState() == BindInfo::State::NonFunctional)
+                {
+                    m_BindsToCleanup.erase(i--);
+                }
+            }
+
+            //update validity of the binds
+            for(size_t i = 0, n = m_TrackedBinds.size(); i < n; ++i)
+            {
+                auto &bi = m_TrackedBinds[i];
+                if (bi->GetState() == BindInfo::State::Functional)
+                    m_ValidBinds |= 1 << i;
+                else
+                    m_ValidBinds &= ~(1 << i);
+            }
             
             static ZbAlarm rep{"InternalsReporting"};
             rep.Setup([](void *p){
                         RuntimeState *pState = (RuntimeState *)p;
                         pState->RunService();
                     }, this, 1000);
-
-            //static int g_cnt = 1;
-            //if (g_cnt == 8)
-            //{
-            //    /* Send "configure report attribute" command to the bound sensor */
-            //    esp_zb_zcl_config_report_cmd_t report_cmd;
-            //    report_cmd.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-            //    report_cmd.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-            //    report_cmd.zcl_basic_cmd.dst_endpoint = g_EndP;
-            //    report_cmd.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            //    report_cmd.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-            //
-            //    int16_t report_change = 1; /* report on each 2 degree changes */
-            //    esp_zb_zcl_config_report_record_t records[] = {
-            //        {
-            //            .direction = ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
-            //            .attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-            //            .attrType = ESP_ZB_ZCL_ATTR_TYPE_BOOL,
-            //            .min_interval = 0,
-            //            .max_interval = 5,
-            //            .reportable_change = &report_change,
-            //        },
-            //    };
-            //    report_cmd.record_number = std::size(records);
-            //    report_cmd.record_field = records;
-            //    auto tsn = esp_zb_zcl_config_report_cmd_req(&report_cmd);
-            //    FMT_PRINT("Sent config report for On/Off; TSN={:x}\n", tsn);
-            //}
-            //if (((++g_cnt) % 10) == 0)
-            //{
-            //    esp_zb_zcl_report_attr_cmd_t req;
-            //    req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-            //    req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-            //    req.zcl_basic_cmd.dst_endpoint = g_EndP;
-            //    req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            //    req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-            //    req.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
-            //    auto tsn = esp_zb_zcl_report_attr_cmd_req(&req);
-            //    FMT_PRINT("Report cmd issued with tsn {:x} for {:x}, ep {:x}\n", tsn, g_BoundAddr, g_EndP);
-            //    //esp_zb_zcl_read_report_config_cmd_t rr;
-            //    //rr.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-            //    //rr.direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV;
-            //    //rr.manuf_code = 0;
-            //    //rr.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            //    //rr.zcl_basic_cmd.dst_endpoint = g_EndP;
-            //    //rr.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-            //    //rr.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-            //    //rr.record_number = 1;
-            //    //esp_zb_zcl_attribute_record_t on_off_r;
-            //    //on_off_r.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
-            //    //on_off_r.report_direction = 0;
-            //    //rr.record_field = &on_off_r;
-            //    //auto tsn = esp_zb_zcl_read_report_config_cmd_req(&rr);
-            //    //FMT_PRINT("Read report config cmd sent. TSN: {:x}\n", tsn);
-            //}
-            //if (((g_cnt) % 15) == 0)
-            //{
-            //    esp_zb_zcl_read_attr_cmd_t read_req;
-            //    read_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-            //    read_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-            //    read_req.zcl_basic_cmd.dst_endpoint = g_EndP;
-            //    read_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            //    read_req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-            //    uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID };
-            //    read_req.attr_number = 1;
-            //    read_req.attr_field = attributes;
-            //    auto tsn = esp_zb_zcl_read_attr_cmd_req(&read_req);
-            //    FMT_PRINT("Sent read req with tsn {:x}\n", tsn);
-            //}
         }
     };
     RuntimeState g_State;
@@ -800,6 +750,7 @@ namespace zb
                                             bi.m_BindChecked = true;
                                             bi.m_EP = pRec->dst_endp;
                                             bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                                            bi.Do();//start the whole thing
                                         }
                                     }
                                 }else
@@ -825,7 +776,11 @@ namespace zb
                     for(auto i = g_State.m_TrackedBinds.begin(); i != g_State.m_TrackedBinds.end(); ++i, ++nextOldIdx)
                     {
                         if (!(*i)->m_BindChecked)
+                        {
+                            (*i)->Unbind();
+                            g_State.m_BindsToCleanup.push_back(std::move(*i));
                             g_State.m_TrackedBinds.erase(i--);
+                        }
                         else
                         {
                             newStates |= (g_State.m_BindStates & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);

@@ -17,6 +17,13 @@ namespace zb
     }
 
     BindInfoPool g_BindInfoPool;
+
+    void BindInfo::Unbind()
+    {
+        TransitTo(State::Unbind);
+        Do();
+    }
+
     void BindInfo::Do()
     {
         switch(m_State)

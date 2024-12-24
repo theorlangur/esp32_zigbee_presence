@@ -54,10 +54,12 @@ namespace zb
             uint16_t m_BindChecked: 1 = 0;
             uint16_t m_AttemptsLeft: 3 = 0;
         };
-        State m_State = State::New;
 
         void Do();
+        void Unbind();
+        State GetState() const { return m_State; }
     private:
+        State m_State = State::New;
         ZbAlarm m_Timer;
         ReadReportConfigNode m_ReadReportConfigNode;
         ConfigReportNode m_ConfigReportNode;
