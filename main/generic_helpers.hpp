@@ -198,6 +198,9 @@ constexpr bool is_expected_type_v = is_expected_type<std::remove_cvref_t<C>>::va
 template<class T>
 using deref_t = std::remove_cvref_t<decltype(*std::declval<T>())>;
 
+template<class T>
+concept simple_destructible_t = std::is_trivially_destructible_v<T> || requires { typename T::can_relocate; };
+
 template<class T, size_t N>
 class ArrayCount
 {
@@ -207,11 +210,13 @@ public:
     using iterator_t = T*;
     using const_iterator_t = const T*;
 
-    ArrayCount():m_Size(0)
-    {
-    }
-
+    ArrayCount():m_Size(0) { }
+    ArrayCount(const ArrayCount&) = delete;
+    ArrayCount(ArrayCount&&) = delete;
     ~ArrayCount() { clear(); }
+
+    ArrayCount& operator=(const ArrayCount&) = delete;
+    ArrayCount& operator=(ArrayCount&&) = delete;
 
     size_t size() const { return m_Size; }
 
@@ -223,7 +228,7 @@ public:
     
     void clear()
     {
-        if constexpr (!std::is_trivially_destructible_v<T>)
+        if constexpr (!simple_destructible_t<T>)
         {
             for(auto i = begin(), e = end(); i != e; ++i)
                 i->~T();
@@ -289,31 +294,31 @@ public:
     void erase(iterator_t i)
     {
         if (i < end()) return;
-        if constexpr (!std::is_trivially_destructible_v<T>)
+
+        if constexpr (!simple_destructible_t<T>)
             i->~T();
 
         if ((i + 1) == end())
         {
+            if constexpr (!simple_destructible_t<T>)
+                (end()-1)->~T();
             --m_Size;
             return;
         }
 
 
-        if constexpr (std::is_trivially_move_constructible_v<T>)
-        {
+        if constexpr (std::is_trivially_move_constructible_v<T> || requires{typename T::can_relocate;})
             std::memmove(i, i + 1, (end() - i) * sizeof(T));
-            --m_Size;
-        }else
+        else
         {
             new (i) T(std::move(*(i + 1)));
             for(auto s = i + 1, e = end() - 1; s != e; ++s)
-            {
                 *s = std::move(*(s + 1));
-            }
-            if constexpr (!std::is_trivially_destructible_v<T>)
+
+            if constexpr (!simple_destructible_t<T>)
                 (end()-1)->~T();
-            --m_Size;
         }
+        --m_Size;
     }
 
 private:
@@ -332,6 +337,8 @@ public:
     class Ptr
     {
     public:
+        using can_relocate = void;
+
         template<class... Args>
         Ptr(Args&&... args):m_pPtr(staticPool.Acquire(std::forward<Args>(args)...)) { }
         ~Ptr() { staticPool.Release(m_pPtr); }
@@ -386,7 +393,8 @@ public:
         if (pPtr)
         {
             assert(((Elem*)pPtr >= m_Data) && ((Elem*)pPtr < (m_Data + N)));
-            pPtr->~T();
+            if constexpr (!simple_destructible_t<T>)
+                pPtr->~T();
             size_t i = (Elem*)pPtr - m_Data;
             m_Data[i].m_NextFree = m_FirstFree;
             m_FirstFree = i;
