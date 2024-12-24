@@ -82,6 +82,7 @@ private:
     union Elem
     {
         Elem():m_NextFree(0){}
+        ~Elem(){}
         size_t m_NextFree;
         T m_Object;
     };
