@@ -1,6 +1,6 @@
 #ifndef BOARD_LED_HPP
 #define BOARD_LED_HPP
-#include "generic_helpers.hpp"
+#include "lib/misc_helpers.hpp"
 #include <cstdint>
 
 namespace led

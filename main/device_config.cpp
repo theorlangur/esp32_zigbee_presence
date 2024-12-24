@@ -2,7 +2,7 @@
 #include "esp_log.h"
 #include <sys/stat.h>
 #include "esp_littlefs.h"
-#include "generic_helpers.hpp"
+#include "lib/misc_helpers.hpp"
 
 static const char *TAG = "esp_littlefs";
 namespace zb

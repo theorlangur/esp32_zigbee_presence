@@ -11,4 +11,13 @@ idf_component_register(SRCS
                     board_led.cpp
                     zb_binds.hpp
                     zb_binds.cpp
+                    lib/function.hpp
+                    lib/array_count.hpp
+                    lib/expected_results.hpp
+                    lib/formatter.hpp
+                    lib/misc_helpers.hpp
+                    lib/object_pool.hpp
+                    lib/thread.hpp
+                    lib/thread_lock.hpp
+                    lib/type_traits.hpp
                     INCLUDE_DIRS "")

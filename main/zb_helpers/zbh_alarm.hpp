@@ -2,8 +2,11 @@
 #define ZBH_ALARM_HPP_
 #include "esp_zigbee_core.h"
 #include <cstdint>
-#include "../generic_helpers.hpp"
-#include "../generic_function.hpp"
+#include "../lib/misc_helpers.hpp"
+#include "../lib/function.hpp"
+#include "../lib/thread_lock.hpp"
+#include "../lib/object_pool.hpp"
+#include "../lib/array_count.hpp"
 
 namespace zb
 {
@@ -39,7 +42,7 @@ namespace zb
 
             std::optional<HandleEntry> Allocate()
             {
-                LockGuard l(&g_AlarmLock);
+                thread::LockGuard l(&g_AlarmLock);
                 if (head != kFull)
                 {
                     auto r = head;
@@ -51,7 +54,7 @@ namespace zb
 
             void Free(handle_t h)
             {
-                LockGuard l(&g_AlarmLock);
+                thread::LockGuard l(&g_AlarmLock);
                 entries[h].nextFree = head;
                 head = h;
             }
@@ -81,7 +84,7 @@ namespace zb
             handle_t head;
             ListEntry entries[kMaxSize];
 
-            static SpinLock g_AlarmLock;
+            static thread::SpinLock g_AlarmLock;
         };
         constinit static TimerList g_TimerList;
 
@@ -181,7 +184,7 @@ namespace zb
 
     inline bool ZbAlarm::g_RunningOutOfHandles = false;
     inline uint8_t ZbAlarm::g_CounterOfDeath = kCounterOfDeathInactive;
-    inline SpinLock ZbAlarm::TimerList::g_AlarmLock;
+    inline thread::SpinLock ZbAlarm::TimerList::g_AlarmLock;
     inline constinit ZbAlarm::TimerList ZbAlarm::g_TimerList = ZbAlarm::TimerList::Create();
 
     struct ZbTimer: ZbAlarm

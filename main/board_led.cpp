@@ -1,5 +1,6 @@
 #include "board_led.hpp"
 #include "led_strip.h"
+#include <thread>
 
 namespace led
 {

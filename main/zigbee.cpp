@@ -50,7 +50,6 @@ namespace zb
 
     static constexpr TickType_t FACTORY_RESET_TIMEOUT = 4;//4 seconds
     static constexpr TickType_t FACTORY_RESET_TIMEOUT_WAIT = 1000 * FACTORY_RESET_TIMEOUT / portTICK_PERIOD_MS;
-    constexpr uint8_t PRESENCE_EP = 1;
     static constexpr const uint16_t CLUSTER_ID_LD2412 = kManufactureSpecificCluster;
 
     /**********************************************************************/

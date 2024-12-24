@@ -5,7 +5,7 @@
 #include "freertos/task.h"
 #include <cstdint>
 #include <thread>
-#include "generic_function.hpp"
+#include "lib/function.hpp"
 #include "ld2412.hpp"
 
 namespace ld2412
