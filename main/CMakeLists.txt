@@ -22,5 +22,6 @@ idf_component_register(SRCS
                     lib/type_traits.hpp
                     lib/linked_list.hpp
                     lib/linked_list.cpp
+                    zb_helpers/zbh_bind_table.hpp
+                    zb_helpers/zbh_bind_table.cpp
                     INCLUDE_DIRS "")
-add_compile_options("-Wno-invalid-offsetof")
