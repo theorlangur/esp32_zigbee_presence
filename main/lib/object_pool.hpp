@@ -14,7 +14,9 @@ public:
     public:
         using can_relocate = void;
 
-        template<class... Args>
+        Ptr() = default;
+        Ptr(T *pPtr): m_pPtr(pPtr) {}
+        template<class... Args>// requires (!(std::is_same_v<std::remove_cvref_t<Args>, T*>||...))
         Ptr(Args&&... args):m_pPtr(staticPool.Acquire(std::forward<Args>(args)...)) { }
         ~Ptr() { staticPool.Release(m_pPtr); }
 
@@ -29,6 +31,9 @@ public:
             rhs.m_pPtr = nullptr; 
             return *this;
         }
+
+        void reset(T *pNew = nullptr) { staticPool.Release(m_pPtr); m_pPtr = pNew; }
+        T* release() { auto *pRes = m_pPtr; m_pPtr = nullptr; return pRes; }
 
         auto operator->() const { return m_pPtr; }
         operator T*() const { return m_pPtr; }
