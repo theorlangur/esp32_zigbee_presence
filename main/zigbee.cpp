@@ -417,9 +417,6 @@ namespace zb
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -429,9 +426,6 @@ namespace zb
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
@@ -443,9 +437,6 @@ namespace zb
         cmd_req.on_off_control = 0;//process unconditionally
         cmd_req.on_time = t * 10;
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        //cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = g_BoundAddr;
-        //cmd_req.zcl_basic_cmd.dst_endpoint = g_EndP;
         return esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
     }
 
@@ -532,7 +523,7 @@ namespace zb
         esp_zb_zcl_status_t m_LastFailedStatus = ESP_ZB_ZCL_STATUS_SUCCESS;
         enum class ExtendedFailureStatus: uint16_t
         {
-            BindRequestIncomplete = 0xe0
+            BindRequestIncomplete = 0xE0
         };
 
         static constexpr esp_zb_zcl_cluster_id_t g_RelevantBoundClusters[] = {ESP_ZB_ZCL_CLUSTER_ID_ON_OFF};
@@ -648,58 +639,6 @@ namespace zb
         {
             if (pNode->Notify(pResp))
                 return ESP_OK;
-        }
-        return ESP_OK;
-    }
-
-
-    esp_err_t report_attributes_handler(const void *message)
-    {
-        esp_zb_zcl_report_attr_message_t *pReport = (esp_zb_zcl_report_attr_message_t *)message;
-        FMT_PRINT("Got report from {}, cluster {:x}, status {:x}; attr: {:x}; Data type: {:x}; Size: {}\n"
-                , pReport->src_address
-                , pReport->cluster
-                , pReport->status
-                , pReport->attribute.id
-                , (int)pReport->attribute.data.type
-                , (int)pReport->attribute.data.size
-                );
-        if (pReport->cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
-        {
-            auto bindIt = g_State.m_TrackedBinds.end();
-            if (pReport->src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_SHORT)
-                bindIt = g_State.m_TrackedBinds.find(pReport->src_address.u.short_addr, &BindInfo::m_ShortAddr);
-            else if (pReport->src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_IEEE)
-                bindIt = g_State.m_TrackedBinds.find(ieee_addr{pReport->src_address.u.ieee_addr}, &BindInfo::m_IEEE);
-
-            if (bindIt != g_State.m_TrackedBinds.end())
-            {
-                size_t idx = bindIt - g_State.m_TrackedBinds.begin();
-                FMT_PRINT("Found a bind info at index {}\n", idx);
-                if (g_State.m_ValidBinds & (1 << idx))
-                {
-                    g_State.m_BindStates &= ~(1 << idx);
-                    bool *pVal = (bool *)pReport->attribute.data.value;
-                    FMT_PRINT("New state of the bind info: {}\n", *pVal);
-                    g_State.m_BindStates |= (int(*pVal) << idx);
-
-                    if (!(g_State.m_BindStates & g_State.m_ValidBinds) && g_State.m_LastPresence)//we still have the presence
-                    {
-                        //re-arm, so that we can again detect and react
-                        g_State.m_LastPresence = false;
-                        if (auto status = g_OccupancyState.Set(ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED); !status)
-                        {
-                            FMT_PRINT("(Bind logic)Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-                        }
-                    }
-                }else
-                {
-                    FMT_PRINT("BindInfo has an invalid state\n");
-                }
-            }else
-            {
-                //not found. Unbind?
-            }
         }
         return ESP_OK;
     }
@@ -853,9 +792,6 @@ namespace zb
             {
                 g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::StillPresenceResetTimer;
                 g_State.m_RunningTimer.Setup(&on_local_on_timer_finished, nullptr, g_Config.GetOnOffTimeout() * 1000);
-                //let's see
-                //FMT_PRINT("Non-Fake On\n");
-                //g_State.m_OnSender.Send(false);
             }
             else
             {
@@ -1647,9 +1583,45 @@ namespace zb
     /**********************************************************************/
     static const ReportAttributeHandler g_ReportHandlers[] = {
         ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-            [](const esp_zb_zcl_report_attr_message_t *message)->esp_err_t
+            [](const esp_zb_zcl_report_attr_message_t *pReport)->esp_err_t
             {
-                FMT_PRINT("Got report on on/off attribute from {}; State={}\n", message->src_address, *(bool*)message->attribute.data.value);
+                FMT_PRINT("Got report on on/off attribute from {}; State={}\n", pReport->src_address, *(bool*)pReport->attribute.data.value);
+
+                auto bindIt = g_State.m_TrackedBinds.end();
+                if (pReport->src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_SHORT)
+                    bindIt = g_State.m_TrackedBinds.find(pReport->src_address.u.short_addr, &BindInfo::m_ShortAddr);
+                else if (pReport->src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_IEEE)
+                    bindIt = g_State.m_TrackedBinds.find(ieee_addr{pReport->src_address.u.ieee_addr}, &BindInfo::m_IEEE);
+
+                if (bindIt != g_State.m_TrackedBinds.end())
+                {
+                    size_t idx = bindIt - g_State.m_TrackedBinds.begin();
+                    FMT_PRINT("Found a bind info at index {}\n", idx);
+                    if (g_State.m_ValidBinds & (1 << idx))
+                    {
+                        g_State.m_BindStates &= ~(1 << idx);
+                        bool *pVal = (bool *)pReport->attribute.data.value;
+                        FMT_PRINT("New state of the bind info: {}\n", *pVal);
+                        g_State.m_BindStates |= (int(*pVal) << idx);
+
+                        if (!(g_State.m_BindStates & g_State.m_ValidBinds) && g_State.m_LastPresence)//we still have the presence
+                        {
+                            //re-arm, so that we can again detect and react
+                            g_State.m_LastPresence = false;
+                            if (auto status = g_OccupancyState.Set(ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED); !status)
+                            {
+                                FMT_PRINT("(Bind logic)Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+                            }
+                        }
+                    }else
+                    {
+                        FMT_PRINT("BindInfo has an invalid state\n");
+                    }
+                }else
+                {
+                    //not found. Unbind?
+                }
+
                 return ESP_OK;
             }
             ),
@@ -1666,6 +1638,7 @@ namespace zb
                                 message->status);
             ESP_LOGI(TAG, "Received report message: endpoint(%d), cluster(0x%x), attribute(0x%x), data size(%d), data type(%d)", message->dst_endpoint, message->cluster,
                      message->attribute.id, message->attribute.data.size, message->attribute.data.type);
+
             return ret;
         }
         ,g_ReportHandlers
