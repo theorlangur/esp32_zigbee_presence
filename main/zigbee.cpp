@@ -705,7 +705,6 @@ namespace zb
                     esp_zb_zcl_addr_t addr;
                     addr.addr_type = pRec->dst_addr_mode;
                     std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
-                    FMT_PRINT("Bind {}. Addr={} to cluster {:x}, ep={}\n", recs, addr, pRec->cluster_id, pRec->dst_endp);
                     if (pRec->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
                     {
                         if (zb::ieee_addr{pRec->dst_address.addr_long} != zb::ieee_addr{g_State.m_CoordinatorIeee})
@@ -715,6 +714,7 @@ namespace zb
                                 auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
                                 if (existingI == g_State.m_TrackedBinds.end())
                                 {
+                                    FMT_PRINT("Bind {}. Addr={} to cluster {:x}, ep={}\n", recs, addr, pRec->cluster_id, pRec->dst_endp);
                                     FMT_PRINT("This is a new bind\n");
                                     auto r = newBinds.emplace_back(pRec->dst_address.addr_long, esp_zb_address_short_by_ieee(pRec->dst_address.addr_long));
                                     if (r)
@@ -749,13 +749,14 @@ namespace zb
                 if (foundExisting != g_State.m_TrackedBinds.size())
                 {
                     int nextOldIdx = 0, nextNewIdx = 0;
-                    for(auto i = g_State.m_TrackedBinds.begin(); i != g_State.m_TrackedBinds.end(); ++i, ++nextOldIdx)
+                    for(auto i = g_State.m_TrackedBinds.begin(), e = g_State.m_TrackedBinds.end(); i != e; ++i, ++nextOldIdx)
                     {
                         if (!(*i)->m_BindChecked)
                         {
                             (*i)->Unbind();
                             g_State.m_BindsToCleanup.push_back(std::move(*i));
                             g_State.m_TrackedBinds.erase(i--);
+                            e = g_State.m_TrackedBinds.end();
                         }
                         else
                         {
@@ -776,7 +777,7 @@ namespace zb
                 g_State.m_BindStates = newStates;
                 g_State.m_ValidBinds = newValidity;
                 g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
-                FMT_PRINT("Binds found: {}\n", foundBinds);
+                //FMT_PRINT("Binds found: {}\n", foundBinds);
             },
             nullptr
         );
