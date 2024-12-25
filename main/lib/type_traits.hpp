@@ -9,7 +9,7 @@ template<class T>
 using deref_t = std::remove_cvref_t<decltype(*std::declval<T>())>;
 
 template<class T>
-concept simple_destructible_t = std::is_trivially_destructible_v<T> || requires { typename T::can_relocate; };
+concept simple_destructible_t = std::is_trivially_destructible_v<T>;// || requires { typename T::can_relocate; };
 
 template<class C>
 struct is_expected_type
