@@ -101,7 +101,7 @@ public:
 
     void erase(iterator_t i)
     {
-        if (i < end()) return;
+        if (i >= end()) return;
 
         if constexpr (!simple_destructible_t<T>)
             i->~T();
