@@ -33,7 +33,8 @@ void Node::AddToList(LinkedList &l)
     RemoveFromList();
     m_pList = &l;
     m_pNext = l.m_pFirst;
-    l.m_pFirst->m_pPrev = this;
+    if (l.m_pFirst)
+        l.m_pFirst->m_pPrev = this;
     l.m_pFirst = this;
 }
 
