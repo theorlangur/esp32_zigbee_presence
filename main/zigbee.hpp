@@ -24,5 +24,7 @@ namespace zb
         virtual bool Notify(esp_zb_zcl_cmd_config_report_resp_message_t *pResp) = 0;
     };
     void RegisterConfigReportResponseHandler(ConfigReportResponseNode &n);
+
+    const esp_zb_ieee_addr_t& GetMyIEEE();
 }
 #endif

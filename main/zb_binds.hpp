@@ -40,7 +40,7 @@ namespace zb
         };
         static constexpr uint16_t kMaxConfigAttempts = 3;
         static constexpr uint32_t kTimeout = 2000;
-        BindInfo(esp_zb_ieee_addr_t &a, uint16_t sh):m_ShortAddr(sh)
+        BindInfo(esp_zb_ieee_addr_t const &a, uint16_t sh):m_ShortAddr(sh)
         {
             std::memcpy(m_IEEE, a, sizeof(esp_zb_ieee_addr_t));
         }
@@ -76,15 +76,17 @@ namespace zb
 
         void GetBindTable();
         void OnGetBindTableFailed(esp_zb_zdp_status_t status);
+        static bool OnBindTableBegin(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
+        static bool OnGetBindTableChunk(esp_zb_zdo_binding_table_record_t *entry, void *user_ctx);
+        static void OnBindTableFinished(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
+        static void OnBindTableFailure(const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx);
 
         void CheckReportConfiguration();
         void SendReportConfiguration();
 
         static void OnSendReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
         static void OnConfigReportTimeout(void* param);
-
         static void OnReadReportConfigTimeout(void* param);
-        static void OnGetBindTableChunk(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
         static void OnReadReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
     };
     constexpr size_t kMaxBinds = 6;

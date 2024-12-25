@@ -536,6 +536,8 @@ namespace zb
         uint8_t m_ValidBinds = 0;
         uint8_t m_BindStates = 0;//on/off, bit per bind
 
+        BindArray m_TempNewBinds;
+        uint8_t m_FoundExisting = 0;
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
         {
             for(auto _i : g_RelevantBoundClusters)
@@ -556,6 +558,14 @@ namespace zb
             m_RunningTimer.Setup(cb, nullptr, time);
         }
 
+        void ScheduleBindsChecking()
+        {
+            m_BindsCheck.Setup([](void *p){
+                        RuntimeState *pState = (RuntimeState *)p;
+                        pState->RunBindsChecking();
+                    }, this, 2000);
+        }
+
         void RunBindsChecking()
         {
             if (!m_Internals.m_BindRequestActive)
@@ -566,10 +576,10 @@ namespace zb
             else
                 m_LastFailedStatus = (esp_zb_zcl_status_t)ExtendedFailureStatus::BindRequestIncomplete;
 
-            m_BindsCheck.Setup([](void *p){
-                        RuntimeState *pState = (RuntimeState *)p;
-                        pState->RunBindsChecking();
-                    }, this, 2000);
+            //m_BindsCheck.Setup([](void *p){
+            //            RuntimeState *pState = (RuntimeState *)p;
+            //            pState->RunBindsChecking();
+            //        }, this, 2000);
         }
 
         void RunService()
@@ -681,107 +691,101 @@ namespace zb
 
     void update_info_on_own_binds()
     {
-        esp_zb_zdo_mgmt_bind_param_t cmd_req;
-        cmd_req.dst_addr = esp_zb_get_short_address();
-        cmd_req.start_index = 0;
-
-        ESP_LOGI(TAG, "Sending request to self to get our current binds");
-        FMT_PRINT("My short addr: {:x}\n", cmd_req.dst_addr);
-        esp_zb_zdo_binding_table_req(&cmd_req, 
-            [](const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
+        BindIteratorConfig cfg;
+        cfg.on_begin = [](const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx)->bool{
+            g_State.m_TempNewBinds.clear();
+            g_State.m_FoundExisting = 0;
+            g_State.m_Internals.m_BindRequestActive = false;
+            g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
+            for(auto &bi : g_State.m_TrackedBinds)
+                bi->m_BindChecked = false;
+            return true;
+        };
+        cfg.on_entry = [](esp_zb_zdo_binding_table_record_t *pRec, void *pCtx)->bool{
+            auto &newBinds = g_State.m_TempNewBinds;
+            uint16_t shortAddr = esp_zb_address_short_by_ieee(pRec->dst_address.addr_long);
+            esp_zb_zcl_addr_t addr;
+            addr.addr_type = pRec->dst_addr_mode;
+            std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
+            FMT_PRINT("(Raw)Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+            if (shortAddr != 0xffff && RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
             {
-                BindArray newBinds;
-                g_State.m_Internals.m_BindRequestActive = false;
-                g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
-                for(auto &bi : g_State.m_TrackedBinds)
-                    bi->m_BindChecked = false;
-                int foundBinds = 0;
-                ESP_LOGI(TAG, "Binds callback");
-                auto *pRec = table_info->record;
-                int recs = 0;
-                int foundExisting = 0;
-                while(pRec)
+                auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
+                if (existingI == g_State.m_TrackedBinds.end())
                 {
-                    esp_zb_zcl_addr_t addr;
-                    addr.addr_type = pRec->dst_addr_mode;
-                    std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
-                    if (pRec->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
+                    FMT_PRINT("Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+                    FMT_PRINT("This is a new bind\n");
+                    auto r = newBinds.emplace_back(pRec->dst_address.addr_long, shortAddr);
+                    if (r)
                     {
-                        if (zb::ieee_addr{pRec->dst_address.addr_long} != zb::ieee_addr{g_State.m_CoordinatorIeee})
+                        BindInfoPtr &ptr = *r;
+                        if (ptr)
                         {
-                            if (RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
-                            {
-                                auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
-                                if (existingI == g_State.m_TrackedBinds.end())
-                                {
-                                    FMT_PRINT("Bind {}. Addr={} to cluster {:x}, ep={}\n", recs, addr, pRec->cluster_id, pRec->dst_endp);
-                                    FMT_PRINT("This is a new bind\n");
-                                    auto r = newBinds.emplace_back(pRec->dst_address.addr_long, esp_zb_address_short_by_ieee(pRec->dst_address.addr_long));
-                                    if (r)
-                                    {
-                                        BindInfoPtr &ptr = *r;
-                                        if (ptr)
-                                        {
-                                            BindInfo &bi = *ptr;
-                                            bi.m_BindChecked = true;
-                                            bi.m_EP = pRec->dst_endp;
-                                            bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
-                                            bi.Do();//start the whole thing
-                                        }
-                                    }
-                                }else
-                                {
-                                    FMT_PRINT("This is a existing bind\n");
-                                    ++foundExisting;
-                                    (*existingI)->m_BindChecked = true;
-                                    (*existingI)->m_EP = pRec->dst_endp;
-                                }
-                                ++foundBinds;
-                            }
-                        }
-                    }
-                    pRec = pRec->next;
-                    ++recs;
-                }
-
-                uint8_t newStates = 0;
-                uint8_t newValidity = 0;
-                if (foundExisting != g_State.m_TrackedBinds.size())
-                {
-                    int nextOldIdx = 0, nextNewIdx = 0;
-                    for(auto i = g_State.m_TrackedBinds.begin(), e = g_State.m_TrackedBinds.end(); i != e; ++i, ++nextOldIdx)
-                    {
-                        if (!(*i)->m_BindChecked)
-                        {
-                            (*i)->Unbind();
-                            g_State.m_BindsToCleanup.push_back(std::move(*i));
-                            g_State.m_TrackedBinds.erase(i--);
-                            e = g_State.m_TrackedBinds.end();
-                        }
-                        else
-                        {
-                            newStates |= (g_State.m_BindStates & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
-                            newValidity |= (g_State.m_ValidBinds & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
-                            ++nextNewIdx;
+                            BindInfo &bi = *ptr;
+                            bi.m_BindChecked = true;
+                            bi.m_EP = pRec->dst_endp;
+                            bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                            bi.Do();//start the whole thing
                         }
                     }
                 }else
                 {
-                    newStates = g_State.m_BindStates;
-                    newValidity = g_State.m_ValidBinds;
+                    //FMT_PRINT("This is a existing bind\n");
+                    ++g_State.m_FoundExisting;
+                    (*existingI)->m_BindChecked = true;
+                    (*existingI)->m_EP = pRec->dst_endp;
                 }
+                //++foundBinds;
+            }else
+            {
+                FMT_PRINT("Bind. Addr={}, invalid short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+            }
+            return true;
+        };
+        cfg.on_error = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
+            //arm the next timer
+            g_State.ScheduleBindsChecking();
+        };
+        cfg.on_end = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
+            uint8_t newStates = 0;
+            uint8_t newValidity = 0;
+            if (g_State.m_FoundExisting != g_State.m_TrackedBinds.size())
+            {
+                int nextOldIdx = 0, nextNewIdx = 0;
+                for(auto i = g_State.m_TrackedBinds.begin(), e = g_State.m_TrackedBinds.end(); i != e; ++i, ++nextOldIdx)
+                {
+                    if (!(*i)->m_BindChecked)
+                    {
+                        (*i)->Unbind();
+                        g_State.m_BindsToCleanup.push_back(std::move(*i));
+                        g_State.m_TrackedBinds.erase(i--);
+                        e = g_State.m_TrackedBinds.end();
+                    }
+                    else
+                    {
+                        newStates |= (g_State.m_BindStates & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
+                        newValidity |= (g_State.m_ValidBinds & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
+                        ++nextNewIdx;
+                    }
+                }
+            }else
+            {
+                newStates = g_State.m_BindStates;
+                newValidity = g_State.m_ValidBinds;
+            }
 
-                for(auto &bi : newBinds)
-                    g_State.m_TrackedBinds.push_back(std::move(bi));
+            for(auto &bi : g_State.m_TempNewBinds)
+                g_State.m_TrackedBinds.push_back(std::move(bi));
 
-                g_State.m_BindStates = newStates;
-                g_State.m_ValidBinds = newValidity;
-                g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
-                //FMT_PRINT("Binds found: {}\n", foundBinds);
-            },
-            nullptr
-        );
-        //ESP_LOGI(TAG, "Check own binds: finish");
+            g_State.m_TempNewBinds.clear();
+            g_State.m_BindStates = newStates;
+            g_State.m_ValidBinds = newValidity;
+            g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
+
+            //schedule
+            g_State.ScheduleBindsChecking();
+        };
+        bind_table_iterate(esp_zb_get_short_address(), cfg);
     }
 
     void on_local_on_timer_finished(void* param)
@@ -1778,6 +1782,12 @@ namespace zb
                             TAG, "Failed to start Zigbee bdb commissioning");
     }
 
+    static esp_zb_ieee_addr_t g_MyIEEE;
+    const esp_zb_ieee_addr_t& GetMyIEEE()
+    {
+        return g_MyIEEE;
+    }
+
     extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     {
         uint32_t *p_sg_p     = signal_struct->p_app_signal;
@@ -1795,9 +1805,10 @@ namespace zb
                 failed_counter = 0;
                 led::blink(false, {});
                 //async setup
+                esp_zb_get_long_address(g_MyIEEE);
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
                 g_State.RunService();
-                g_State.RunBindsChecking();
+                g_State.ScheduleBindsChecking();
 
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {

@@ -2,6 +2,7 @@
 #include "zb_binds.hpp"
 #include "zb_helpers/zbh_types.hpp"
 #include "zb_helpers/zbh_handlers_cmd.hpp"
+#include "zb_helpers/zbh_bind_table.hpp"
 
 namespace zb
 {
@@ -157,31 +158,31 @@ namespace zb
             return false;
         }
 
-        bool found = false;
-        auto *pVar = pResp->variables;
-        while(pVar)
-        {
-            if (pVar->attribute_id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID)
-            {
-                FMT_PRINT("({:x})Got attribute {:x}; Status {:x}\n", pBind->m_ShortAddr, pVar->attribute_id, pVar->status);
-                if (pVar->status == ESP_ZB_ZCL_STATUS_SUCCESS)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            //FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, pVar->status, pVar->report_direction);
-            pVar = pVar->next;
-        }
+        //bool found = false;
+        //auto *pVar = pResp->variables;
+        //while(pVar)
+        //{
+        //    if (pVar->attribute_id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID)
+        //    {
+        //        FMT_PRINT("({:x})Got attribute {:x}; Status {:x}\n", pBind->m_ShortAddr, pVar->attribute_id, pVar->status);
+        //        if (pVar->status == ESP_ZB_ZCL_STATUS_SUCCESS)
+        //        {
+        //            found = true;
+        //            break;
+        //        }
+        //    }
+        //    FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, pVar->status, pVar->direction);
+        //    pVar = pVar->next;
+        //}
 
-        if (found)
+        if (pResp->info.status == esp_zb_zcl_status_t::ESP_ZB_ZCL_STATUS_SUCCESS)
         {
             FMT_PRINT("({:x})Attribute reporting configured. All good.\n", pBind->m_ShortAddr);
             pBind->m_ReportConfigured = true;
             pBind->TransitTo(State::Functional);
         }else
         {
-            FMT_PRINT("({:x})Attribute reporting could not be configured.\n", pBind->m_ShortAddr);
+            FMT_PRINT("({:x})Attribute reporting could not be configured. Status: {:x}\n", pBind->m_ShortAddr, pResp->info.status);
             pBind->TransitTo(State::NonFunctional);
             pBind->Do();
         }
@@ -198,7 +199,7 @@ namespace zb
         report_cmd.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         report_cmd.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
 
-        int16_t report_change = 1; /* report on each 2 degree changes */
+        int16_t report_change = 1;
         esp_zb_zcl_config_report_record_t records[] = {
             {
                 .direction = ESP_ZB_ZCL_REPORT_DIRECTION_SEND,
@@ -209,7 +210,7 @@ namespace zb
                 .reportable_change = &report_change,
             },
         };
-        report_cmd.record_number = std::size(records);
+        report_cmd.record_number = 1;//std::size(records);
         report_cmd.record_field = records;
         m_LastTSN = esp_zb_zcl_config_report_cmd_req(&report_cmd);
         FMT_PRINT("Sent configure report request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
@@ -362,6 +363,7 @@ namespace zb
 
     void BindInfo::SendUnBindRequest()
     {
+        m_AttemptsLeft = kMaxConfigAttempts;
         esp_zb_zdo_bind_req_param_t bind_req;
         bind_req.req_dst_addr = m_ShortAddr;
         std::memcpy(bind_req.src_address, m_IEEE, sizeof(esp_zb_ieee_addr_t));
@@ -390,6 +392,25 @@ namespace zb
             return;
         }
 
+        if (zdo_status == ESP_ZB_ZDP_STATUS_TIMEOUT)
+        {
+            if (pBind->m_AttemptsLeft--)
+            {
+                FMT_PRINT("({:x})Got Bind request result {:x}. Failed. Starting another attempt (left: {})\n", pBind->m_ShortAddr, zdo_status, (int)pBind->m_AttemptsLeft);
+                pBind->m_Timer.Setup(
+                        [](void *user_ctx){
+                            BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
+                            if (!g_BindInfoPool.IsValid(pBind)) 
+                            {
+                                FMT_PRINT("(Re-try attempt)({:x})(Bind request)BindInfo is dead\n", user_ctx);
+                                pBind->SendBindRequest();
+                                return;//we're dead
+                            }
+                        }, pBind, kTimeout);
+                return;
+            }
+        }
+
         pBind->m_ReportConfigured = false;
         pBind->m_BoundToMe = false;
         FMT_PRINT("({:x})Got UnBind request result {:x}\n", pBind->m_ShortAddr, zdo_status);
@@ -399,6 +420,7 @@ namespace zb
     
     void BindInfo::SendBindRequest()
     {
+        m_AttemptsLeft = kMaxConfigAttempts;
         esp_zb_zdo_bind_req_param_t bind_req;
         bind_req.req_dst_addr = m_ShortAddr;
         std::memcpy(bind_req.src_address, m_IEEE, sizeof(esp_zb_ieee_addr_t));
@@ -429,6 +451,24 @@ namespace zb
 
         if (zdo_status != ESP_ZB_ZDP_STATUS_SUCCESS)
         {
+            if (zdo_status == ESP_ZB_ZDP_STATUS_TIMEOUT)
+            {
+                if (pBind->m_AttemptsLeft--)
+                {
+                    FMT_PRINT("({:x})Got Bind request result {:x}. Failed. Starting another attempt (left: {})\n", pBind->m_ShortAddr, zdo_status, (int)pBind->m_AttemptsLeft);
+                    pBind->m_Timer.Setup(
+                            [](void *user_ctx){
+                                BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
+                                if (!g_BindInfoPool.IsValid(pBind)) 
+                                {
+                                    FMT_PRINT("(Re-try attempt)({:x})(Bind request)BindInfo is dead\n", user_ctx);
+                                    pBind->SendBindRequest();
+                                    return;//we're dead
+                                }
+                            }, pBind, kTimeout);
+                    return;
+                }
+            }
             FMT_PRINT("({:x})Got Bind request result {:x}. Failed\n", pBind->m_ShortAddr, zdo_status);
             pBind->m_ReportConfigured = false;
             pBind->m_BoundToMe = false;
@@ -445,12 +485,88 @@ namespace zb
 
     void BindInfo::OnGetBindTableFailed(esp_zb_zdp_status_t status)
     {
+        if (status == ESP_ZB_ZDP_STATUS_TIMEOUT)
+        {
+            if (m_AttemptsLeft--)
+            {
+                FMT_PRINT("({:x})Got Get Bind Table result {:x}. Failed. Starting another attempt (left: {})\n", m_ShortAddr, status, (int)m_AttemptsLeft);
+                m_Timer.Setup(
+                        [](void *user_ctx){
+                            BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
+                            if (!g_BindInfoPool.IsValid(pBind)) 
+                            {
+                                FMT_PRINT("(Re-try attempt)({:x})(Get Bind Table)BindInfo is dead\n", user_ctx);
+                                pBind->GetBindTable();
+                                return;//we're dead
+                            }
+                        }, this, kTimeout);
+                return;
+            }
+        }
         m_ReportConfigured = false;
         m_BoundToMe = false;
         TransitTo(State::NonFunctional);
     }
 
-    void BindInfo::OnGetBindTableChunk(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
+    bool BindInfo::OnBindTableBegin(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
+    {
+        BindInfo *pBind = (BindInfo *)user_ctx;
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("({:x})Got Bind table chunk, but BindInfo is dead\n", user_ctx);
+            return false;//we're dead
+        }
+
+        if (pBind->m_State != State::VerifyBinds)
+        {
+            FMT_PRINT("({:x})(VerifyBinds)Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
+            return false;
+        }
+        return true;
+    }
+
+    bool BindInfo::OnGetBindTableChunk(esp_zb_zdo_binding_table_record_t *pNext, void *user_ctx)
+    {
+        BindInfo *pBind = (BindInfo *)user_ctx;
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("({:x})Got Bind table chunk, but BindInfo is dead\n", user_ctx);
+            return false;//we're dead
+        }
+
+        if (zb::ieee_addr{pNext->dst_address.addr_long} == zb::ieee_addr{GetMyIEEE()})
+        {
+            //ok, it's me
+            //right cluster?
+            if (IsRelevant(esp_zb_zcl_cluster_id_t(pNext->cluster_id)))//got it. at least one
+            {
+                //no need to search further
+                //need to check if reporting is properly configured
+                FMT_PRINT("({:x})Bind table chunk: Found.\n", pBind->m_ShortAddr);
+                pBind->TransitTo(State::CheckConfigureReport);
+                pBind->Do();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void BindInfo::OnBindTableFinished(const esp_zb_zdo_binding_table_info_t *, void *user_ctx)
+    {
+        BindInfo *pBind = (BindInfo *)user_ctx;
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("({:x})Got final Bind table chunk, but BindInfo is dead\n", user_ctx);
+            return;//we're dead
+        }
+
+        FMT_PRINT("({:x})Last bind table chunk: Not Found.\n", pBind->m_ShortAddr);
+        //we're done and apparently no bind to ourselfs found
+        pBind->TransitTo(State::SendBindToMeReq);
+        return pBind->Do();
+    }
+
+    void BindInfo::OnBindTableFailure(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
     {
         BindInfo *pBind = (BindInfo *)user_ctx;
         if (!g_BindInfoPool.IsValid(pBind)) 
@@ -459,65 +575,16 @@ namespace zb
             return;//we're dead
         }
 
-        if (pBind->m_State != State::VerifyBinds)
-        {
-            FMT_PRINT("({:x})(VerifyBinds)Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-
         if (esp_zb_zdp_status_t(table_info->status) != esp_zb_zdp_status_t::ESP_ZB_ZDP_STATUS_SUCCESS)
         {
             FMT_PRINT("({:x})Bind table chunk failed. Status {:x}\n", pBind->m_ShortAddr, table_info->status);
             return pBind->OnGetBindTableFailed(esp_zb_zdp_status_t(table_info->status));
         }
-
-        esp_zb_ieee_addr_t me;
-        esp_zb_get_long_address(me);
-        auto *pNext = table_info->record;
-        while(pNext)
-        {
-            if (pNext->dst_addr_mode == ESP_ZB_ZDO_BIND_DST_ADDR_MODE_64_BIT_EXTENDED)
-            {
-                if (zb::ieee_addr{pNext->dst_address.addr_long} == zb::ieee_addr{me})
-                {
-                    //ok, it's me
-                    //right cluster?
-                    if (IsRelevant(esp_zb_zcl_cluster_id_t(pNext->cluster_id)))//got it. at least one
-                    {
-                        //no need to search further
-                        //need to check if reporting is properly configured
-                        FMT_PRINT("({:x})Bind table chunk: Found.\n", pBind->m_ShortAddr);
-                        pBind->TransitTo(State::CheckConfigureReport);
-                        return pBind->Do();
-                    }
-                }
-            }
-            pNext = pNext->next;
-        }
-
-        if ((table_info->index + table_info->count) < table_info->total)
-        {
-            //there are more binds
-            esp_zb_zdo_mgmt_bind_param_t cmd_req;
-            cmd_req.dst_addr = pBind->m_ShortAddr;
-            cmd_req.start_index = table_info->index + table_info->count;
-
-            FMT_PRINT("Sending request (next chunk, index {}) to {:x} to get binds\n", cmd_req.start_index, cmd_req.dst_addr);
-            return esp_zb_zdo_binding_table_req(&cmd_req, OnGetBindTableChunk, pBind);
-        }
-        FMT_PRINT("({:x})Last bind table chunk: Not Found.\n", pBind->m_ShortAddr);
-        //we're done and apparently no bind to ourselfs found
-        pBind->TransitTo(State::SendBindToMeReq);
-        return pBind->Do();
     }
 
     void BindInfo::GetBindTable()
     {
-        esp_zb_zdo_mgmt_bind_param_t cmd_req;
-        cmd_req.dst_addr = m_ShortAddr;
-        cmd_req.start_index = 0;
-
-        FMT_PRINT("Sending request to {:x} to get binds\n", cmd_req.dst_addr);
-        esp_zb_zdo_binding_table_req(&cmd_req, OnGetBindTableChunk, this);
+        FMT_PRINT("Sending request to {:x} to get binds\n", m_ShortAddr);
+        bind_table_iterate(m_ShortAddr, {this, OnGetBindTableChunk, OnBindTableBegin, OnBindTableFinished, OnBindTableFailure});
     }
 }

@@ -9,5 +9,6 @@
 #include "zbh_attributes.hpp"
 #include "zbh_handlers.hpp"
 #include "zbh_alarm.hpp"
+#include "zbh_bind_table.hpp"
 
 #endif
