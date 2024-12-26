@@ -44,11 +44,11 @@ struct LinkedList
     Node *m_pFirst = nullptr;
 };
 
-template<class NodeType> requires std::is_base_of_v<Node, NodeType>
+template<class NodeType>
 struct LinkedListT: LinkedList
 {
     Iterator<NodeType> begin() { if (m_pFirst) return {(NodeType*)m_pFirst, (NodeType*)m_pFirst->m_pNext}; else return end(); }
-    Iterator<NodeType> end() { return {}; }
+    Iterator<NodeType> end() { static_assert(std::is_base_of_v<Node, NodeType>, "NodeType must be derived from Node"); return {}; }
 
     LinkedListT& operator+=(NodeType &n) { LinkedList::operator+=(n); return *this; }
 };

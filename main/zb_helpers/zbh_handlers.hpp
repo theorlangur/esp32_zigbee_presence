@@ -7,5 +7,6 @@
 #include "zbh_handlers_cmd.hpp"
 #include "zbh_handlers_attr.hpp"
 #include "zbh_handlers_report.hpp"
+#include "zbh_handlers_list.hpp"
 
 #endif
