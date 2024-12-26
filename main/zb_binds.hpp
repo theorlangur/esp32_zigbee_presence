@@ -96,6 +96,7 @@ namespace zb
         static void OnBindTableFinished(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
         static void OnBindTableFailure(const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx);
 
+        void CheckReportingAbility();
         void ReadAttribute();
         void CheckReportConfiguration();
         void SendReportConfiguration();

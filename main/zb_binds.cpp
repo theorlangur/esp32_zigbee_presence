@@ -40,6 +40,7 @@ namespace zb
             case State::CheckConfigureReport: return CheckReportConfiguration();
             case State::SendConfigureReport: return SendReportConfiguration();
             case State::TryReadAttribute: return ReadAttribute();
+            case State::CheckReportingAbility: return CheckReportingAbility();
             case State::NonFunctional:
                 {
                     //we're done
@@ -62,8 +63,14 @@ namespace zb
         m_Timer.Cancel();
         m_ConfigReportNode.RemoveFromList();
         m_ReadReportConfigNode.RemoveFromList();
+        m_ReadAttrNode.RemoveFromList();
 
         m_State = s;
+    }
+
+    void BindInfo::CheckReportingAbility()
+    {
+        //TODO: implement
     }
 
     void BindInfo::ReadAttribute()
