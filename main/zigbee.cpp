@@ -413,7 +413,7 @@ namespace zb
 
     zb::seq_nr_t send_on_raw()
     {
-        esp_zb_zcl_on_off_cmd_t cmd_req;
+        esp_zb_zcl_on_off_cmd_t cmd_req{};
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
@@ -422,7 +422,7 @@ namespace zb
 
     zb::seq_nr_t send_off_raw()
     {
-        esp_zb_zcl_on_off_cmd_t cmd_req;
+        esp_zb_zcl_on_off_cmd_t cmd_req{};
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
@@ -432,7 +432,7 @@ namespace zb
     zb::seq_nr_t send_on_timed_raw()
     {
         auto t = g_Config.GetOnOffTimeout();
-        esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req;
+        esp_zb_zcl_on_off_on_with_timed_off_cmd_t cmd_req{};
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
         cmd_req.on_off_control = 0;//process unconditionally
         cmd_req.on_time = t * 10;

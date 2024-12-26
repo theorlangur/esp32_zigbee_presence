@@ -17,7 +17,7 @@ namespace zb
     static void OnGetBindTableChunk(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx);
     void bind_table_iterate(uint16_t shortAddr, BindIteratorConfig config)
     {
-        esp_zb_zdo_mgmt_bind_param_t cmd_req;
+        esp_zb_zdo_mgmt_bind_param_t cmd_req{};
         cmd_req.dst_addr = shortAddr;
         cmd_req.start_index = 0;
 
