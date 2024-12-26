@@ -24,4 +24,6 @@ idf_component_register(SRCS
                     lib/linked_list.cpp
                     zb_helpers/zbh_bind_table.hpp
                     zb_helpers/zbh_bind_table.cpp
+                    zb_helpers/zbh_cmd_sender.hpp
+                    zb_helpers/zbh_cmd_sender.cpp
                     INCLUDE_DIRS "")

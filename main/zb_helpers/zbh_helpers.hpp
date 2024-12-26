@@ -10,5 +10,6 @@
 #include "zbh_handlers.hpp"
 #include "zbh_alarm.hpp"
 #include "zbh_bind_table.hpp"
+#include "zbh_cmd_sender.hpp"
 
 #endif

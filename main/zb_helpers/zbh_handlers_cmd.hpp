@@ -148,7 +148,7 @@ namespace zb
     inline ZbCmdResponse ZbCmdResponse::g_CmdResponseRegistry[kMaxClusters];
 
 
-    using seq_nr_t = uint8_t;
+    using seq_nr_t = uint16_t;
     /**********************************************************************/
     /* ZbCmdSend                                                          */
     /**********************************************************************/
