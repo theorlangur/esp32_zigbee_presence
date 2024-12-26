@@ -160,20 +160,61 @@ namespace zb
         }
     }
 
-    void BindInfo::CheckReportingAbility()
+    zb::seq_nr_t BindInfo::SendTryOnOffCmd(void*pCtx)
     {
+        BindInfo *pBind = static_cast<BindInfo *>(pCtx);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Target BindInfo object is dead\n");
+            return kInvalidTSN;//we're dead
+        }
         esp_zb_zcl_on_off_cmd_t cmd_req{};
         cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        if (m_InitialValue)
+        if (pBind->m_InitialValue)
             cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;//it's 'on' now we need to try and turn it off
         else
             cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;//it's 'off' now we need to try and turn it on
         cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-        cmd_req.zcl_basic_cmd.dst_endpoint = m_EP;
-        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
-        m_LastTSN = esp_zb_zcl_on_off_cmd_req(&cmd_req);
-        m_Timer.Setup(OnTimeout<State::CheckReportingAbility>, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckReportingAbility>, this);
+        cmd_req.zcl_basic_cmd.dst_endpoint = pBind->m_EP;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = pBind->m_ShortAddr;
+        return esp_zb_zcl_on_off_cmd_req(&cmd_req);
+    }
+
+    void BindInfo::OnTryOnOffSuccess(void*pCtx)
+    {
+        BindInfo *pBind = static_cast<BindInfo *>(pCtx);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Target BindInfo object is dead\n");
+            return;//we're dead
+        }
+
+        if (pBind->m_State == State::CheckReportingAbility)
+        {
+            //ok, waiting for a report
+            pBind->m_Timer.Setup(OnTimeout<State::CheckReportingAbility>, pBind, kTimeout);
+        }
+    }
+
+    void BindInfo::OnTryOnOffFail(void *pCtx, esp_zb_zcl_status_t)
+    {
+        BindInfo *pBind = static_cast<BindInfo *>(pCtx);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Target BindInfo object is dead\n");
+            return;//we're dead
+        }
+
+        pBind->TransitTo(State::NonFunctional);
+    }
+
+    void BindInfo::CheckReportingAbility()
+    {
+        if (m_InitialValue)
+            m_TryReportCmd.Send(ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID);
+        else
+            m_TryReportCmd.Send(ESP_ZB_ZCL_CMD_ON_OFF_ON_ID);
+        //ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckReportingAbility>, this);
     }
 
     void BindInfo::OnReport(const esp_zb_zcl_report_attr_message_t *pReport)

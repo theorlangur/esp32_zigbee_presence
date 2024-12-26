@@ -8,6 +8,7 @@
 #include "lib/object_pool.hpp"
 #include "lib/array_count.hpp"
 #include "zb_helpers/zbh_alarm.hpp"
+#include "zb_helpers/zbh_cmd_sender.hpp"
 #include "zigbee.hpp"
 
 namespace zb
@@ -72,11 +73,16 @@ namespace zb
 
         void OnReport(const esp_zb_zcl_report_attr_message_t *pReport);
     private:
+        static zb::seq_nr_t SendTryOnOffCmd(void*);
+        static void OnTryOnOffSuccess(void*);
+        static void OnTryOnOffFail(void*, esp_zb_zcl_status_t);
+
         State m_State = State::New;
         ZbAlarm m_Timer;
         ReadReportConfigNode m_ReadReportConfigNode;
         ConfigReportNode m_ConfigReportNode;
         ReadAttrRespNode m_ReadAttrNode;
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2> m_TryReportCmd{SendTryOnOffCmd, OnTryOnOffSuccess, OnTryOnOffFail, nullptr, this};
 
         static constexpr uint16_t kInvalidTSN = 0xffff;
         uint16_t m_LastTSN = kInvalidTSN;
