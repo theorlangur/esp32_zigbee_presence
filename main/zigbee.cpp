@@ -598,6 +598,7 @@ namespace zb
                 }
             }
 
+            auto prevValidBinds = m_ValidBinds;
             //update validity of the binds
             for(size_t i = 0, n = m_TrackedBinds.size(); i < n; ++i)
             {
@@ -606,6 +607,10 @@ namespace zb
                     m_ValidBinds |= 1 << i;
                 else
                     m_ValidBinds &= ~(1 << i);
+            }
+            if (prevValidBinds != m_ValidBinds)
+            {
+                FMT_PRINT("Valid binds changed: from {:x} to {:x}\n", prevValidBinds, m_ValidBinds);
             }
             
             static ZbAlarm rep{"InternalsReporting"};
@@ -693,6 +698,7 @@ namespace zb
     {
         BindIteratorConfig cfg;
         cfg.on_begin = [](const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx)->bool{
+            //FMT_PRINT("New own binds check round\n");
             g_State.m_TempNewBinds.clear();
             g_State.m_FoundExisting = 0;
             g_State.m_Internals.m_BindRequestActive = false;
@@ -707,7 +713,7 @@ namespace zb
             esp_zb_zcl_addr_t addr;
             addr.addr_type = pRec->dst_addr_mode;
             std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
-            FMT_PRINT("(Raw)Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+            //FMT_PRINT("(Raw)Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
             if (shortAddr != 0xffff && RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
             {
                 auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
@@ -744,6 +750,7 @@ namespace zb
         };
         cfg.on_error = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
             //arm the next timer
+            FMT_PRINT("Binds check error: {:x}; Next round\n", pTable->status);
             g_State.ScheduleBindsChecking();
         };
         cfg.on_end = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
@@ -783,8 +790,10 @@ namespace zb
             g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
 
             //schedule
+            //FMT_PRINT("Binds check finish; Next round\n");
             g_State.ScheduleBindsChecking();
         };
+        //FMT_PRINT("Initiating own binds iteration\n");
         bind_table_iterate(esp_zb_get_short_address(), cfg);
     }
 
@@ -1608,9 +1617,11 @@ namespace zb
                         bool *pVal = (bool *)pReport->attribute.data.value;
                         FMT_PRINT("New state of the bind info: {}\n", *pVal);
                         g_State.m_BindStates |= (int(*pVal) << idx);
+                        FMT_PRINT("New binds state: {:x}\n", g_State.m_BindStates);
 
                         if (!(g_State.m_BindStates & g_State.m_ValidBinds) && g_State.m_LastPresence)//we still have the presence
                         {
+                            FMT_PRINT("No controlled bound devices are on. Resetting presence\n");
                             //re-arm, so that we can again detect and react
                             g_State.m_LastPresence = false;
                             if (auto status = g_OccupancyState.Set(ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED); !status)
