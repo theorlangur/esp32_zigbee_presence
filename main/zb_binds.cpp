@@ -39,6 +39,7 @@ namespace zb
             case State::SendBindToMeReq: return SendBindRequest();
             case State::CheckConfigureReport: return CheckReportConfiguration();
             case State::SendConfigureReport: return SendReportConfiguration();
+            case State::TryReadAttribute: return ReadAttribute();
             case State::NonFunctional:
                 {
                     //we're done
@@ -63,6 +64,11 @@ namespace zb
         m_ReadReportConfigNode.RemoveFromList();
 
         m_State = s;
+    }
+
+    void BindInfo::ReadAttribute()
+    {
+        //TODO: implement
     }
 
     BindInfo* BindInfo::ReadReportConfigNode::GetBindInfo()
@@ -157,23 +163,6 @@ namespace zb
             FMT_PRINT("{:x}Timeout already happened. We should never reach here\n", pBind->m_ShortAddr);
             return false;
         }
-
-        //bool found = false;
-        //auto *pVar = pResp->variables;
-        //while(pVar)
-        //{
-        //    if (pVar->attribute_id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID)
-        //    {
-        //        FMT_PRINT("({:x})Got attribute {:x}; Status {:x}\n", pBind->m_ShortAddr, pVar->attribute_id, pVar->status);
-        //        if (pVar->status == ESP_ZB_ZCL_STATUS_SUCCESS)
-        //        {
-        //            found = true;
-        //            break;
-        //        }
-        //    }
-        //    FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, pVar->status, pVar->direction);
-        //    pVar = pVar->next;
-        //}
 
         if (pResp->info.status == esp_zb_zcl_status_t::ESP_ZB_ZCL_STATUS_SUCCESS)
         {
