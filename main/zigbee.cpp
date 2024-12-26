@@ -1589,6 +1589,16 @@ namespace zb
 
                 if (bindIt != g_State.m_TrackedBinds.end())
                 {
+                    switch((*bindIt)->m_State)
+                    {
+                    case BindInfo::State::CheckReportingAbility:
+                        (*bindIt)->OnReport(pReport);
+                        return ESP_OK;
+                    case BindInfo::State::Functional:
+                        break;
+                    default:
+                        return ESP_OK;//anything else but functional is ignored
+                    }
                     size_t idx = bindIt - g_State.m_TrackedBinds.begin();
                     FMT_PRINT("Found a bind info at index {}\n", idx);
                     if (g_State.m_ValidBinds & (1 << idx))

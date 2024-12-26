@@ -41,6 +41,7 @@ namespace zb
             SendBindToMeReq,
             CheckConfigureReport,
             SendConfigureReport,
+            CheckReportingAbility,
             TryReadAttribute,
             NonFunctional,
             Functional,
@@ -68,6 +69,8 @@ namespace zb
         void Do();
         void Unbind();
         State GetState() const { return m_State; }
+
+        void OnReport(const esp_zb_zcl_report_attr_message_t *pReport);
     private:
         State m_State = State::New;
         ZbAlarm m_Timer;
