@@ -538,6 +538,8 @@ namespace zb
 
         BindArray m_TempNewBinds;
         uint8_t m_FoundExisting = 0;
+        bool m_NeedBindsChecking = true;
+
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
         {
             for(auto _i : g_RelevantBoundClusters)
@@ -611,6 +613,12 @@ namespace zb
             if (prevValidBinds != m_ValidBinds)
             {
                 FMT_PRINT("Valid binds changed: from {:x} to {:x}\n", prevValidBinds, m_ValidBinds);
+            }
+
+            if (m_NeedBindsChecking)
+            {
+                m_NeedBindsChecking = false;
+                ScheduleBindsChecking();
             }
             
             static ZbAlarm rep{"InternalsReporting"};
@@ -698,7 +706,7 @@ namespace zb
     {
         BindIteratorConfig cfg;
         cfg.on_begin = [](const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx)->bool{
-            //FMT_PRINT("New own binds check round\n");
+            FMT_PRINT("New own binds check round\n");
             g_State.m_TempNewBinds.clear();
             g_State.m_FoundExisting = 0;
             g_State.m_Internals.m_BindRequestActive = false;
@@ -713,7 +721,7 @@ namespace zb
             esp_zb_zcl_addr_t addr;
             addr.addr_type = pRec->dst_addr_mode;
             std::memcpy(&addr.u, &pRec->dst_address, sizeof(addr.u));
-            //FMT_PRINT("(Raw)Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+            FMT_PRINT("(Raw)Bind. Addr={}, short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
             if (shortAddr != 0xffff && RuntimeState::IsRelevant(esp_zb_zcl_cluster_id_t(pRec->cluster_id)))//got it. at least one
             {
                 auto existingI = g_State.m_TrackedBinds.find(zb::ieee_addr{pRec->dst_address.addr_long}, &BindInfo::m_IEEE);
@@ -736,7 +744,7 @@ namespace zb
                     }
                 }else
                 {
-                    //FMT_PRINT("This is a existing bind\n");
+                    FMT_PRINT("This is a existing bind\n");
                     ++g_State.m_FoundExisting;
                     (*existingI)->m_BindChecked = true;
                     (*existingI)->m_EP = pRec->dst_endp;
@@ -751,7 +759,7 @@ namespace zb
         cfg.on_error = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
             //arm the next timer
             FMT_PRINT("Binds check error: {:x}; Next round\n", pTable->status);
-            g_State.ScheduleBindsChecking();
+            g_State.m_NeedBindsChecking = true;
         };
         cfg.on_end = [](const esp_zb_zdo_binding_table_info_t *pTable, void *pCtx){
             uint8_t newStates = 0;
@@ -788,12 +796,8 @@ namespace zb
             g_State.m_BindStates = newStates;
             g_State.m_ValidBinds = newValidity;
             g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
-
-            //schedule
-            //FMT_PRINT("Binds check finish; Next round\n");
-            g_State.ScheduleBindsChecking();
         };
-        //FMT_PRINT("Initiating own binds iteration\n");
+        FMT_PRINT("Initiating own binds iteration\n");
         bind_table_iterate(esp_zb_get_short_address(), cfg);
     }
 
@@ -1873,6 +1877,54 @@ namespace zb
         }
     }
 
+    bool apsde_data_indication_callback(esp_zb_apsde_data_ind_t ind)
+    {
+        if (ind.dst_short_addr == esp_zb_get_short_address() && ind.status == 0)
+        {
+            //when I'm the target
+            if (ind.asdu_length == sizeof(APSME_BindReq) + 1)
+            {
+                auto cmd = APSME_Commands(ind.cluster_id);//this will have a command id
+                //FMT_PRINT("(cmd={:x})APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
+                //        , cmd
+                //        , ind.status
+                //        , ind.src_short_addr , ind.src_endpoint
+                //        , ind.dst_short_addr , ind.dst_endpoint
+                //        , ind.cluster_id
+                //        , ind.asdu_length
+                //        );
+                switch(cmd)
+                {
+                    case APSME_Commands::Bind:
+                    case APSME_Commands::Unbind:
+                    {
+                        APSME_BindReq *pReq = (APSME_BindReq *)(ind.asdu + 1);
+                        if (pReq->cluster_id == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
+                        {
+                            FMT_PRINT("Got {} request via APSDE.indication for {}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst);
+                            //relevant
+                            //trigger binds re-check
+                            g_State.m_NeedBindsChecking = true;
+                        }else
+                        {
+                            FMT_PRINT("Got {} request via APSDE.indication for {}, cluster {:x}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst, (int)pReq->cluster_id);
+                        }
+                    }
+                    break;
+                    default:
+                        break;
+                }
+            }
+            //FMT_PRINT("APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
+            //        , ind.status
+            //        , ind.src_short_addr , ind.src_endpoint
+            //        , ind.dst_short_addr , ind.dst_endpoint
+            //        , ind.cluster_id
+            //        , ind.asdu_length
+            //        );
+        }
+        return false;
+    }
 
     /**********************************************************************/
     /* Zigbee Task Entry Point                                            */
@@ -1918,6 +1970,7 @@ namespace zb
                 >
         );
         esp_zb_zcl_command_send_status_handler_register(&zb::ZbCmdSend::handler);
+        esp_zb_aps_data_indication_handler_register(apsde_data_indication_callback);
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 

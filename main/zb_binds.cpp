@@ -277,6 +277,13 @@ namespace zb
         }
         pBind->m_ConfigReportNode.RemoveFromList();
         pBind->m_ReportConfigured = false;
+
+        if (pBind->m_AttemptsLeft--)
+        {
+            FMT_PRINT("Making another attempt. {} left\n", (int)pBind->m_AttemptsLeft);
+            pBind->Do();
+            return;
+        }
         pBind->TransitTo(State::NonFunctional);
         return;
     }
@@ -325,6 +332,13 @@ namespace zb
         }
         pBind->m_ReadReportConfigNode.RemoveFromList();
         pBind->m_ReportConfigured = false;
+        if (pBind->m_AttemptsLeft--)
+        {
+            FMT_PRINT("Making another attempt. {} left\n", (int)pBind->m_AttemptsLeft);
+            pBind->Do();
+            return;
+        }
+
         pBind->TransitTo(State::NonFunctional);
         return;
     }
