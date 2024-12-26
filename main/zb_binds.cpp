@@ -307,8 +307,10 @@ namespace zb
         if (pResp->info.status == esp_zb_zcl_status_t::ESP_ZB_ZCL_STATUS_SUCCESS)
         {
             FMT_PRINT("({:x})Attribute reporting configured. All good.\n", pBind->m_ShortAddr);
-            pBind->m_ReportConfigured = true;
-            pBind->TransitTo(State::Functional);
+            //pBind->m_ReportConfigured = true;
+            //pBind->TransitTo(State::Functional);
+            pBind->TransitTo(State::TryReadAttribute);
+            pBind->Do();
         }else
         {
             FMT_PRINT("({:x})Attribute reporting could not be configured. Status: {:x}\n", pBind->m_ShortAddr, pResp->info.status);
