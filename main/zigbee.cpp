@@ -1589,7 +1589,7 @@ namespace zb
 
                 if (bindIt != g_State.m_TrackedBinds.end())
                 {
-                    switch((*bindIt)->m_State)
+                    switch((*bindIt)->GetState())
                     {
                     case BindInfo::State::CheckReportingAbility:
                         (*bindIt)->OnReport(pReport);

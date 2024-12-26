@@ -4,6 +4,31 @@
 #include "zb_helpers/zbh_handlers_cmd.hpp"
 #include "zb_helpers/zbh_bind_table.hpp"
 
+
+template<>
+struct tools::formatter_t<zb::BindInfo::State>
+{
+    template<FormatDestination Dest>
+    static std::expected<size_t, FormatError> format_to(Dest &&dst, std::string_view const& fmtStr, zb::BindInfo::State const& p)
+    {
+        const char *pStr = "<unk>";
+        switch(p)
+        {
+            case zb::BindInfo::State::New: pStr = "New"; break;
+            case zb::BindInfo::State::VerifyBinds: pStr = "VerifyBinds"; break;
+            case zb::BindInfo::State::SendBindToMeReq: pStr = "SendBindToMeReq"; break;
+            case zb::BindInfo::State::CheckConfigureReport: pStr = "CheckConfigureReport"; break;
+            case zb::BindInfo::State::SendConfigureReport: pStr = "SendConfigureReport"; break;
+            case zb::BindInfo::State::CheckReportingAbility: pStr = "CheckReportingAbility"; break;
+            case zb::BindInfo::State::TryReadAttribute: pStr = "TryReadAttribute"; break;
+            case zb::BindInfo::State::NonFunctional: pStr = "NonFunctional"; break;
+            case zb::BindInfo::State::Functional: pStr = "Functional"; break;
+            case zb::BindInfo::State::Unbind: pStr = "Unbind"; break;
+        }
+        return tools::format_to(std::forward<Dest>(dst), "{}", pStr);
+    }
+};
+
 namespace zb
 {
     namespace{
@@ -68,74 +93,21 @@ namespace zb
         m_State = s;
     }
 
-    void BindInfo::CheckReportingAbility()
-    {
-        //TODO: implement
-    }
-
-    void BindInfo::ReadAttribute()
-    {
-        esp_zb_zcl_read_attr_cmd_t read_req = {};
-        read_req.address_mode = ESP_ZB_APS_ADDR_MODE_64_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
-        read_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-        read_req.zcl_basic_cmd.dst_endpoint = m_EP;
-        std::memcpy(read_req.zcl_basic_cmd.dst_addr_u.addr_long, m_IEEE, sizeof(esp_zb_ieee_addr_t));
-        //read_req.zcl_basic_cmd.dst_addr_u.addr_long = m_EP;
-        read_req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
-        uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID, };
-        read_req.attr_number = std::size(attributes);
-        read_req.attr_field = attributes;
-        m_LastTSN = esp_zb_zcl_read_attr_cmd_req(&read_req);
-        m_ReadAttrNode.RegisterSelf();
-        m_Timer.Setup(OnReadAttrTimeout, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnReadAttrSendStatus, this);
-    }
-
-    void BindInfo::OnReadAttrSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
-    {
-        BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
-        FMT_PRINT("(ReadAttr)Got send status callback for {:x} for TSN {:x}. Status {:x}\n", user_ctx, pSendStatus->tsn, pSendStatus->status);
-        if (!g_BindInfoPool.IsValid(pBind)) 
-        {
-            FMT_PRINT("Target BindInfo object is dead\n");
-            return;//we're dead
-        }
-
-        if (pBind->m_State != State::TryReadAttribute)
-        {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-
-        pBind->m_LastTSN = kInvalidTSN;
-        if (!pBind->m_Timer.IsRunning())//timeout already happened?
-        {
-            FMT_PRINT("({:x})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr);
-            return;
-        }
-
-        if (pSendStatus->status != ESP_OK)
-        {
-            FMT_PRINT("({:x})Failed to read attribute\n", pBind->m_ShortAddr);
-            pBind->TransitTo(State::NonFunctional);
-            return;
-        }
-    }
-
-    void BindInfo::OnReadAttrTimeout(void* param)
+    template<BindInfo::State expectedState>
+    void BindInfo::OnTimeout(void* param)
     {
         BindInfo *pBind = static_cast<BindInfo *>(param);
         if (!g_BindInfoPool.IsValid(pBind)) 
         {
-            FMT_PRINT("Timeout for read attr happened but BindInfo {:x} is dead\n", param);
+            FMT_PRINT("Timeout for {} happened but BindInfo {:x} is dead\n", expectedState, param);
             return;//we're dead
         }
         
-        FMT_PRINT("Timeout happened while trying to read attr for {:x}\n", pBind->m_ShortAddr);
+        FMT_PRINT("Timeout happened at state {} for {:x}\n", expectedState, pBind->m_ShortAddr);
 
-        if (pBind->m_State != State::TryReadAttribute)
+        if (pBind->m_State != expectedState)
         {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
+            FMT_PRINT("({:x}-{})Unexpected state: {:x}\n", pBind->m_ShortAddr, expectedState, pBind->m_State);
             return;
         }
 
@@ -154,6 +126,66 @@ namespace zb
         }
         pBind->TransitTo(State::NonFunctional);
         return;
+    }
+
+    template<BindInfo::State expectedState>
+    void BindInfo::OnSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
+    {
+        BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
+        FMT_PRINT("({})Got send status callback for {:x} for TSN {:x}. Status {:x}\n", expectedState, user_ctx, pSendStatus->tsn, pSendStatus->status);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Target BindInfo object is dead\n");
+            return;//we're dead
+        }
+
+        if (pBind->m_State != State::TryReadAttribute)
+        {
+            FMT_PRINT("({:x}-{})Unexpected state: {:x}\n", pBind->m_ShortAddr, expectedState, pBind->m_State);
+            return;
+        }
+
+        pBind->m_LastTSN = kInvalidTSN;
+        if (!pBind->m_Timer.IsRunning())//timeout already happened?
+        {
+            FMT_PRINT("({:x}-{})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr, expectedState);
+            return;
+        }
+
+        if (pSendStatus->status != ESP_OK)
+        {
+            FMT_PRINT("({:x})Failed to read attribute\n", pBind->m_ShortAddr);
+            pBind->TransitTo(State::NonFunctional);
+            return;
+        }
+    }
+
+    void BindInfo::CheckReportingAbility()
+    {
+        //TODO: implement
+    }
+
+    void BindInfo::OnReport(const esp_zb_zcl_report_attr_message_t *pReport)
+    {
+        //TODO: react to a report
+    }
+
+    void BindInfo::ReadAttribute()
+    {
+        esp_zb_zcl_read_attr_cmd_t read_req = {};
+        read_req.address_mode = ESP_ZB_APS_ADDR_MODE_64_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        read_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        read_req.zcl_basic_cmd.dst_endpoint = m_EP;
+        std::memcpy(read_req.zcl_basic_cmd.dst_addr_u.addr_long, m_IEEE, sizeof(esp_zb_ieee_addr_t));
+        //read_req.zcl_basic_cmd.dst_addr_u.addr_long = m_EP;
+        read_req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+        uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID, };
+        read_req.attr_number = std::size(attributes);
+        read_req.attr_field = attributes;
+        m_LastTSN = esp_zb_zcl_read_attr_cmd_req(&read_req);
+        m_ReadAttrNode.RegisterSelf();
+        m_Timer.Setup(OnTimeout<State::TryReadAttribute>, this, kTimeout);
+        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::TryReadAttribute>, this);
     }
 
     BindInfo* BindInfo::ReadAttrRespNode::GetBindInfo()
@@ -353,77 +385,9 @@ namespace zb
         m_LastTSN = esp_zb_zcl_config_report_cmd_req(&report_cmd);
         FMT_PRINT("Sent configure report request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
         m_ConfigReportNode.RegisterSelf();
-        m_Timer.Setup(OnConfigReportTimeout, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnSendReportConfigSendStatus, this);
+        m_Timer.Setup(OnTimeout<State::SendConfigureReport>, this, kTimeout);
+        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::SendConfigureReport>, this);
         //FMT_PRINT("Sent config report for On/Off; TSN={:x}\n", tsn);
-    }
-
-    void BindInfo::OnSendReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
-    {
-        BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
-        FMT_PRINT("(ConfigReport)Got send status callback for {:x} for TSN {:x}. Status {:x}\n", user_ctx, pSendStatus->tsn, pSendStatus->status);
-        if (!g_BindInfoPool.IsValid(pBind)) 
-        {
-            FMT_PRINT("Target BindInfo object is dead\n");
-            return;//we're dead
-        }
-
-        if (pBind->m_State != State::SendConfigureReport)
-        {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-
-        pBind->m_LastTSN = kInvalidTSN;
-        if (!pBind->m_Timer.IsRunning())//timeout already happened?
-        {
-            FMT_PRINT("({:x})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr);
-            return;
-        }
-
-        if (pSendStatus->status != ESP_OK)
-        {
-            FMT_PRINT("({:x})Failed to configure reporting\n", pBind->m_ShortAddr);
-            pBind->m_ConfigReportNode.RemoveFromList();
-            pBind->m_ReportConfigured = false;
-            pBind->TransitTo(State::NonFunctional);
-            return;
-        }
-    }
-
-    void BindInfo::OnConfigReportTimeout(void* param)
-    {
-        BindInfo *pBind = static_cast<BindInfo *>(param);
-        if (!g_BindInfoPool.IsValid(pBind)) 
-        {
-            FMT_PRINT("Timeout for config report happened but BindInfo {:x} is dead\n", param);
-            return;//we're dead
-        }
-        
-        FMT_PRINT("Timeout happened while trying to configure reporting for {:x}\n", pBind->m_ShortAddr);
-
-        if (pBind->m_State != State::SendConfigureReport)
-        {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-
-        if (pBind->m_LastTSN != kInvalidTSN)
-        {
-            ZbCmdSend::Unregister(uint8_t(pBind->m_LastTSN));
-            pBind->m_LastTSN = kInvalidTSN;
-        }
-        pBind->m_ConfigReportNode.RemoveFromList();
-        pBind->m_ReportConfigured = false;
-
-        if (pBind->m_AttemptsLeft--)
-        {
-            FMT_PRINT("Making another attempt. {} left\n", (int)pBind->m_AttemptsLeft);
-            pBind->Do();
-            return;
-        }
-        pBind->TransitTo(State::NonFunctional);
-        return;
     }
 
     void BindInfo::CheckReportConfiguration()
@@ -444,73 +408,8 @@ namespace zb
         m_LastTSN = esp_zb_zcl_read_report_config_cmd_req(&rr);
         FMT_PRINT("Sent read configure request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
         m_ReadReportConfigNode.RegisterSelf();
-        m_Timer.Setup(OnReadReportConfigTimeout, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnReadReportConfigSendStatus, this);
-    }
-
-    void BindInfo::OnReadReportConfigTimeout(void* param)
-    {
-        BindInfo *pBind = static_cast<BindInfo *>(param);
-        if (!g_BindInfoPool.IsValid(pBind)) 
-        {
-            FMT_PRINT("Timeout for read report config happened but BindInfo {:x} is dead\n", param);
-            return;//we're dead
-        }
-        
-        FMT_PRINT("Timeout happened while trying to read the reporting config for {:x}\n", pBind->m_ShortAddr);
-        if (pBind->m_State != State::CheckConfigureReport)
-        {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-        if (pBind->m_LastTSN != kInvalidTSN)
-        {
-            ZbCmdSend::Unregister(uint8_t(pBind->m_LastTSN));
-            pBind->m_LastTSN = kInvalidTSN;
-        }
-        pBind->m_ReadReportConfigNode.RemoveFromList();
-        pBind->m_ReportConfigured = false;
-        if (pBind->m_AttemptsLeft--)
-        {
-            FMT_PRINT("Making another attempt. {} left\n", (int)pBind->m_AttemptsLeft);
-            pBind->Do();
-            return;
-        }
-
-        pBind->TransitTo(State::NonFunctional);
-        return;
-    }
-
-    void BindInfo::OnReadReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
-    {
-        BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
-        FMT_PRINT("(ReadConfig)Got send status callback for {:x} for TSN {:x}. Status {:x}\n", user_ctx, pSendStatus->tsn, pSendStatus->status);
-        if (!g_BindInfoPool.IsValid(pBind)) 
-        {
-            FMT_PRINT("({:x})Target BindInfo object is dead\n", user_ctx);
-            return;//we're dead
-        }
-
-        if (pBind->m_State != State::CheckConfigureReport)
-        {
-            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
-            return;
-        }
-        pBind->m_LastTSN = kInvalidTSN;
-        if (!pBind->m_Timer.IsRunning())//timeout already happened?
-        {
-            FMT_PRINT("({:x})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr);
-            return;
-        }
-
-        if (pSendStatus->status != ESP_OK)
-        {
-            FMT_PRINT("({:x})Failed to read reporting config\n", pBind->m_ShortAddr);
-            pBind->m_ReadReportConfigNode.RemoveFromList();
-            pBind->m_ReportConfigured = false;
-            pBind->TransitTo(State::NonFunctional);
-            return;
-        }
+        m_Timer.Setup(OnTimeout<State::CheckConfigureReport>, this, kTimeout);
+        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckConfigureReport>, this);
     }
 
     void BindInfo::SendUnBindRequest()

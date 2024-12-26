@@ -101,13 +101,10 @@ namespace zb
         void CheckReportConfiguration();
         void SendReportConfiguration();
 
-        static void OnReadAttrSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
-        static void OnReadAttrTimeout(void* param);
-
-        static void OnSendReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
-        static void OnConfigReportTimeout(void* param);
-        static void OnReadReportConfigTimeout(void* param);
-        static void OnReadReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
+        template<State expectedState>
+        static void OnTimeout(void* param);
+        template<State expectedState>
+        static void OnSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
     };
     constexpr size_t kMaxBinds = 6;
     using BindInfoPool = ObjectPool<BindInfo, kMaxBinds * 2>;
