@@ -139,7 +139,7 @@ namespace zb
             return;//we're dead
         }
 
-        if (pBind->m_State != State::TryReadAttribute)
+        if (pBind->m_State != expectedState)
         {
             FMT_PRINT("({:x}-{})Unexpected state: {:x}\n", pBind->m_ShortAddr, expectedState, pBind->m_State);
             return;
