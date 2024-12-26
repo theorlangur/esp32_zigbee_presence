@@ -601,18 +601,30 @@ namespace zb
             }
 
             auto prevValidBinds = m_ValidBinds;
+            auto prevBindStates = m_BindStates;
             //update validity of the binds
             for(size_t i = 0, n = m_TrackedBinds.size(); i < n; ++i)
             {
                 auto &bi = m_TrackedBinds[i];
                 if (bi->GetState() == BindInfo::State::Functional)
+                {
                     m_ValidBinds |= 1 << i;
+                    if (bi->m_Initial)
+                    {
+                        bi->m_Initial = false;
+                        m_BindStates = (m_BindStates & ~(1 << i)) | (bi->m_InitialValue << i);
+                    }
+                }
                 else
                     m_ValidBinds &= ~(1 << i);
             }
             if (prevValidBinds != m_ValidBinds)
             {
                 FMT_PRINT("Valid binds changed: from {:x} to {:x}\n", prevValidBinds, m_ValidBinds);
+            }
+            if (prevBindStates != m_BindStates)
+            {
+                FMT_PRINT("Bind states changed: from {:x} to {:x}\n", prevBindStates, m_BindStates);
             }
 
             if (m_NeedBindsChecking)
@@ -629,42 +641,6 @@ namespace zb
         }
     };
     RuntimeState g_State;
-
-    LinkedListT<ReadConfigResponseNode> g_ReadConfigResponseHandlers;
-    void RegisterReadConfigResponseHandler(ReadConfigResponseNode &n)
-    {
-        g_ReadConfigResponseHandlers += n;
-    }
-
-    esp_err_t read_reporting_cfg_response_handler(const void *message)
-    {
-        esp_zb_zcl_cmd_read_report_config_resp_message_t *pResp = (esp_zb_zcl_cmd_read_report_config_resp_message_t *)message;
-        FMT_PRINT("Read report resp:\n");
-        for(auto *pNode : g_ReadConfigResponseHandlers)
-        {
-            if (pNode->Notify(pResp))
-                return ESP_OK;
-        }
-        return ESP_OK;
-    }
-
-    LinkedListT<ConfigReportResponseNode> g_ConfigReportResponseHandlers;
-    void RegisterConfigReportResponseHandler(ConfigReportResponseNode &n)
-    {
-        g_ConfigReportResponseHandlers += n;
-    }
-
-    esp_err_t config_report_response_handler(const void *message)
-    {
-        esp_zb_zcl_cmd_config_report_resp_message_t *pResp = (esp_zb_zcl_cmd_config_report_resp_message_t *)message;
-        FMT_PRINT("Config Report Response:\n");
-        for(auto *pNode : g_ConfigReportResponseHandlers)
-        {
-            if (pNode->Notify(pResp))
-                return ESP_OK;
-        }
-        return ESP_OK;
-    }
 
     bool is_coordinator(esp_zb_zcl_addr_t &addr)
     {
@@ -1963,12 +1939,14 @@ namespace zb
                 generic_zb_action_handler<
                     ActionHandler{ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID, cmd_custom_cluster_req_cb<g_CommandsDesc>},
                     ActionHandler{ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID, cmd_response_action_handler},
-                    ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, read_reporting_cfg_response_handler},
-                    ActionHandler{ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID, config_report_response_handler},
+                    ActionHandler{ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID, generic_node_list_handler<ReadConfigResponseNode>},
+                    ActionHandler{ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID, generic_node_list_handler<ConfigReportResponseNode>},
+                    ActionHandler{ESP_ZB_CORE_CMD_READ_ATTR_RESP_CB_ID, generic_node_list_handler<ReadAttrResponseNode>},
                     ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attr_cb<g_ReportHandlingDesc>},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
         );
+
         esp_zb_zcl_command_send_status_handler_register(&zb::ZbCmdSend::handler);
         esp_zb_aps_data_indication_handler_register(apsde_data_indication_callback);
         ESP_LOGI(TAG, "ZB registered device");

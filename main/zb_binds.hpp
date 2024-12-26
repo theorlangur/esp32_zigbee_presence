@@ -26,6 +26,13 @@ namespace zb
             BindInfo* GetBindInfo();
             virtual bool Notify(esp_zb_zcl_cmd_config_report_resp_message_t *pResp) override;
         };
+
+        struct ReadAttrRespNode: ReadAttrResponseNode
+        {
+            //return 'true' - was handled, no need to keep iterating
+            BindInfo* GetBindInfo();
+            virtual bool Notify(esp_zb_zcl_cmd_read_attr_resp_message_t *pResp) override;
+        };
         
         enum class State: uint8_t
         {
@@ -53,7 +60,9 @@ namespace zb
             uint16_t m_ReportConfigured: 1 = 0;
             uint16_t m_BoundToMe: 1 = 0;
             uint16_t m_BindChecked: 1 = 0;
-            uint16_t m_AttemptsLeft: 3 = 0;
+            uint16_t m_AttemptsLeft: 2 = 0;
+            uint16_t m_InitialValue: 1 = 0;//valid only if m_Initial is true
+            uint16_t m_Initial: 1 = 1;
         };
 
         void Do();
@@ -64,6 +73,8 @@ namespace zb
         ZbAlarm m_Timer;
         ReadReportConfigNode m_ReadReportConfigNode;
         ConfigReportNode m_ConfigReportNode;
+        ReadAttrRespNode m_ReadAttrNode;
+
         static constexpr uint16_t kInvalidTSN = 0xffff;
         uint16_t m_LastTSN = kInvalidTSN;
 
@@ -85,6 +96,9 @@ namespace zb
         void ReadAttribute();
         void CheckReportConfiguration();
         void SendReportConfiguration();
+
+        static void OnReadAttrSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
+        static void OnReadAttrTimeout(void* param);
 
         static void OnSendReportConfigSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
         static void OnConfigReportTimeout(void* param);

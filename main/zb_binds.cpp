@@ -68,7 +68,145 @@ namespace zb
 
     void BindInfo::ReadAttribute()
     {
-        //TODO: implement
+        esp_zb_zcl_read_attr_cmd_t read_req = {};
+        read_req.address_mode = ESP_ZB_APS_ADDR_MODE_64_ENDP_PRESENT;//ESP_ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT;
+        read_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        read_req.zcl_basic_cmd.dst_endpoint = m_EP;
+        std::memcpy(read_req.zcl_basic_cmd.dst_addr_u.addr_long, m_IEEE, sizeof(esp_zb_ieee_addr_t));
+        //read_req.zcl_basic_cmd.dst_addr_u.addr_long = m_EP;
+        read_req.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
+        uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID, };
+        read_req.attr_number = std::size(attributes);
+        read_req.attr_field = attributes;
+        m_LastTSN = esp_zb_zcl_read_attr_cmd_req(&read_req);
+        m_ReadAttrNode.RegisterSelf();
+        m_Timer.Setup(OnReadAttrTimeout, this, kTimeout);
+        ZbCmdSend::Register(m_LastTSN, OnReadAttrSendStatus, this);
+    }
+
+    void BindInfo::OnReadAttrSendStatus(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx)
+    {
+        BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
+        FMT_PRINT("(ReadAttr)Got send status callback for {:x} for TSN {:x}. Status {:x}\n", user_ctx, pSendStatus->tsn, pSendStatus->status);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Target BindInfo object is dead\n");
+            return;//we're dead
+        }
+
+        if (pBind->m_State != State::TryReadAttribute)
+        {
+            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
+            return;
+        }
+
+        pBind->m_LastTSN = kInvalidTSN;
+        if (!pBind->m_Timer.IsRunning())//timeout already happened?
+        {
+            FMT_PRINT("({:x})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr);
+            return;
+        }
+
+        if (pSendStatus->status != ESP_OK)
+        {
+            FMT_PRINT("({:x})Failed to read attribute\n", pBind->m_ShortAddr);
+            pBind->TransitTo(State::NonFunctional);
+            return;
+        }
+    }
+
+    void BindInfo::OnReadAttrTimeout(void* param)
+    {
+        BindInfo *pBind = static_cast<BindInfo *>(param);
+        if (!g_BindInfoPool.IsValid(pBind)) 
+        {
+            FMT_PRINT("Timeout for read attr happened but BindInfo {:x} is dead\n", param);
+            return;//we're dead
+        }
+        
+        FMT_PRINT("Timeout happened while trying to read attr for {:x}\n", pBind->m_ShortAddr);
+
+        if (pBind->m_State != State::TryReadAttribute)
+        {
+            FMT_PRINT("({:x})Unexpected state: {:x}\n", pBind->m_ShortAddr, pBind->m_State);
+            return;
+        }
+
+        if (pBind->m_LastTSN != kInvalidTSN)
+        {
+            ZbCmdSend::Unregister(uint8_t(pBind->m_LastTSN));
+            pBind->m_LastTSN = kInvalidTSN;
+        }
+        pBind->m_ReportConfigured = false;
+
+        if (pBind->m_AttemptsLeft--)
+        {
+            FMT_PRINT("Making another attempt. {} left\n", (int)pBind->m_AttemptsLeft);
+            pBind->Do();
+            return;
+        }
+        pBind->TransitTo(State::NonFunctional);
+        return;
+    }
+
+    BindInfo* BindInfo::ReadAttrRespNode::GetBindInfo()
+    {
+        uint8_t *pRaw = (uint8_t*)this;
+        return (BindInfo*)(pRaw - offsetof(BindInfo, m_ReadAttrNode));
+    }
+
+    bool BindInfo::ReadAttrRespNode::Notify(esp_zb_zcl_cmd_read_attr_resp_message_t *pResp)
+    {
+        BindInfo *pBind = GetBindInfo();
+        if (pResp->info.src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_SHORT)
+        {
+            if (pResp->info.src_address.u.short_addr != pBind->m_ShortAddr)
+                return false;
+        }else if (pResp->info.src_address.addr_type == ESP_ZB_ZCL_ADDR_TYPE_IEEE)
+        {
+            if (ieee_addr{pResp->info.src_address.u.ieee_addr} != ieee_addr{pBind->m_IEEE})
+                return false;
+        }
+
+        FMT_PRINT("Got read attr response from {}\n", pResp->info.src_address);
+        pBind->m_ReadAttrNode.RemoveFromList();
+        if (pBind->m_Timer.IsRunning())
+        {
+            pBind->m_Timer.Cancel();
+        }
+        else //timer already cancelled, this report is outdated
+        {
+            FMT_PRINT("Timeout already happened. We should never reach here\n");
+            return false;
+        }
+
+        bool found = false, value = false;
+        auto *pVar = pResp->variables;
+        while(pVar)
+        {
+            if (pVar->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID)
+            {
+                FMT_PRINT("({:x})Got attribute {:x}; Status {:x}\n", pBind->m_ShortAddr, pVar->attribute.id, pVar->status);
+                if (pVar->status == ESP_ZB_ZCL_STATUS_SUCCESS)
+                {
+                    found = true;
+                    value = *(bool*)pVar->attribute.data.value;
+                    break;
+                }
+            }
+            //FMT_PRINT("Attr[{:x}]: status={:x} dir={}\n", pVar->attribute_id, pVar->status, pVar->report_direction);
+            pVar = pVar->next;
+        }
+
+        if (found)
+        {
+            FMT_PRINT("({:x})Read Attribute done. Attribute found, value {}. All good.\n", pBind->m_ShortAddr, value);
+            pBind->m_ReportConfigured = true;
+            pBind->m_InitialValue = value;
+            pBind->TransitTo(State::Functional);
+        }else
+            pBind->TransitTo(State::NonFunctional);
+        return true;
     }
 
     BindInfo* BindInfo::ReadReportConfigNode::GetBindInfo()
@@ -123,7 +261,9 @@ namespace zb
         {
             FMT_PRINT("({:x})Attribute reporting config found. All good.\n", pBind->m_ShortAddr);
             pBind->m_ReportConfigured = true;
-            pBind->TransitTo(State::Functional);
+            //pBind->TransitTo(State::Functional);
+            pBind->TransitTo(State::TryReadAttribute);
+            pBind->Do();
         }else
         {
             FMT_PRINT("({:x})Attribute reporting config NOT found. Attempting to send a configuration request.\n", pBind->m_ShortAddr);
@@ -181,7 +321,7 @@ namespace zb
     void BindInfo::SendReportConfiguration()
     {
         /* Send "configure report attribute" command to the bound sensor */
-        esp_zb_zcl_config_report_cmd_t report_cmd;
+        esp_zb_zcl_config_report_cmd_t report_cmd = {};
         report_cmd.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
         report_cmd.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
         report_cmd.zcl_basic_cmd.dst_endpoint = m_EP;
@@ -203,7 +343,7 @@ namespace zb
         report_cmd.record_field = records;
         m_LastTSN = esp_zb_zcl_config_report_cmd_req(&report_cmd);
         FMT_PRINT("Sent configure report request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
-        RegisterConfigReportResponseHandler(m_ConfigReportNode);
+        m_ConfigReportNode.RegisterSelf();
         m_Timer.Setup(OnConfigReportTimeout, this, kTimeout);
         ZbCmdSend::Register(m_LastTSN, OnSendReportConfigSendStatus, this);
         //FMT_PRINT("Sent config report for On/Off; TSN={:x}\n", tsn);
@@ -279,7 +419,7 @@ namespace zb
 
     void BindInfo::CheckReportConfiguration()
     {
-        esp_zb_zcl_read_report_config_cmd_t rr;
+        esp_zb_zcl_read_report_config_cmd_t rr = {};
         rr.clusterID = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF;
         rr.direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV;
         rr.manuf_code = 0;
@@ -294,7 +434,7 @@ namespace zb
         rr.record_field = &on_off_r;
         m_LastTSN = esp_zb_zcl_read_report_config_cmd_req(&rr);
         FMT_PRINT("Sent read configure request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
-        RegisterReadConfigResponseHandler(m_ReadReportConfigNode);
+        m_ReadReportConfigNode.RegisterSelf();
         m_Timer.Setup(OnReadReportConfigTimeout, this, kTimeout);
         ZbCmdSend::Register(m_LastTSN, OnReadReportConfigSendStatus, this);
     }
@@ -367,7 +507,7 @@ namespace zb
     void BindInfo::SendUnBindRequest()
     {
         m_AttemptsLeft = kMaxConfigAttempts;
-        esp_zb_zdo_bind_req_param_t bind_req;
+        esp_zb_zdo_bind_req_param_t bind_req = {};
         bind_req.req_dst_addr = m_ShortAddr;
         std::memcpy(bind_req.src_address, m_IEEE, sizeof(esp_zb_ieee_addr_t));
         bind_req.src_endp = m_EP;
@@ -424,7 +564,7 @@ namespace zb
     void BindInfo::SendBindRequest()
     {
         m_AttemptsLeft = kMaxConfigAttempts;
-        esp_zb_zdo_bind_req_param_t bind_req;
+        esp_zb_zdo_bind_req_param_t bind_req = {};
         bind_req.req_dst_addr = m_ShortAddr;
         std::memcpy(bind_req.src_address, m_IEEE, sizeof(esp_zb_ieee_addr_t));
         bind_req.src_endp = m_EP;
