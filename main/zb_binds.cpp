@@ -162,12 +162,44 @@ namespace zb
 
     void BindInfo::CheckReportingAbility()
     {
-        //TODO: implement
+        esp_zb_zcl_on_off_cmd_t cmd_req{};
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        if (m_InitialValue)
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;//it's 'on' now we need to try and turn it off
+        else
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;//it's 'off' now we need to try and turn it on
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+        cmd_req.zcl_basic_cmd.dst_endpoint = m_EP;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
+        m_LastTSN = esp_zb_zcl_on_off_cmd_req(&cmd_req);
+        m_Timer.Setup(OnTimeout<State::CheckReportingAbility>, this, kTimeout);
+        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckReportingAbility>, this);
     }
 
     void BindInfo::OnReport(const esp_zb_zcl_report_attr_message_t *pReport)
     {
-        //TODO: react to a report
+        bool newState = *(bool*)pReport->attribute.data.value;
+        if (newState != m_InitialValue)
+        {
+            //yep, all good
+            //shoot-n-forget the initial state again
+            esp_zb_zcl_on_off_cmd_t cmd_req{};
+            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+            if (m_InitialValue)
+                cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+            else
+                cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+            cmd_req.zcl_basic_cmd.dst_endpoint = m_EP;
+            cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
+            esp_zb_zcl_on_off_cmd_req(&cmd_req);
+            //and we're done
+            m_ReportConfigured = true;
+            TransitTo(State::Functional);
+            return;
+        }
+        m_ReportConfigured = false;
+        TransitTo(State::NonFunctional);
     }
 
     void BindInfo::ReadAttribute()
@@ -240,9 +272,10 @@ namespace zb
         if (found)
         {
             FMT_PRINT("({:x})Read Attribute done. Attribute found, value {}. All good.\n", pBind->m_ShortAddr, value);
-            pBind->m_ReportConfigured = true;
+            //pBind->m_ReportConfigured = true;
             pBind->m_InitialValue = value;
-            pBind->TransitTo(State::Functional);
+            pBind->TransitTo(State::CheckReportingAbility);
+            pBind->Do();
         }else
             pBind->TransitTo(State::NonFunctional);
         return true;
@@ -299,7 +332,7 @@ namespace zb
         if (found)
         {
             FMT_PRINT("({:x})Attribute reporting config found. All good.\n", pBind->m_ShortAddr);
-            pBind->m_ReportConfigured = true;
+            //pBind->m_ReportConfigured = true;
             //pBind->TransitTo(State::Functional);
             pBind->TransitTo(State::TryReadAttribute);
             pBind->Do();
