@@ -22,20 +22,23 @@ namespace zb
         cmd_req.start_index = 0;
 
         auto *pState = g_BindTableIterationsPool.Acquire(config, shortAddr);
-        //FMT_PRINT("Sending request to {:x} to get binds\n", cmd_req.dst_addr);
+        if (config.debug)
+            FMT_PRINT("Sending request to {:x} to get binds\n", cmd_req.dst_addr);
         esp_zb_zdo_binding_table_req(&cmd_req, OnGetBindTableChunk, pState);
     }
 
     static void OnGetBindTableChunk(const esp_zb_zdo_binding_table_info_t *table_info, void *user_ctx)
     {
         BindTablePoolPtr ptr((BindTableIterationState*)user_ctx);
+        if (ptr->config.debug)
+            FMT_PRINT("OnGetBindTableChunk: status: {:x}\n", table_info->status);
         if (!table_info->index && ptr->config.on_begin)
         {
             if (!(ptr->config.on_begin)(table_info, ptr->config.pCtx))
                 return;
         }
 
-        if (!table_info->status)
+        if (table_info->status != esp_zb_zdp_status_t::ESP_ZB_ZDP_STATUS_SUCCESS)
         {
             //request failed
             if (ptr->config.on_error)

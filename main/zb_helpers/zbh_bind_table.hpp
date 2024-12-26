@@ -18,6 +18,7 @@ namespace zb
         bind_end_callback_t on_end = nullptr;
         bind_error_callback_t on_error = nullptr;
         bool skipCoordinator = true;
+        bool debug = false;
     };
 
     void bind_table_iterate(uint16_t shortAddr, BindIteratorConfig config);
