@@ -421,6 +421,7 @@ namespace zb
             {
                 if ((*i)->GetState() == BindInfo::State::NonFunctional)
                 {
+                    FMT_PRINT("Bind cleanup: {:x}\n", (*i)->m_ShortAddr);
                     m_BindsToCleanup.erase(i--);
                 }
             }
@@ -630,7 +631,12 @@ namespace zb
                         ++nextNewIdx;
                     }
                 }
-                g_State.m_BindsReportingCapable = newReportingStates;
+                if (g_State.m_BindsReportingCapable.GetRaw() != newReportingStates.GetRaw())
+                {
+                    FMT_PRINT("After iterating binds: updating info about report capabilities: from {:x} to {:x}\n", g_State.m_BindsReportingCapable.GetRaw(), newReportingStates.GetRaw());
+                    g_State.m_BindsReportingCapable = newReportingStates;
+                    g_Config.SetBindReporting(g_State.m_BindsReportingCapable);
+                }
             }else
             {
                 newStates = g_State.m_BindStates;
