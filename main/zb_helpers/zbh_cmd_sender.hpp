@@ -139,6 +139,8 @@ namespace zb
 
             //all good
             pCmd->m_WaitResponseTimer.Cancel();
+            if (pCmd->m_OnSuccess)
+                (pCmd->m_OnSuccess)(pCmd->m_pUserCtx);
             return false;
         }
 
