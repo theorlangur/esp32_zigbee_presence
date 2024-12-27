@@ -295,11 +295,12 @@ namespace zb
             FinishedPresenceChangeSentOnOff = 2,
         };
 
-        uint32_t m_BoundDevices                 : 3  = 0;
-        uint32_t m_ConfiguredReports            : 6  = 0;
+        uint32_t m_BoundDevices                 : 4  = 0;
+        uint32_t m_Unused2                      : 4  = 0;
+        uint32_t m_ConfiguredReports            : 8  = 0;
         uint32_t m_IntermediateCmdFailuireCount : 8  = 0;
         uint32_t m_TotalFailureCount            : 4  = 0;
-        uint32_t m_Unused                       : 11 = 0;
+        uint32_t m_Unused                       : 4  = 0;
         //uint32_t m_HasRunningTimer : 1 = 0;
         //uint32_t m_HasExternalTimer : 1 = 0;
 
