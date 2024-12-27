@@ -9,7 +9,7 @@ namespace zb
     bool is_coordinator(esp_zb_zcl_addr_t &addr);
 
     template<uint16_t ClusterId, int CmdId, int Retries>
-    struct CmdWithRetries
+    struct CmdWithRetries: NonMovable, NonCopyable
     {
         static constexpr uint32_t kCmdResponseWait = 700;//ms
         static constexpr uint16_t kInvalidSeqNr = kInvalidTSN;

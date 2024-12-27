@@ -31,12 +31,14 @@ private:
 
 struct NonCopyable
 {
+    NonCopyable() = default;
     NonCopyable(NonCopyable const& rhs) = delete;
     NonCopyable& operator=(NonCopyable const& rhs) const = delete;
 };
 
 struct NonMovable
 {
+    NonMovable() = default;
     NonMovable(NonMovable && rhs) = delete;
     NonMovable& operator=(NonMovable && rhs) const = delete;
 };

@@ -13,7 +13,7 @@
 
 namespace zb
 {
-    struct BindInfo
+    struct BindInfo: NonMovable, NonCopyable
     {
         struct ReadReportConfigNode: ReadConfigResponseNode
         {
