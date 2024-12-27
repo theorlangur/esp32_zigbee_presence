@@ -58,17 +58,19 @@ namespace zb
         esp_zb_ieee_addr_t m_IEEE;
         uint16_t m_ShortAddr;
         struct{
-            uint16_t m_EP : 8 = 0;
+            uint16_t m_EP              : 8 = 0;
             uint16_t m_ReportConfigured: 1 = 0;
-            uint16_t m_BoundToMe: 1 = 0;
-            uint16_t m_BindChecked: 1 = 0;
-            uint16_t m_AttemptsLeft: 2 = 0;
-            uint16_t m_InitialValue: 1 = 0;//valid only if m_Initial is true
-            uint16_t m_Initial: 1 = 1;
+            uint16_t m_BoundToMe       : 1 = 0;
+            uint16_t m_BindChecked     : 1 = 0;
+            uint16_t m_AttemptsLeft    : 2 = 0;
+            uint16_t m_InitialValue    : 1 = 0;//valid only if m_Initial is true
+            uint16_t m_Initial         : 1 = 1;
+            uint16_t m_CheckReporting  : 1 = 0;
         };
 
         void Do();
         void Unbind();
+        void Failed();
         State GetState() const { return m_State; }
 
         void OnReport(const esp_zb_zcl_report_attr_message_t *pReport);
@@ -89,6 +91,7 @@ namespace zb
 
         void TransitTo(State s);
 
+        void SendCmdToSetInitialValue();
         void SendBindRequest();
         static void OnBindRequestResult(esp_zb_zdp_status_t zdo_status, void *user_ctx);
 

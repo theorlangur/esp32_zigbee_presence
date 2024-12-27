@@ -144,6 +144,12 @@ namespace zb
         on_change();
     }
 
+    void LocalConfig::SetBindReporting(TriState8Array v)
+    {
+        m_BindReporting = v;
+        on_change();
+    }
+
     void LocalConfig::FactoryReset()
     {
         esp_littlefs_format(kParitionLabel);

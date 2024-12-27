@@ -29,6 +29,7 @@ namespace zb
         uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
         uint16_t m_ExternalOnOffTimeout = 1;
         uint16_t m_Restarts = 0;
+        TriState8Array m_BindReporting;
     public:
         auto GetVersion() const { return m_Version; }
         auto GetOnOffTimeout() const { return m_OnOffTimeout; }
@@ -38,6 +39,7 @@ namespace zb
         auto GetIlluminanceThreshold() const { return m_IlluminanceThreshold; }
         auto GetExternalOnOffTimeout() const { return m_ExternalOnOffTimeout; }
         auto GetRestarts() const { return m_Restarts; }
+        auto GetBindReporting() const { return m_BindReporting; }
 
         void SetVersion(uint32_t v);
         void SetOnOffTimeout(uint16_t v);
@@ -46,6 +48,7 @@ namespace zb
         void SetLD2412Mode(LD2412::SystemMode v);
         void SetIlluminanceThreshold(uint8_t v);
         void SetExternalOnOffTimeout(uint16_t v);
+        void SetBindReporting(TriState8Array v);
 
         void FactoryReset();
 

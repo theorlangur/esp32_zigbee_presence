@@ -365,6 +365,9 @@ namespace zb
 
         BindArray m_TempNewBinds;
         uint8_t m_FoundExisting = 0;
+
+        TriState8Array m_BindsReportingCapable;
+        bool m_InitialBindsChecking = true;
         bool m_NeedBindsChecking = true;
 
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
@@ -404,11 +407,6 @@ namespace zb
             }
             else
                 m_LastFailedStatus = (esp_zb_zcl_status_t)ExtendedFailureStatus::BindRequestIncomplete;
-
-            //m_BindsCheck.Setup([](void *p){
-            //            RuntimeState *pState = (RuntimeState *)p;
-            //            pState->RunBindsChecking();
-            //        }, this, 2000);
         }
 
         void RunService()
@@ -429,11 +427,14 @@ namespace zb
 
             auto prevValidBinds = m_ValidBinds;
             auto prevBindStates = m_BindStates;
+            auto prevReportCaps = m_BindsReportingCapable;
+            bool updateReportingCapsInConfig = false;
             //update validity of the binds
             for(size_t i = 0, n = m_TrackedBinds.size(); i < n; ++i)
             {
                 auto &bi = m_TrackedBinds[i];
-                if (bi->GetState() == BindInfo::State::Functional)
+                auto s = bi->GetState();
+                if (s == BindInfo::State::Functional)
                 {
                     m_ValidBinds |= 1 << i;
                     if (bi->m_Initial)
@@ -441,9 +442,27 @@ namespace zb
                         bi->m_Initial = false;
                         m_BindStates = (m_BindStates & ~(1 << i)) | (bi->m_InitialValue << i);
                     }
+
+                    if (bi->m_CheckReporting)
+                    {
+                        FMT_PRINT("Bind {:x} Is has functional reporting\n", bi->m_ShortAddr);
+                        updateReportingCapsInConfig = true;   
+                        m_BindsReportingCapable.Set(i, TriState::True);
+                    }
                 }
                 else
+                {
                     m_ValidBinds &= ~(1 << i);
+                    if (s == BindInfo::State::NonFunctional && bi->m_CheckReporting && bi->m_BoundToMe)
+                    {
+                        FMT_PRINT("Bind {:x} Is has non-functional reporting\n", bi->m_ShortAddr);
+                        updateReportingCapsInConfig = true;   
+                        m_BindsReportingCapable.Set(i, TriState::False);
+                    }
+                }
+
+                if (s == BindInfo::State::Functional || s == BindInfo::State::NonFunctional)
+                    bi->m_CheckReporting = false;
             }
             if (prevValidBinds != m_ValidBinds)
             {
@@ -452,6 +471,12 @@ namespace zb
             if (prevBindStates != m_BindStates)
             {
                 FMT_PRINT("Bind states changed: from {:x} to {:x}\n", prevBindStates, m_BindStates);
+            }
+
+            if (updateReportingCapsInConfig)
+            {
+                FMT_PRINT("Updating info about report capabilities: from {:x} to {:x}\n", prevReportCaps.GetRaw(), m_BindsReportingCapable.GetRaw());
+                g_Config.SetBindReporting(m_BindsReportingCapable);
             }
 
             if (m_NeedBindsChecking)
@@ -504,6 +529,8 @@ namespace zb
             g_State.m_FoundExisting = 0;
             g_State.m_Internals.m_BindRequestActive = false;
             g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
+            g_State.m_BindsReportingCapable = g_Config.GetBindReporting();
+            FMT_PRINT("Bind report caps: {:x}\n", g_State.m_BindsReportingCapable.GetRaw());
             for(auto &bi : g_State.m_TrackedBinds)
                 bi->m_BindChecked = false;
             return true;
@@ -532,6 +559,26 @@ namespace zb
                             bi.m_BindChecked = true;
                             bi.m_EP = pRec->dst_endp;
                             bi.m_AttemptsLeft = BindInfo::kMaxConfigAttempts;
+                            if (g_State.m_InitialBindsChecking)
+                            {
+                                auto repCapable = g_State.m_BindsReportingCapable.Get(newBinds.size() - 1);
+                                if (repCapable == TriState::Undefined)
+                                {
+                                    bi.m_CheckReporting = true;
+                                    FMT_PRINT("{:x}: Requesting reporting check as this one is saved as undefined\n", shortAddr);
+                                }
+                                else if (repCapable == TriState::False)
+                                {
+                                    FMT_PRINT("{:x}: Skipping check as this one is saved as non-functional\n", shortAddr);
+                                    //no need to do any checks
+                                    bi.Failed();//put into failed state, skip all the checks
+                                }
+                            }
+                            else
+                            {
+                                FMT_PRINT("Requesting reporting check for {:x}\n", shortAddr);
+                                bi.m_CheckReporting = true;
+                            }
                             bi.Do();//start the whole thing
                         }
                     }
@@ -546,6 +593,11 @@ namespace zb
             }else
             {
                 FMT_PRINT("Bind. Addr={}, invalid short:{:x} to cluster {:x}, ep={}\n", addr, shortAddr, pRec->cluster_id, pRec->dst_endp);
+                if (shortAddr == 0xffff)
+                {
+                    //request another one
+                    g_State.m_NeedBindsChecking = true;
+                }
             }
             return true;
         };
@@ -559,6 +611,7 @@ namespace zb
             uint8_t newValidity = 0;
             if (g_State.m_FoundExisting != g_State.m_TrackedBinds.size())
             {
+                TriState8Array newReportingStates;
                 int nextOldIdx = 0, nextNewIdx = 0;
                 for(auto i = g_State.m_TrackedBinds.begin(), e = g_State.m_TrackedBinds.end(); i != e; ++i, ++nextOldIdx)
                 {
@@ -571,11 +624,13 @@ namespace zb
                     }
                     else
                     {
+                        newReportingStates.Set(nextNewIdx, g_State.m_BindsReportingCapable.Get(nextOldIdx));
                         newStates |= (g_State.m_BindStates & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
                         newValidity |= (g_State.m_ValidBinds & (1 << nextOldIdx)) >> (nextNewIdx - nextOldIdx);
                         ++nextNewIdx;
                     }
                 }
+                g_State.m_BindsReportingCapable = newReportingStates;
             }else
             {
                 newStates = g_State.m_BindStates;
@@ -589,6 +644,7 @@ namespace zb
             g_State.m_BindStates = newStates;
             g_State.m_ValidBinds = newValidity;
             g_State.m_Internals.m_BoundDevices = g_State.m_TrackedBinds.size();
+            g_State.m_InitialBindsChecking = false;
         };
         FMT_PRINT("Initiating own binds iteration\n");
         bind_table_iterate(esp_zb_get_short_address(), cfg);
@@ -1648,6 +1704,11 @@ namespace zb
                 led::blink(true, kSteering);
                 esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
             }
+            break;
+        case ESP_ZB_ZDO_SIGNAL_LEAVE:
+            ESP_LOGW(TAG, "Got leave signal");
+            esp_zb_factory_reset();
+            esp_restart();
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {

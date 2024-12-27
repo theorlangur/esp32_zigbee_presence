@@ -50,6 +50,12 @@ namespace zb
         Do();
     }
 
+    void BindInfo::Failed()
+    {
+        TransitTo(State::NonFunctional);
+        Do();
+    }
+
     void BindInfo::Do()
     {
         switch(m_State)
@@ -90,6 +96,10 @@ namespace zb
         m_ReadReportConfigNode.RemoveFromList();
         m_ReadAttrNode.RemoveFromList();
 
+        if (m_State == State::CheckReportingAbility && s != m_State)
+            SendCmdToSetInitialValue();
+
+        FMT_PRINT("({:x})State change: {} => {}\n", m_ShortAddr, m_State, s);
         m_State = s;
     }
 
@@ -192,7 +202,11 @@ namespace zb
         if (pBind->m_State == State::CheckReportingAbility)
         {
             //ok, waiting for a report
+            FMT_PRINT("{:x}: Testing on/off sent. Now waiting {} seconds\n", pBind->m_ShortAddr, kTimeout);
             pBind->m_Timer.Setup(OnTimeout<State::CheckReportingAbility>, pBind, kTimeout);
+        }else
+        {
+            FMT_PRINT("{:x}: Testing on/off sent but we're in unexpected state {}\n", pBind->m_ShortAddr, pBind->m_State);
         }
     }
 
@@ -205,16 +219,37 @@ namespace zb
             return;//we're dead
         }
 
-        pBind->TransitTo(State::NonFunctional);
+
+        if (pBind->m_State == State::CheckReportingAbility)
+        {
+            FMT_PRINT("{:x}: Could not send testing on/off.\n", pBind->m_ShortAddr);
+            pBind->TransitTo(State::NonFunctional);
+        }
     }
 
     void BindInfo::CheckReportingAbility()
     {
+        m_AttemptsLeft = 0;//no re-tries on this side
         if (m_InitialValue)
             m_TryReportCmd.Send(ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID);
         else
             m_TryReportCmd.Send(ESP_ZB_ZCL_CMD_ON_OFF_ON_ID);
-        //ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckReportingAbility>, this);
+    }
+
+    void BindInfo::SendCmdToSetInitialValue()
+    {
+        FMT_PRINT("({:x})Restoring initial state to {}\n", m_ShortAddr, (int)m_InitialValue);
+        //shoot-n-forget the initial state again
+        esp_zb_zcl_on_off_cmd_t cmd_req{};
+        cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
+        if (m_InitialValue)
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
+        else
+            cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
+        cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
+        cmd_req.zcl_basic_cmd.dst_endpoint = m_EP;
+        cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
+        esp_zb_zcl_on_off_cmd_req(&cmd_req);
     }
 
     void BindInfo::OnReport(const esp_zb_zcl_report_attr_message_t *pReport)
@@ -223,17 +258,6 @@ namespace zb
         if (newState != m_InitialValue)
         {
             //yep, all good
-            //shoot-n-forget the initial state again
-            esp_zb_zcl_on_off_cmd_t cmd_req{};
-            cmd_req.zcl_basic_cmd.src_endpoint = PRESENCE_EP;
-            if (m_InitialValue)
-                cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_ON_ID;
-            else
-                cmd_req.on_off_cmd_id = ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID;
-            cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
-            cmd_req.zcl_basic_cmd.dst_endpoint = m_EP;
-            cmd_req.zcl_basic_cmd.dst_addr_u.addr_short = m_ShortAddr;
-            esp_zb_zcl_on_off_cmd_req(&cmd_req);
             //and we're done
             m_ReportConfigured = true;
             TransitTo(State::Functional);
@@ -313,9 +337,17 @@ namespace zb
         if (found)
         {
             FMT_PRINT("({:x})Read Attribute done. Attribute found, value {}. All good.\n", pBind->m_ShortAddr, value);
-            //pBind->m_ReportConfigured = true;
             pBind->m_InitialValue = value;
-            pBind->TransitTo(State::CheckReportingAbility);
+            pBind->m_ReportConfigured = !pBind->m_CheckReporting;
+            if (pBind->m_CheckReporting)
+            {
+                FMT_PRINT("({:x})Reporting check is requested so doing that.\n", pBind->m_ShortAddr);
+                pBind->TransitTo(State::CheckReportingAbility);
+            }
+            else
+            {
+                pBind->TransitTo(State::Functional);
+            }
             pBind->Do();
         }else
             pBind->TransitTo(State::NonFunctional);
@@ -604,6 +636,7 @@ namespace zb
         FMT_PRINT("({:x})Got Bind request result: OK\n", pBind->m_ShortAddr);
         //other device did the binding
         //let's configure
+        pBind->m_BoundToMe = true;
         pBind->TransitTo(State::SendConfigureReport);
         pBind->Do();
     }
@@ -668,6 +701,7 @@ namespace zb
                 //no need to search further
                 //need to check if reporting is properly configured
                 FMT_PRINT("({:x})Bind table chunk: Found.\n", pBind->m_ShortAddr);
+                pBind->m_BoundToMe = true;
                 pBind->TransitTo(State::CheckConfigureReport);
                 pBind->Do();
                 return false;
