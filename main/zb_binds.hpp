@@ -53,6 +53,7 @@ namespace zb
         BindInfo(esp_zb_ieee_addr_t const &a, uint16_t sh):m_ShortAddr(sh)
         {
             std::memcpy(m_IEEE, a, sizeof(esp_zb_ieee_addr_t));
+            m_SendStatusNode.user_ctx = this;
         }
 
         esp_zb_ieee_addr_t m_IEEE;
@@ -85,9 +86,7 @@ namespace zb
         ConfigReportNode m_ConfigReportNode;
         ReadAttrRespNode m_ReadAttrNode;
         CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2> m_TryReportCmd{SendTryOnOffCmd, OnTryOnOffSuccess, OnTryOnOffFail, nullptr, this};
-
-        static constexpr uint16_t kInvalidTSN = 0xffff;
-        uint16_t m_LastTSN = kInvalidTSN;
+        ZbCmdSend::Node m_SendStatusNode;
 
         void TransitTo(State s);
 

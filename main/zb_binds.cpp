@@ -88,10 +88,8 @@ namespace zb
 
     void BindInfo::TransitTo(State s)
     {
-        if (m_LastTSN != kInvalidTSN)
-            ZbCmdSend::Unregister(m_LastTSN);
-
         m_Timer.Cancel();
+        m_SendStatusNode.RemoveFromList();
         m_ConfigReportNode.RemoveFromList();
         m_ReadReportConfigNode.RemoveFromList();
         m_ReadAttrNode.RemoveFromList();
@@ -121,11 +119,7 @@ namespace zb
             return;
         }
 
-        if (pBind->m_LastTSN != kInvalidTSN)
-        {
-            ZbCmdSend::Unregister(uint8_t(pBind->m_LastTSN));
-            pBind->m_LastTSN = kInvalidTSN;
-        }
+        pBind->m_SendStatusNode.RemoveFromList();
         pBind->m_ReportConfigured = false;
 
         if (pBind->m_AttemptsLeft--)
@@ -155,7 +149,6 @@ namespace zb
             return;
         }
 
-        pBind->m_LastTSN = kInvalidTSN;
         if (!pBind->m_Timer.IsRunning())//timeout already happened?
         {
             FMT_PRINT("({:x}-{})Timeout has already happened. (should not be reachable)\n", pBind->m_ShortAddr, expectedState);
@@ -279,10 +272,11 @@ namespace zb
         uint16_t attributes[] = { ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID, };
         read_req.attr_number = std::size(attributes);
         read_req.attr_field = attributes;
-        m_LastTSN = esp_zb_zcl_read_attr_cmd_req(&read_req);
+        m_SendStatusNode.tsn = esp_zb_zcl_read_attr_cmd_req(&read_req);
+        m_SendStatusNode.cb = OnSendStatus<State::TryReadAttribute>;
+        m_SendStatusNode.RegisterSelf();
         m_ReadAttrNode.RegisterSelf();
         m_Timer.Setup(OnTimeout<State::TryReadAttribute>, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::TryReadAttribute>, this);
     }
 
     BindInfo* BindInfo::ReadAttrRespNode::GetBindInfo()
@@ -488,11 +482,12 @@ namespace zb
         };
         report_cmd.record_number = 1;//std::size(records);
         report_cmd.record_field = records;
-        m_LastTSN = esp_zb_zcl_config_report_cmd_req(&report_cmd);
-        FMT_PRINT("Sent configure report request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
+        m_SendStatusNode.tsn = esp_zb_zcl_config_report_cmd_req(&report_cmd);
+        m_SendStatusNode.cb = OnSendStatus<State::SendConfigureReport>;
+        m_SendStatusNode.RegisterSelf();
+        FMT_PRINT("Sent configure report request to {:x}; TSN={:x}.\n", m_ShortAddr, m_SendStatusNode.tsn);
         m_ConfigReportNode.RegisterSelf();
         m_Timer.Setup(OnTimeout<State::SendConfigureReport>, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::SendConfigureReport>, this);
         //FMT_PRINT("Sent config report for On/Off; TSN={:x}\n", tsn);
     }
 
@@ -511,11 +506,12 @@ namespace zb
         on_off_r.attributeID = ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID;
         on_off_r.report_direction = 0;
         rr.record_field = &on_off_r;
-        m_LastTSN = esp_zb_zcl_read_report_config_cmd_req(&rr);
-        FMT_PRINT("Sent read configure request to {:x}; TSN={:x}.\n", m_ShortAddr, m_LastTSN);
+        m_SendStatusNode.tsn = esp_zb_zcl_read_report_config_cmd_req(&rr);
+        m_SendStatusNode.cb = OnSendStatus<State::CheckConfigureReport>;
+        m_SendStatusNode.RegisterSelf();
+        FMT_PRINT("Sent read configure request to {:x}; TSN={:x}.\n", m_ShortAddr, m_SendStatusNode.tsn);
         m_ReadReportConfigNode.RegisterSelf();
         m_Timer.Setup(OnTimeout<State::CheckConfigureReport>, this, kTimeout);
-        ZbCmdSend::Register(m_LastTSN, OnSendStatus<State::CheckConfigureReport>, this);
     }
 
     void BindInfo::SendUnBindRequest()

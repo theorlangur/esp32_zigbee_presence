@@ -1,7 +1,9 @@
 #ifndef ZBH_HANDLERS_CMD_HPP_
 #define ZBH_HANDLERS_CMD_HPP_
 
+#include "zbh_types.hpp"
 #include "zbh_handlers.hpp"
+#include "../lib/linked_list.hpp"
 
 namespace zb
 {
@@ -82,73 +84,27 @@ namespace zb
         uint8_t cmd_id;
         typeless_cmd_handler handler = nullptr;
     };
+    using seq_nr_t = uint16_t;
+    static constexpr seq_nr_t kInvalidTSN = 0xffff;
 
     struct ZbCmdResponse
     {
-        //returns true - auto remove from registered callbacks, false - leave in callbacks
-        using cmd_resp_handler_t = bool(*)(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *, void *user_ctx);
-        struct RespHandlers
+        using cmd_resp_handler_t = void(*)(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *, void *user_ctx);
+        struct Node: ::Node
         {
-            cmd_resp_handler_t h;
+            uint16_t cluster_id;
+            uint8_t cmd_id;
+            seq_nr_t tsn;
+            cmd_resp_handler_t cb;
             void *user_ctx;
+
+            void RegisterSelf();
         };
-        RespHandlers m_RegisteredResponseCallbacks[256] = {};
-        uint16_t m_ClusterId = 0xffff;
 
-        static constexpr size_t kMaxClusters = 2;
-        static ZbCmdResponse g_CmdResponseRegistry[kMaxClusters];
-    public:
-        static ZbCmdResponse* FindOrAquireRegistry(uint16_t clusterId)
-        {
-            for(auto &r : g_CmdResponseRegistry)
-            {
-                if (r.m_ClusterId == clusterId)
-                    return &r;
-                if (r.m_ClusterId == 0xffff)
-                {
-                    //free
-                    r.m_ClusterId = clusterId;
-                    return &r;
-                }
-            }
-            return nullptr;
-        }
-        static ZbCmdResponse* FindRegistry(uint16_t clusterId)
-        {
-            for(auto &r : g_CmdResponseRegistry)
-            {
-                if (r.m_ClusterId == clusterId)
-                    return &r;
-            }
-            return nullptr;
-        }
-
-        static RespHandlers Register(uint16_t clusterId, uint8_t cmd, cmd_resp_handler_t cb, void *user_ctx)
-        {
-            auto *pR = FindOrAquireRegistry(clusterId);
-            if (!pR) return {};
-
-            auto prev = pR->m_RegisteredResponseCallbacks[cmd];
-            pR->m_RegisteredResponseCallbacks[cmd] = {cb, user_ctx};
-            return prev;
-        }
-
-        static RespHandlers Unregister(uint16_t clusterId, uint8_t cmd)
-        {
-            auto *pR = FindRegistry(clusterId);
-            if (pR)
-            {
-                auto prev = pR->m_RegisteredResponseCallbacks[cmd];
-                pR->m_RegisteredResponseCallbacks[cmd] = {nullptr, nullptr};
-                return prev;
-            }
-            return {};
-        }
+        static LinkedListT<Node> g_CmdResponseList;
     };
-    inline ZbCmdResponse ZbCmdResponse::g_CmdResponseRegistry[kMaxClusters];
 
 
-    using seq_nr_t = uint16_t;
     /**********************************************************************/
     /* ZbCmdSend                                                          */
     /**********************************************************************/
@@ -156,38 +112,18 @@ namespace zb
     {
         //returns true - auto remove from registered callbacks, false - leave in callbacks
         using cmd_send_handler_t = void(*)(esp_zb_zcl_command_send_status_message_t *pSendStatus, void *user_ctx);
-        struct SendHandlers
+        struct Node: ::Node
         {
-            cmd_send_handler_t h;
+            seq_nr_t tsn;
+            cmd_send_handler_t cb;
             void *user_ctx;
+
+            void RegisterSelf();
         };
-        inline static SendHandlers g_RegisteredSendCallbacks[256] = {};
+
+        static LinkedListT<Node> g_SendStatusList;
     public:
-        static SendHandlers Register(uint8_t seqNr, cmd_send_handler_t cb, void *user_ctx)
-        {
-            auto prev = g_RegisteredSendCallbacks[seqNr];
-            g_RegisteredSendCallbacks[seqNr] = {cb, user_ctx};
-            return prev;
-        }
-
-        static void Unregister(uint8_t seqNr)
-        {
-            g_RegisteredSendCallbacks[seqNr] = {nullptr, nullptr};
-        }
-
-        static void handler(esp_zb_zcl_command_send_status_message_t message)
-        {
-            auto &entry = g_RegisteredSendCallbacks[message.tsn];
-            if (entry.h)
-            {
-                auto e = entry;
-                entry = {nullptr, nullptr};
-                e.h(&message, e.user_ctx);
-            }else
-            {
-                FMT_PRINT("[task={}; lock={}]Send status(no callback): seqNr={}; dst={},  status={:x}\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, message.tsn, message.dst_addr, message.status);
-            }
-        }
+        static void handler(esp_zb_zcl_command_send_status_message_t message);
     };
 
 
@@ -231,13 +167,25 @@ namespace zb
     inline esp_err_t cmd_response_action_handler(const void *message)
     {
         auto *pCmdRespMsg = (esp_zb_zcl_cmd_default_resp_message_t *)message;
-        auto *pR = ZbCmdResponse::FindRegistry(pCmdRespMsg->info.cluster);
-        auto cb = pR ? pR->m_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] : ZbCmdResponse::RespHandlers{nullptr, nullptr};
-        if (cb.h)
+        for(ZbCmdResponse::Node *pN : ZbCmdResponse::g_CmdResponseList)
         {
-            if (!cb.h(pCmdRespMsg->resp_to_cmd, pCmdRespMsg->status_code, &pCmdRespMsg->info, cb.user_ctx))
-                pR->m_RegisteredResponseCallbacks[pCmdRespMsg->resp_to_cmd] = {nullptr, nullptr};
-        }else
+            if (pN->cluster_id == pCmdRespMsg->info.cluster 
+                && pN->cmd_id == pCmdRespMsg->resp_to_cmd
+                && pCmdRespMsg->info.header.tsn == pN->tsn
+                )
+            {
+                //
+                if (pN->cb)
+                {
+                    pN->cb(pCmdRespMsg->resp_to_cmd, pCmdRespMsg->status_code, &pCmdRespMsg->info, pN->user_ctx);
+                }else
+                {
+                    //?
+                }
+                return ESP_OK;
+            }
+        }
+
         {
 #ifndef NDEBUG
             using clock_t = std::chrono::system_clock;
