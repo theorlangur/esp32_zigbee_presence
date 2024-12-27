@@ -297,12 +297,16 @@ const orlangurOccupactionExtended = {
     },
     internals: () => {
         const exposes = [
-            e.composite('internals', 'internals', ea.STATE_GET)
-            .withCategory('diagnostic')
-                .withFeature(e.numeric('bound_devices', ea.STATE))
-                .withFeature(e.numeric('cmd_retry_failures', ea.STATE))
-                .withFeature(e.numeric('cmd_total_failures', ea.STATE))
-                .withFeature(e.text('configured_reports_for_binds', ea.STATE))
+            //e.composite('internals', 'internals', ea.STATE_GET)
+            //.withCategory('diagnostic')
+            //    .withFeature(e.numeric('bound_devices', ea.STATE))
+            //    .withFeature(e.numeric('cmd_retry_failures', ea.STATE))
+            //    .withFeature(e.numeric('cmd_total_failures', ea.STATE))
+            //    .withFeature(e.text('configured_reports_for_binds', ea.STATE))
+            e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('cmd_retry_failures', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('cmd_total_failures', ea.STATE_GET).withCategory('diagnostic'),
+            e.text('configured_reports_for_binds', ea.STATE_GET).withCategory('diagnostic')
         ];
 
         const fromZigbee = [
@@ -317,24 +321,24 @@ const orlangurOccupactionExtended = {
                     {
                         const buffer = Buffer.alloc(4);
                         buffer.writeUInt32LE(data['internals']);
-                        const r = {};
-                        r['bound_devices'] = buffer.readUInt8(0) & 0x0f;
-                        r['cmd_retry_failures'] = buffer.readUInt8(2);
-                        r['cmd_total_failures'] = buffer.readUInt8(3) & 0x0f;
+                        result['bound_devices'] = buffer.readUInt8(0) & 0x0f;
+                        result['cmd_retry_failures'] = buffer.readUInt8(2);
+                        result['cmd_total_failures'] = buffer.readUInt8(3) & 0x0f;
                         const v = buffer.readUInt8(1);
-                        r['configured_reports_for_binds'] = ''
+                        result['configured_reports_for_binds'] = ''
                         for(var i = 0; i < 8; ++i)
                         {
                             const b = v & (1 << i)
                             if (b)
                             {
-                                if (r['configured_reports_for_binds'] == '')
-                                    r['configured_reports_for_binds'] = "Bind" + i;
+                                if (result['configured_reports_for_binds'] == '')
+                                    result['configured_reports_for_binds'] = "Bind" + i;
                                 else
-                                    r['configured_reports_for_binds'] += ", Bind" + i;
+                                    result['configured_reports_for_binds'] += ", Bind" + i;
                             }
                         }
-                        result['internals'] = r
+                        if (result['configured_reports_for_binds'] == '')
+                            result['configured_reports_for_binds'] = '<no configured reports>'
                     }
                     else 
                     {
@@ -348,9 +352,9 @@ const orlangurOccupactionExtended = {
 
         const toZigbee = [
             {
-                key: ['internals'],
+                key: ['bound_devices', 'configured_reports_for_binds', 'cmd_retry_failures', 'cmd_total_failures'],
                 convertGet: async (entity, key, meta) => {
-                    await entity.read('customOccupationConfig', [key]);
+                    await entity.read('customOccupationConfig', ['internals']);
                 },
             }
         ];
