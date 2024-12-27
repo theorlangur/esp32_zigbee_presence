@@ -109,11 +109,9 @@ namespace zb
     static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL = 26;
     static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL = 27;
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
-    static constexpr const uint16_t ATTRIB_FAILURE_COUNT = 29;
-    static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 30;
-    static constexpr const uint16_t ATTRIB_TOTAL_FAILURE_COUNT = 31;
-    static constexpr const uint16_t ATTRIB_INTERNALS = 32;
-    static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 33;
+    static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 29;
+    static constexpr const uint16_t ATTRIB_INTERNALS = 30;
+    static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 31;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -173,9 +171,7 @@ namespace zb
     using ZclAttributePresenceKeepDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL, bool>;
     using ZclAttributePresenceKeepDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL, bool>;
     using ZclAttributeExternalOnTime_t                        = LD2412CustomCluster_t::Attribute<EXTERNAL_ON_TIME , uint16_t>;
-    using ZclAttributeFailureCount_t                          = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_COUNT , uint16_t>;
     using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
-    using ZclAttributeTotalFailureCount_t                     = LD2412CustomCluster_t::Attribute<ATTRIB_TOTAL_FAILURE_COUNT , uint16_t>;
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
 
@@ -221,9 +217,7 @@ namespace zb
     static ZclAttributePresenceKeepDetectionPIRInternal_t      g_PresenceKeepDetectionPIRInternal;
     static ZclAttributePresenceKeepDetectionExternal_t         g_PresenceKeepDetectionExternal;
     static ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
-    static ZclAttributeFailureCount_t                          g_FailureCount;
     static ZclAttributeFailureStatus_t                         g_FailureStatus;
-    static ZclAttributeTotalFailureCount_t                     g_TotalFailureCount;
     static ZclAttributeInternals_t                             g_Internals;
     static ZclAttributeRestartsCount_t                         g_RestartsCount;
 
@@ -267,8 +261,6 @@ namespace zb
         return esp_zb_zcl_on_off_on_with_timed_off_cmd_req(&cmd_req);
     }
 
-    void update_info_on_own_binds();
-    
     /**********************************************************************/
     /* Runtime data                                                       */
     /**********************************************************************/
@@ -303,15 +295,13 @@ namespace zb
             FinishedPresenceChangeSentOnOff = 2,
         };
 
-        uint32_t m_LastBindResponseStatus : 8 = 0;
-        uint32_t m_BoundDevices : 4 = 0;
-        uint32_t m_LastSendOnOffResult : 4 = 0;
-        uint32_t m_LastLocalTimerState : 4 = 0;
-        uint32_t m_LastExternalTimerState : 4 = 0;
-        uint32_t m_HasRunningTimer : 1 = 0;
-        uint32_t m_HasExternalTimer : 1 = 0;
-        uint32_t m_BindRequestActive : 1 = 0;
-        uint32_t m_Unused : 5 = 0;
+        uint32_t m_BoundDevices                 : 3  = 0;
+        uint32_t m_ConfiguredReports            : 6  = 0;
+        uint32_t m_IntermediateCmdFailuireCount : 8  = 0;
+        uint32_t m_TotalFailureCount            : 4  = 0;
+        uint32_t m_Unused                       : 11 = 0;
+        //uint32_t m_HasRunningTimer : 1 = 0;
+        //uint32_t m_HasExternalTimer : 1 = 0;
 
         uint32_t GetVal() const { return *(uint32_t*)this; }
 
@@ -398,23 +388,14 @@ namespace zb
                     }, this, 2000);
         }
 
-        void RunBindsChecking()
-        {
-            if (!m_Internals.m_BindRequestActive)
-            {
-                m_Internals.m_BindRequestActive = true;
-                update_info_on_own_binds();
-            }
-            else
-                m_LastFailedStatus = (esp_zb_zcl_status_t)ExtendedFailureStatus::BindRequestIncomplete;
-        }
+        void RunBindsChecking();
 
         void RunService()
         {
             ZbAlarm::check_death_count();
 
-            m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
-            m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
+            //m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
+            //m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
             m_Internals.Update();//send to zigbee
 
             for(auto i = m_BindsToCleanup.begin(); i != m_BindsToCleanup.end(); ++i)
@@ -465,6 +446,13 @@ namespace zb
                 if (s == BindInfo::State::Functional || s == BindInfo::State::NonFunctional)
                     bi->m_CheckReporting = false;
             }
+
+            if (m_Internals.m_ConfiguredReports != m_ValidBinds)
+            {
+                m_Internals.m_ConfiguredReports = m_ValidBinds;
+                m_Internals.Update();
+            }
+
             if (prevValidBinds != m_ValidBinds)
             {
                 FMT_PRINT("Valid binds changed: from {:x} to {:x}\n", prevValidBinds, m_ValidBinds);
@@ -497,13 +485,9 @@ namespace zb
 
     void cmd_failure(void *, esp_zb_zcl_status_t status_code)
     {
-        ++g_State.m_FailureCount;
+        ++g_State.m_Internals.m_IntermediateCmdFailuireCount;
         g_State.m_LastFailedStatus = status_code;
-
-        if (auto status = g_FailureCount.Set(g_State.m_FailureCount); !status)
-        {
-            FMT_PRINT("Failed to inc failure count {:x}\n", (int)status.error());
-        }
+        g_State.m_Internals.Update();
         if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
         {
             FMT_PRINT("Failed to set failure status {:x}\n", (int)status.error());
@@ -514,22 +498,16 @@ namespace zb
     {
         led::blink_pattern(kBlinkPatternCmdError, kCmdError, duration_ms_t(1000));
         led::blink(false, {});
-        ++g_State.m_TotalFailureCount;
-        if (auto status = g_TotalFailureCount.Set(g_State.m_TotalFailureCount); !status)
-        {
-            FMT_PRINT("Failed to inc total failure count {:x}\n", (int)status.error());
-        }
+        g_State.m_Internals.Update();
     }
 
-    void update_info_on_own_binds()
+    void RuntimeState::RunBindsChecking()
     {
         BindIteratorConfig cfg;
         cfg.on_begin = [](const esp_zb_zdo_binding_table_info_t *table_info, void *pCtx)->bool{
             FMT_PRINT("New own binds check round\n");
             g_State.m_TempNewBinds.clear();
             g_State.m_FoundExisting = 0;
-            g_State.m_Internals.m_BindRequestActive = false;
-            g_State.m_Internals.m_LastBindResponseStatus = table_info->status;
             g_State.m_BindsReportingCapable = g_Config.GetBindReporting();
             FMT_PRINT("Bind report caps: {:x}\n", g_State.m_BindsReportingCapable.GetRaw());
             for(auto &bi : g_State.m_TrackedBinds)
@@ -662,14 +640,7 @@ namespace zb
         if (g_State.m_LastPresence)//presence still active. start another timer
         {
             if (g_Config.GetOnOffTimeout())//still valid timeout?
-            {
-                g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::StillPresenceResetTimer;
                 g_State.m_RunningTimer.Setup(&on_local_on_timer_finished, nullptr, g_Config.GetOnOffTimeout() * 1000);
-            }
-            else
-            {
-                g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::StillPresenceNoTimeout;
-            }
         }
         else
         {
@@ -681,13 +652,7 @@ namespace zb
             FMT_PRINT("{} Sending off command on timer\n", _n);
 #endif
             if (g_State.m_Internals.m_BoundDevices)
-            {
-                g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::NoPresenceSentOff;
                 g_State.m_OffSender.Send();
-            }else
-            {
-                g_State.m_Internals.m_LastLocalTimerState = (uint8_t)Internals::LocalTimerState::NoPresenceNoBoundDevices;
-            }
 
             ZbAlarm::check_counter_of_death();
         }
@@ -699,36 +664,36 @@ namespace zb
         auto t = g_Config.GetOnOffTimeout();
         if (m == OnOffMode::Nothing)
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNothing;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNothing;
             return;//nothing
         }
         if (on && (m == OnOffMode::OffOnly))
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOffOnly;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOffOnly;
             return;//nothing
         }
         if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOnTimedOnTimedLocal;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOnTimedOnTimedLocal;
             return;//nothing
         }
 
         if (!g_State.m_Internals.m_BoundDevices)
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNoBoundDevices;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNoBoundDevices;
             return;//no bound devices with on/off cluster, no reason to send a command
         }
 
         g_State.m_RunningTimer.Cancel();
         if (m == OnOffMode::TimedOn)
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOn;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOn;
             FMT_PRINT("Sending timed on command to binded with timeout: {};\n", t);
             g_State.m_OnTimedSender.Send();
         }
         else if (m == OnOffMode::TimedOnLocal)
         {
-            g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOnLocal;
+            //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOnLocal;
 #ifndef NDEBUG
             using clock_t = std::chrono::system_clock;
             auto now = clock_t::now();
@@ -748,12 +713,12 @@ namespace zb
             FMT_PRINT("Sending command to binded: {};\n", (int)on);
             if (on)
             {
-                g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOn;
+                //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOn;
                 g_State.m_OnSender.Send();
             }
             else
             {
-                g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOff;
+                //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOff;
                 g_State.m_OffSender.Send();
             }
         }
@@ -1006,17 +971,9 @@ namespace zb
             {
                 FMT_PRINT("Failed to set initial on time for external {:x}\n", (int)status.error());
             }
-            if (auto status = g_FailureCount.Set(g_State.m_FailureCount); !status)
-            {
-                FMT_PRINT("Failed to set initial failure count {:x}\n", (int)status.error());
-            }
             if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
             {
                 FMT_PRINT("Failed to set initial failure status {:x}\n", (int)status.error());
-            }
-            if (auto status = g_TotalFailureCount.Set(g_State.m_TotalFailureCount); !status)
-            {
-                FMT_PRINT("Failed to set initial total failure count {:x}\n", (int)status.error());
             }
             if (auto status = g_Internals.Set(g_State.m_Internals.GetVal()); !status)
             {
@@ -1140,15 +1097,13 @@ namespace zb
         //g_ExternalOnOff.Report(g_DestCoordinator);
         if (update_presence_state())
         {
-            g_State.m_Internals.m_LastExternalTimerState = (uint8_t)Internals::ExternalTimerState::FinishedPresenceChangeSentOnOff;
             send_on_off(g_State.m_LastPresence);
             esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
             if (auto status = g_OccupancyState.Set(val); !status)
             {
                 FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
             }
-        }else
-            g_State.m_Internals.m_LastExternalTimerState = (uint8_t)Internals::ExternalTimerState::FinishedNoPresenceChange;
+        }
     }
 
     esp_err_t cmd_on_off_external_on()
@@ -1568,9 +1523,7 @@ namespace zb
         ESP_ERROR_CHECK(g_PresenceKeepDetectionPIRInternal.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_PresenceKeepDetectionExternal.AddToCluster(custom_cluster, Access::RW));
         ESP_ERROR_CHECK(g_ExternalOnTime.AddToCluster(custom_cluster, Access::RW));
-        ESP_ERROR_CHECK(g_FailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_FailureStatus.AddToCluster(custom_cluster, Access::Read | Access::Report));
-        ESP_ERROR_CHECK(g_TotalFailureCount.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_Internals.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report, g_Config.GetRestarts()));
 
@@ -1688,7 +1641,6 @@ namespace zb
                 esp_zb_get_long_address(g_MyIEEE);
                 thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
                 g_State.RunService();
-                g_State.ScheduleBindsChecking();
 
                 ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
                 if (esp_zb_bdb_is_factory_new()) {
