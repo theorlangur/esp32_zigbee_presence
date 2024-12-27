@@ -297,37 +297,12 @@ const orlangurOccupactionExtended = {
     },
     internals: () => {
         const exposes = [
-            e.numeric('last_bind_response_status', ea.STATE_GET).withCategory('diagnostic'),
-            e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic'),
-            e.enum('last_send_on_off_status', ea.STATE_GET, 
-                ['Initial'
-                    ,'ReturnOnNothing'
-                    ,'ReturnOnOffOnly'
-                    ,'ReturnOnOnTimedOnTimedLocal'
-                    ,'ReturnOnNoBoundDevices'
-                    ,'SentTimedOn'
-                    ,'SentTimedOnLocal'
-                    ,'SentOn'
-                    ,'SentOff'
-                ]
-            ).withCategory('diagnostic'),
-            e.enum('last_local_timer_state', ea.STATE_GET, 
-                ['Initial'
-                    ,'PresenceResetTimer'
-                    ,'PresenceNoTimeout'
-                    ,'NoPresenceSentOff'
-                    ,'NoPresenceNoBoundDevices'
-                ]
-            ).withCategory('diagnostic'),
-            e.enum('last_external_timer_state', ea.STATE_GET, 
-                ['Initial'
-                    ,'FinishedNoPresenceChange'
-                    ,'FinishedPresenceChangeSentOnOff'
-                ]
-            ).withCategory('diagnostic'),
-            e.numeric('has_running_timer', ea.STATE_GET).withCategory('diagnostic'),
-            e.numeric('has_external_timer', ea.STATE_GET).withCategory('diagnostic'),
-            e.numeric('bind_req_active', ea.STATE_GET).withCategory('diagnostic'),
+            e.composite('internals', 'internals', ea.STATE_GET)
+            .withCategory('diagnostic')
+                .withFeature(e.numeric('bound_devices', ea.STATE))
+                .withFeature(e.numeric('cmd_retry_failures', ea.STATE))
+                .withFeature(e.numeric('cmd_total_failures', ea.STATE))
+                .withFeature(e.text('configured_reports_for_binds', ea.STATE))
         ];
 
         const fromZigbee = [
@@ -342,17 +317,24 @@ const orlangurOccupactionExtended = {
                     {
                         const buffer = Buffer.alloc(4);
                         buffer.writeUInt32LE(data['internals']);
-                        result['last_bind_response_status'] = buffer.readUInt8(0);
-                        const boundDevsSendOff = buffer.readUInt8(1);
-                        result['bound_devices'] = boundDevsSendOff & 0x0f;
-                        result['last_send_on_off_status'] = exposes[2].values[(boundDevsSendOff >> 4) & 0x0f];
-                        const lastTimerStates = buffer.readUInt8(2);
-                        result['last_local_timer_state'] = exposes[3].values[lastTimerStates & 0x0f];
-                        result['last_external_timer_state'] = exposes[4].values[(lastTimerStates >> 4) & 0x0f];
-                        const miscBits = buffer.readUInt8(3);
-                        result['has_running_timer'] = miscBits & 1;
-                        result['has_external_timer'] = (miscBits >> 1) & 1;
-                        result['bind_req_active'] = (miscBits >> 2) & 1;
+                        const r = {};
+                        r['bound_devices'] = buffer.readUInt8(0) & 0x0f;
+                        r['cmd_retry_failures'] = buffer.readUInt8(2);
+                        r['cmd_total_failures'] = buffer.readUInt8(3) & 0x0f;
+                        const v = buffer.readUInt8(1);
+                        r['configured_reports_for_binds'] = ''
+                        for(var i = 0; i < 8; ++i)
+                        {
+                            const b = v & (1 << i)
+                            if (b)
+                            {
+                                if (r['configured_reports_for_binds'] == '')
+                                    r['configured_reports_for_binds'] = "Bind" + i;
+                                else
+                                    r['configured_reports_for_binds'] += ", Bind" + i;
+                            }
+                        }
+                        result['internals'] = r
                     }
                     else 
                     {
@@ -364,7 +346,14 @@ const orlangurOccupactionExtended = {
             }
         ];
 
-        const toZigbee = [];
+        const toZigbee = [
+            {
+                key: ['internals'],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', [key]);
+                },
+            }
+        ];
 
         return {
             exposes,
@@ -585,11 +574,9 @@ const definition = {
                 presence_detection_keep_pir_internal: {ID: 0x001a, type: Zcl.DataType.BOOLEAN},
                 presence_detection_keep_external: {ID: 0x001b, type: Zcl.DataType.BOOLEAN},
                 external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
-                failure_count: {ID:0x001d, type: Zcl.DataType.UINT16},
-                failure_status: {ID:0x001e, type: Zcl.DataType.UINT16},
-                total_failure_count: {ID:0x001f, type: Zcl.DataType.UINT16},
-                internals: {ID:0x0020, type: Zcl.DataType.UINT32},
-                restarts_count: {ID:0x0021, type: Zcl.DataType.UINT16},
+                failure_status: {ID:0x001d, type: Zcl.DataType.UINT16},
+                internals: {ID:0x001e, type: Zcl.DataType.UINT32},
+                restarts_count: {ID:0x001f, type: Zcl.DataType.UINT16},
             },
             commands: {
                 restart: {
@@ -701,28 +688,6 @@ const definition = {
             entityCategory: 'config',
         }),
         numeric({
-            name: 'failure_count',
-            cluster: 'customOccupationConfig',
-            attribute: 'failure_count',
-            description: 'Amount of cmd failures',
-            valueMin: 0,
-            valueMax: 65535,
-            access: 'STATE',
-            entityCategory: 'diagnostic',
-            unit: 'times',
-        }),
-        numeric({
-            name: 'total_failure_count',
-            cluster: 'customOccupationConfig',
-            attribute: 'total_failure_count',
-            description: 'Amount of irrecoverable cmd failures',
-            valueMin: 0,
-            valueMax: 65535,
-            access: 'STATE',
-            entityCategory: 'diagnostic',
-            unit: 'times',
-        }),
-        numeric({
             name: 'restarts_count',
             cluster: 'customOccupationConfig',
             attribute: 'restarts_count',
@@ -771,7 +736,7 @@ const definition = {
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance', 'illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
-        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state', 'failure_count', 'total_failure_count', 'failure_status']);
+        await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state', 'failure_status', 'internals']);
         //await endpoint.read('customOccupationConfig', ['moveDistance','stillDistance','moveEnergy','stillEnergy']);
         //await endpoint.read('customOccupationConfig', ['still_energy_last','still_energy_min','still_energy_max']);
         //await endpoint.read('customOccupationConfig', ['move_energy_last','move_energy_min','move_energy_max']);
@@ -855,18 +820,6 @@ const definition = {
                 reportableChange: null,
             },
             {
-                attribute: 'failure_count',
-                minimumReportInterval: 0,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
-            {
-                attribute: 'total_failure_count',
-                minimumReportInterval: 0,
-                maximumReportInterval: constants.repInterval.HOUR,
-                reportableChange: null,
-            },
-            {
                 attribute: 'internals',
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
@@ -875,14 +828,6 @@ const definition = {
         ]);
 
         await endpoint.read('customOccupationConfig', ['restarts_count']);
-        //await endpoint.configureReporting('customOccupationConfig', [
-        //    {
-        //        attribute: 'restarts_count',
-        //        minimumReportInterval: 0,
-        //        maximumReportInterval: constants.repInterval.HOUR,
-        //        reportableChange: null,
-        //    },
-        //]);
     },
 
 };
