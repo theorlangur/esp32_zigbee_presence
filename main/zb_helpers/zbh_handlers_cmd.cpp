@@ -27,7 +27,15 @@ namespace zb
                 return;
             }
         }
-
-        FMT_PRINT("[task={}; lock={}]Send status(no callback): seqNr={}; dst={},  status={:x}\n", (const char*)pcTaskGetName(nullptr), APILock::g_State, message.tsn, message.dst_addr, message.status);
+#ifndef NDEBUG
+        const char *pTaskName = pcTaskGetName(nullptr);
+        if (!pTaskName) pTaskName = "";
+        FMT_PRINT("[task={}; lock={}]Send status(no callback): seqNr={}; dst={},  status={:x}\n"
+                , pTaskName
+                , APILock::g_State
+                , message.tsn
+                , message.dst_addr
+                , message.status);
+#endif
     }
 }
