@@ -15,7 +15,5 @@ namespace zb
     struct ReadConfigResponseNode: GenericActionNode<ReadConfigResponseNode, esp_zb_zcl_cmd_read_report_config_resp_message_t>{};
     struct ConfigReportResponseNode: GenericActionNode<ConfigReportResponseNode, esp_zb_zcl_cmd_config_report_resp_message_t>{};
     struct ReadAttrResponseNode: GenericActionNode<ReadAttrResponseNode, esp_zb_zcl_cmd_read_attr_resp_message_t>{};
-
-    const esp_zb_ieee_addr_t& GetMyIEEE();
 }
 #endif

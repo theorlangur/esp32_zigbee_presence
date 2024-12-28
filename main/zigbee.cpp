@@ -1053,6 +1053,60 @@ namespace zb
         ESP_LOGI(TAG, "Sensor setup done");
     }
 
+    void ias_zone_state_change(uint8_t param)
+    {
+        FMT_PRINT("ias zone status change to {:x}\n", param);
+    }
+
+    bool apsde_data_indication_callback(esp_zb_apsde_data_ind_t ind)
+    {
+        if (ind.dst_short_addr == esp_zb_get_short_address() && ind.status == 0)
+        {
+            //when I'm the target
+            if (ind.asdu_length == sizeof(APSME_BindReq) + 1)
+            {
+                auto cmd = APSME_Commands(ind.cluster_id);//this will have a command id
+                //FMT_PRINT("(cmd={:x})APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
+                //        , cmd
+                //        , ind.status
+                //        , ind.src_short_addr , ind.src_endpoint
+                //        , ind.dst_short_addr , ind.dst_endpoint
+                //        , ind.cluster_id
+                //        , ind.asdu_length
+                //        );
+                switch(cmd)
+                {
+                    case APSME_Commands::Bind:
+                    case APSME_Commands::Unbind:
+                    {
+                        APSME_BindReq *pReq = (APSME_BindReq *)(ind.asdu + 1);
+                        if (pReq->cluster_id == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
+                        {
+                            FMT_PRINT("Got {} request via APSDE.indication for {}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst);
+                            //relevant
+                            //trigger binds re-check
+                            g_State.m_NeedBindsChecking = true;
+                        }else
+                        {
+                            FMT_PRINT("Got {} request via APSDE.indication for {}, cluster {:x}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst, (int)pReq->cluster_id);
+                        }
+                    }
+                    break;
+                    default:
+                        break;
+                }
+            }
+            //FMT_PRINT("APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
+            //        , ind.status
+            //        , ind.src_short_addr , ind.src_endpoint
+            //        , ind.dst_short_addr , ind.dst_endpoint
+            //        , ind.cluster_id
+            //        , ind.asdu_length
+            //        );
+        }
+        return false;
+    }
+
     /**********************************************************************/
     /* Commands                                                           */
     /**********************************************************************/
@@ -1500,6 +1554,94 @@ namespace zb
         ,g_ReportHandlers
     };
 
+
+    /**********************************************************************/
+    /* Common zigbee network handling                                     */
+    /**********************************************************************/
+    static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
+    {
+        ESP_RETURN_ON_FALSE(esp_zb_bdb_start_top_level_commissioning(mode_mask) == ESP_OK, ,
+                            TAG, "Failed to start Zigbee bdb commissioning");
+    }
+
+    extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
+    {
+        uint32_t *p_sg_p     = signal_struct->p_app_signal;
+        esp_err_t err_status = signal_struct->esp_err_status;
+        esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
+        static int failed_counter = 0;
+        switch (sig_type) {
+        case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
+            ESP_LOGI(TAG, "Initialize Zigbee stack");
+            esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
+            break;
+        case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
+        case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
+            if (err_status == ESP_OK) {
+                failed_counter = 0;
+                led::blink(false, {});
+                //async setup
+                InitHelpers();
+                thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
+                g_State.RunService();
+
+                ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
+                if (esp_zb_bdb_is_factory_new()) {
+                    ESP_LOGI(TAG, "Start network steering");
+                    esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
+                } else {
+                    ESP_LOGI(TAG, "Device rebooted");
+                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
+                }
+            } else {
+                /* commissioning failed */
+                if (++failed_counter > 6)
+                {
+                    failed_counter = 0;
+                    esp_restart();
+                }
+                ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
+                led::blink_pattern(kBlinkPatternZStackError, kZStackError, duration_ms_t(1000));
+                led::blink(true, kSteering);
+                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+            }
+            break;
+        case ESP_ZB_ZDO_SIGNAL_LEAVE:
+            ESP_LOGW(TAG, "Got leave signal");
+            esp_zb_factory_reset();
+            esp_restart();
+            break;
+        case ESP_ZB_BDB_SIGNAL_STEERING:
+            if (err_status == ESP_OK) {
+                failed_counter = 0;
+                led::blink(false, {});
+                esp_zb_ieee_addr_t extended_pan_id;
+                esp_zb_get_extended_pan_id(extended_pan_id);
+                ESP_LOGI(TAG, "Joined network successfully (Extended PAN ID: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, PAN ID: 0x%04hx, Channel:%d, Short Address: 0x%04hx)",
+                         extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
+                         extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
+                         esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
+
+                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
+            } else {
+                if (++failed_counter > 4)
+                {
+                    failed_counter = 0;
+                    esp_restart();
+                }
+                ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
+                led::blink_pattern(kBlinkPatternSteeringError, kSteeringError, duration_ms_t(1000));
+                led::blink(true, kSteering);
+                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
+            }
+            break;
+        default:
+            ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
+                     esp_err_to_name(err_status));
+            break;
+        }
+    }
+
     /**********************************************************************/
     /* Registering ZigBee device with clusters and attributes             */
     /**********************************************************************/
@@ -1609,6 +1751,14 @@ namespace zb
             ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         }
 
+        {
+            esp_zb_ias_zone_cluster_cfg_t ias_client_cfg{};
+            ias_client_cfg.zone_state = 0;
+            ias_client_cfg.zone_ctx.process_result_cb = ias_zone_state_change;
+            esp_zb_attribute_list_t *ias_zone_cluster = esp_zb_ias_zone_cluster_create(&ias_client_cfg);
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_ias_zone_cluster(cluster_list, ias_zone_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+        }
+
         /**********************************************************************/
         /* Endpoint configuration                                             */
         /**********************************************************************/
@@ -1621,148 +1771,6 @@ namespace zb
         esp_zb_ep_list_add_ep(ep_list, cluster_list, endpoint_config);
     }
 
-
-    /**********************************************************************/
-    /* Common zigbee network handling                                     */
-    /**********************************************************************/
-    static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
-    {
-        ESP_RETURN_ON_FALSE(esp_zb_bdb_start_top_level_commissioning(mode_mask) == ESP_OK, ,
-                            TAG, "Failed to start Zigbee bdb commissioning");
-    }
-
-    static esp_zb_ieee_addr_t g_MyIEEE;
-    const esp_zb_ieee_addr_t& GetMyIEEE()
-    {
-        return g_MyIEEE;
-    }
-
-    extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
-    {
-        uint32_t *p_sg_p     = signal_struct->p_app_signal;
-        esp_err_t err_status = signal_struct->esp_err_status;
-        esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
-        static int failed_counter = 0;
-        switch (sig_type) {
-        case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
-            ESP_LOGI(TAG, "Initialize Zigbee stack");
-            esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
-            break;
-        case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
-        case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
-            if (err_status == ESP_OK) {
-                failed_counter = 0;
-                led::blink(false, {});
-                //async setup
-                esp_zb_get_long_address(g_MyIEEE);
-                thread::start_task({.pName="LD2412_Setup", .stackSize = 2*4096}, &setup_sensor).detach();
-                g_State.RunService();
-
-                ESP_LOGI(TAG, "Device started up in %s factory-reset mode", esp_zb_bdb_is_factory_new() ? "" : "non");
-                if (esp_zb_bdb_is_factory_new()) {
-                    ESP_LOGI(TAG, "Start network steering");
-                    esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
-                } else {
-                    ESP_LOGI(TAG, "Device rebooted");
-                    esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
-                }
-            } else {
-                /* commissioning failed */
-                if (++failed_counter > 6)
-                {
-                    failed_counter = 0;
-                    esp_restart();
-                }
-                ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
-                led::blink_pattern(kBlinkPatternZStackError, kZStackError, duration_ms_t(1000));
-                led::blink(true, kSteering);
-                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
-            }
-            break;
-        case ESP_ZB_ZDO_SIGNAL_LEAVE:
-            ESP_LOGW(TAG, "Got leave signal");
-            esp_zb_factory_reset();
-            esp_restart();
-            break;
-        case ESP_ZB_BDB_SIGNAL_STEERING:
-            if (err_status == ESP_OK) {
-                failed_counter = 0;
-                led::blink(false, {});
-                esp_zb_ieee_addr_t extended_pan_id;
-                esp_zb_get_extended_pan_id(extended_pan_id);
-                ESP_LOGI(TAG, "Joined network successfully (Extended PAN ID: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x, PAN ID: 0x%04hx, Channel:%d, Short Address: 0x%04hx)",
-                         extended_pan_id[7], extended_pan_id[6], extended_pan_id[5], extended_pan_id[4],
-                         extended_pan_id[3], extended_pan_id[2], extended_pan_id[1], extended_pan_id[0],
-                         esp_zb_get_pan_id(), esp_zb_get_current_channel(), esp_zb_get_short_address());
-
-                esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
-            } else {
-                if (++failed_counter > 4)
-                {
-                    failed_counter = 0;
-                    esp_restart();
-                }
-                ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
-                led::blink_pattern(kBlinkPatternSteeringError, kSteeringError, duration_ms_t(1000));
-                led::blink(true, kSteering);
-                esp_zb_scheduler_alarm((esp_zb_callback_t)bdb_start_top_level_commissioning_cb, ESP_ZB_BDB_MODE_NETWORK_STEERING, 1000);
-            }
-            break;
-        default:
-            ESP_LOGI(TAG, "ZDO signal: %s (0x%x), status: %s", esp_zb_zdo_signal_to_string(sig_type), sig_type,
-                     esp_err_to_name(err_status));
-            break;
-        }
-    }
-
-    bool apsde_data_indication_callback(esp_zb_apsde_data_ind_t ind)
-    {
-        if (ind.dst_short_addr == esp_zb_get_short_address() && ind.status == 0)
-        {
-            //when I'm the target
-            if (ind.asdu_length == sizeof(APSME_BindReq) + 1)
-            {
-                auto cmd = APSME_Commands(ind.cluster_id);//this will have a command id
-                //FMT_PRINT("(cmd={:x})APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
-                //        , cmd
-                //        , ind.status
-                //        , ind.src_short_addr , ind.src_endpoint
-                //        , ind.dst_short_addr , ind.dst_endpoint
-                //        , ind.cluster_id
-                //        , ind.asdu_length
-                //        );
-                switch(cmd)
-                {
-                    case APSME_Commands::Bind:
-                    case APSME_Commands::Unbind:
-                    {
-                        APSME_BindReq *pReq = (APSME_BindReq *)(ind.asdu + 1);
-                        if (pReq->cluster_id == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
-                        {
-                            FMT_PRINT("Got {} request via APSDE.indication for {}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst);
-                            //relevant
-                            //trigger binds re-check
-                            g_State.m_NeedBindsChecking = true;
-                        }else
-                        {
-                            FMT_PRINT("Got {} request via APSDE.indication for {}, cluster {:x}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst, (int)pReq->cluster_id);
-                        }
-                    }
-                    break;
-                    default:
-                        break;
-                }
-            }
-            //FMT_PRINT("APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
-            //        , ind.status
-            //        , ind.src_short_addr , ind.src_endpoint
-            //        , ind.dst_short_addr , ind.dst_endpoint
-            //        , ind.cluster_id
-            //        , ind.asdu_length
-            //        );
-        }
-        return false;
-    }
 
     /**********************************************************************/
     /* Zigbee Task Entry Point                                            */
