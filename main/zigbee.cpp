@@ -364,6 +364,11 @@ namespace zb
         bool m_InitialBindsChecking = true;
         bool m_NeedBindsChecking = true;
 
+        bool CanSendCommandsToBind() const
+        {
+            return m_Internals.m_BoundDevices || m_InitialBindsChecking;
+        }
+
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
         {
             for(auto _i : g_RelevantBoundClusters)
@@ -656,7 +661,7 @@ namespace zb
             //no presence. send 'off' command, no timer reset
             FMT_PRINT("{} Sending off command on timer\n", _n);
 #endif
-            if (g_State.m_Internals.m_BoundDevices)
+            if (g_State.CanSendCommandsToBind())
                 g_State.m_OffSender.Send();
 
             ZbAlarm::check_counter_of_death();
@@ -683,7 +688,7 @@ namespace zb
             return;//nothing
         }
 
-        if (!g_State.m_Internals.m_BoundDevices)
+        if (!g_State.CanSendCommandsToBind())
         {
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNoBoundDevices;
             return;//no bound devices with on/off cluster, no reason to send a command
