@@ -326,6 +326,7 @@ namespace zb
         esp_zb_ieee_addr_t m_CoordinatorIeee;
         bool m_FirstRun = true;
         bool m_LastPresence = false;
+        bool m_TriggerAllowed = true;
         bool m_SuppressedByIllulminance = false;
         bool m_LastPresenceMMWave = false;
         bool m_LastPresencePIRInternal = false;
@@ -732,24 +733,38 @@ namespace zb
     {
         bool changed = false;
         auto cfg = g_Config.GetPresenceDetectionMode();
-        if (g_State.m_FirstRun || !g_State.m_LastPresence)
+        if (g_State.m_FirstRun || g_State.m_TriggerAllowed)
         {
             //edge detection
-            g_State.m_LastPresence = 
+            bool trigger = 
                    (cfg.m_Edge_mmWave && g_State.m_LastPresenceMMWave)
                 || (cfg.m_Edge_PIRInternal && g_State.m_LastPresencePIRInternal)
                 || (cfg.m_Edge_External && g_State.m_LastPresenceExternal);
-            changed = g_State.m_LastPresence;
+
+            if (trigger)
+            {
+                g_State.m_LastPresence = true;
+                g_State.m_TriggerAllowed = false;
+            }
+            changed = trigger;
             g_State.m_FirstRun = false;
-        }else if (!g_State.m_FirstRun && g_State.m_LastPresence)
+        }
+
+        if (!g_State.m_FirstRun && g_State.m_LastPresence)
         {
             //keep detection
             g_State.m_LastPresence = 
                    (cfg.m_Keep_mmWave && g_State.m_LastPresenceMMWave)
                 || (cfg.m_Keep_PIRInternal && g_State.m_LastPresencePIRInternal)
                 || (cfg.m_Keep_External && g_State.m_LastPresenceExternal);
-            changed = !g_State.m_LastPresence;
+
+            if (!g_State.m_LastPresence)
+            {
+                changed = true;
+                g_State.m_TriggerAllowed = true;
+            }
         }
+
         if (changed)
         {
             FMT_PRINT("Presence update to {}\n", g_State.m_LastPresence);
@@ -1061,14 +1076,6 @@ namespace zb
             if (ind.asdu_length == sizeof(APSME_BindReq) + 1)
             {
                 auto cmd = APSME_Commands(ind.cluster_id);//this will have a command id
-                //FMT_PRINT("(cmd={:x})APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
-                //        , cmd
-                //        , ind.status
-                //        , ind.src_short_addr , ind.src_endpoint
-                //        , ind.dst_short_addr , ind.dst_endpoint
-                //        , ind.cluster_id
-                //        , ind.asdu_length
-                //        );
                 switch(cmd)
                 {
                     case APSME_Commands::Bind:
@@ -1091,13 +1098,6 @@ namespace zb
                         break;
                 }
             }
-            //FMT_PRINT("APSDE.indication: status={:x}; from:addr={:x}, EP={:x}; to:addr={:x}, EP={:x}; cluster={:x}; len={}\n"
-            //        , ind.status
-            //        , ind.src_short_addr , ind.src_endpoint
-            //        , ind.dst_short_addr , ind.dst_endpoint
-            //        , ind.cluster_id
-            //        , ind.asdu_length
-            //        );
         }
         return false;
     }
@@ -1552,13 +1552,9 @@ namespace zb
 
                         if (!(g_State.m_BindStates & g_State.m_ValidBinds) && g_State.m_LastPresence)//we still have the presence
                         {
-                            FMT_PRINT("No controlled bound devices are on. Resetting presence\n");
+                            FMT_PRINT("No controlled bound devices are on. Permitting triggering\n");
                             //re-arm, so that we can again detect and react
-                            g_State.m_LastPresence = false;
-                            if (auto status = g_OccupancyState.Set(ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED); !status)
-                            {
-                                FMT_PRINT("(Bind logic)Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-                            }
+                            g_State.m_TriggerAllowed = true;
                         }
                     }else
                     {
