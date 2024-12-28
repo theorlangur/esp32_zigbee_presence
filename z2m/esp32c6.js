@@ -600,6 +600,10 @@ const definition = {
                     ID: 0x0003,
                     parameters: [{name: 'on', type: Zcl.DataType.BOOLEAN}],
                 },
+                recheck_binds: {
+                    ID: 0x0004,
+                    parameters: [],
+                },
             },
             commandsResponse: {},
         }),
