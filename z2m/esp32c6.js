@@ -43,13 +43,14 @@ const orlangurOccupactionExtended = {
             e.enum('factory_reset', ea.SET, ['Reset']).withLabel('Factory Reset').withDescription('Perform factory reset on LD2412 module'),
             e.enum('switch_bluetooth_on', ea.SET, ['On']).withLabel('Switch Bluetooth On').withDescription('Turn Bluetooth On'),
             e.enum('switch_bluetooth_off', ea.SET, ['Off']).withLabel('Switch Bluetooth Off').withDescription('Turn Bluetooth Off'),
+            e.enum('recheck_binds', ea.SET, ['Recheck']).withLabel('Re-check Binds').withDescription('Run reporting capability check on existing binds again'),
         ];
 
         const fromZigbee = [];
 
         const toZigbee = [
             {
-                key: ['restart','factory_reset','reset_energy_stat'],
+                key: ['restart','factory_reset','reset_energy_stat', 'recheck_binds'],
                 convertSet: async (entity, key, value, meta) => {
                     await entity.command('customOccupationConfig', key, {}, {});
                     if (key == 'factory_reset')

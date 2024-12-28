@@ -72,6 +72,8 @@ namespace zb
         void Do();
         void Unbind();
         void Failed();
+        void RunCheckIfRequested();
+        bool IsPassive() const;
         State GetState() const { return m_State; }
 
         void OnReport(const esp_zb_zcl_report_attr_message_t *pReport);

@@ -56,6 +56,20 @@ namespace zb
         Do();
     }
 
+    bool BindInfo::IsPassive() const
+    {
+        return m_State == State::NonFunctional || m_State == State::Functional;
+    }
+
+    void BindInfo::RunCheckIfRequested()
+    {
+        if (m_CheckReporting && IsPassive())
+        {
+            TransitTo(State::New);
+            Do();
+        }
+    }
+
     void BindInfo::Do()
     {
         switch(m_State)
