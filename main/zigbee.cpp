@@ -1053,11 +1053,6 @@ namespace zb
         ESP_LOGI(TAG, "Sensor setup done");
     }
 
-    void ias_zone_state_change(uint8_t param)
-    {
-        FMT_PRINT("ias zone status change to {:x}\n", param);
-    }
-
     bool apsde_data_indication_callback(esp_zb_apsde_data_ind_t ind)
     {
         if (ind.dst_short_addr == esp_zb_get_short_address() && ind.status == 0)
@@ -1215,6 +1210,48 @@ namespace zb
         }
         return ESP_OK;
     }
+
+    esp_err_t ias_zone_state_change(const void *_m)
+    {
+        esp_zb_zcl_ias_zone_status_change_notification_message_t *message = (esp_zb_zcl_ias_zone_status_change_notification_message_t *)_m;
+        FMT_PRINT("ias zone status change from {}: to {:x}; extended: {:x}; delay: {:x}; zone id {:x};\n"
+                , message->info.src_address
+                , message->zone_status
+                , message->extended_status
+                , message->delay
+                , message->zone_id
+                );
+
+        bool alarm1 = message->zone_status & 1;
+        if (g_State.m_LastPresenceExternal != alarm1)
+        {
+            FMT_PRINT("Switching external to {} based on ias zone change\n");
+            g_State.m_LastPresenceExternal = alarm1;
+            g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
+
+            if (g_State.m_LastPresenceExternal)
+            {
+                if (auto et = g_Config.GetExternalOnOffTimeout(); et > 0)
+                    g_State.StartExternalTimer(&on_external_on_timer_finished, et * 1000);
+                else
+                    g_State.m_ExternalRunningTimer.Cancel();
+            }else
+                g_State.m_ExternalRunningTimer.Cancel();
+
+            if (update_presence_state())
+            {
+                send_on_off(g_State.m_LastPresence);
+                esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
+                if (auto status = g_OccupancyState.Set(val); !status)
+                {
+                    FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+                }
+            }
+        }
+
+        return ESP_OK;
+    }
+
 
     struct OnWithTimedOffPayload{
         uint8_t on_off_ctrl;
@@ -1754,7 +1791,7 @@ namespace zb
         {
             esp_zb_ias_zone_cluster_cfg_t ias_client_cfg{};
             ias_client_cfg.zone_state = 0;
-            ias_client_cfg.zone_ctx.process_result_cb = ias_zone_state_change;
+            //ias_client_cfg.zone_ctx.process_result_cb = ias_zone_state_change;
             esp_zb_attribute_list_t *ias_zone_cluster = esp_zb_ias_zone_cluster_create(&ias_client_cfg);
             ESP_ERROR_CHECK(esp_zb_cluster_list_add_ias_zone_cluster(cluster_list, ias_zone_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
         }
@@ -1813,6 +1850,7 @@ namespace zb
                     ActionHandler{ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID, generic_node_list_handler<ConfigReportResponseNode>},
                     ActionHandler{ESP_ZB_CORE_CMD_READ_ATTR_RESP_CB_ID, generic_node_list_handler<ReadAttrResponseNode>},
                     ActionHandler{ESP_ZB_CORE_REPORT_ATTR_CB_ID, report_attr_cb<g_ReportHandlingDesc>},
+                    ActionHandler{ESP_ZB_CORE_CMD_IAS_ZONE_ZONE_STATUS_CHANGE_NOT_ID, ias_zone_state_change},
                     ActionHandler{ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID, set_attr_value_cb<g_AttributeHandlingDesc>}
                 >
         );
