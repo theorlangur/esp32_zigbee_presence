@@ -191,6 +191,7 @@ const orlangurOccupactionExtended = {
             e.binary('presence_detection_keep_mm_wave'     , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by mmWave'),
             e.binary('presence_detection_keep_pir_internal', ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by internal PIR'),
             e.binary('presence_detection_keep_external'    , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if presence should be kept by external'),
+            e.binary('illuminance_external'                , ea.ALL, 1, 0).withCategory('config').withDescription('Defines if illuminance should be taken from external bound sensor'),
         ];
 
         const fromZigbee = [
@@ -216,6 +217,9 @@ const orlangurOccupactionExtended = {
                     if (data['presence_detection_keep_external'] !== undefined) 
                         result['presence_detection_keep_external'] = data['presence_detection_keep_external'];
 
+                    if (data['illuminance_external'] !== undefined) 
+                        result['illuminance_external'] = data['illuminance_external'];
+
                     if (Object.keys(result).length == 0) 
                         return;
 
@@ -225,7 +229,7 @@ const orlangurOccupactionExtended = {
         ];
 
         const toZigbee = [{
-            key: ['presence_detection_edge_mm_wave', 'presence_detection_edge_pir_internal', 'presence_detection_edge_external'
+            key: ['illuminance_external', 'presence_detection_edge_mm_wave', 'presence_detection_edge_pir_internal', 'presence_detection_edge_external'
                  ,'presence_detection_keep_mm_wave', 'presence_detection_keep_pir_internal', 'presence_detection_keep_external'],
             convertSet: async (entity, key, value, meta) => {
                 const payload = {[key]: value}
@@ -582,6 +586,7 @@ const definition = {
                 failure_status: {ID:0x001d, type: Zcl.DataType.UINT16},
                 internals: {ID:0x001e, type: Zcl.DataType.UINT32},
                 restarts_count: {ID:0x001f, type: Zcl.DataType.UINT16},
+                illuminance_external: {ID:0x0020, type: Zcl.DataType.BOOLEAN},
             },
             commands: {
                 restart: {
