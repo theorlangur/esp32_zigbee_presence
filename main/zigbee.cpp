@@ -65,6 +65,7 @@ namespace zb
     static constexpr led::Color kColorError2{255, 0, 255};
     static constexpr led::Color kColorSpecial{0, 255, 255};
     static constexpr led::Color kColorWhite{255, 255, 255};
+    static constexpr led::Color kColorBlue{0, 0, 255};
 
     static constexpr uint32_t kBlinkPatternFactoryReset = 0x0F00F00F;
     static constexpr uint32_t kBlinkPatternZStackError = 0x0F00F00F;
@@ -412,7 +413,7 @@ namespace zb
 
             auto prevValidBinds = m_ValidBinds;
             auto prevBindStates = m_BindStates;
-            auto prevReportCaps = m_BindsReportingCapable;
+            [[maybe_unused]]auto prevReportCaps = m_BindsReportingCapable;
             bool updateReportingCapsInConfig = false;
             //update validity of the binds
             for(size_t i = 0, n = m_TrackedBinds.size(); i < n; ++i)
@@ -733,7 +734,9 @@ namespace zb
     {
         bool changed = false;
         auto cfg = g_Config.GetPresenceDetectionMode();
-        if (g_State.m_FirstRun || g_State.m_TriggerAllowed)
+        //FMT_PRINT("Upd Presence state. First: {}, Trigger allowed: {}, last pres: {}\n", g_State.m_FirstRun, g_State.m_TriggerAllowed, g_State.m_LastPresence);
+
+        if (g_State.m_FirstRun || g_State.m_TriggerAllowed || !g_State.m_LastPresence)
         {
             //edge detection
             bool trigger = 
@@ -1643,6 +1646,14 @@ namespace zb
             ESP_LOGW(TAG, "Got leave signal");
             esp_zb_factory_reset();
             esp_restart();
+            break;
+        case ESP_ZB_ZDO_DEVICE_UNAVAILABLE:
+            if (++failed_counter > 4)
+            {
+                failed_counter = 0;
+                esp_restart();
+            }
+            led::blink_pattern(kBlinkPatternZStackError, kColorBlue, duration_ms_t(1000));
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {
