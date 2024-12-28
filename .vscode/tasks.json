@@ -4,6 +4,24 @@
         {
             "label": "Build Debug",
             "type": "shell",
+            "command": "cp -f --update=all sdkconfig.dbg sdkconfig && cmake --build build",
+            "group": {
+                "isDefault": true,
+                "kind": "build"
+            }
+        },
+        {
+            "label": "Build Release",
+            "type": "shell",
+            "command": "cp -f --update=all sdkconfig.rel sdkconfig && cmake --build build",
+            "group": {
+                "isDefault": true,
+                "kind": "build"
+            }
+        },
+        {
+            "label": "Build Last",
+            "type": "shell",
             "command": "cmake --build build",
             "group": {
                 "isDefault": true,
