@@ -13,12 +13,14 @@ namespace zb
 
         struct PresenceDetectionMode
         {
-            uint8_t m_Edge_mmWave      : 1 = 1;
-            uint8_t m_Edge_PIRInternal : 1 = 1;
-            uint8_t m_Edge_External    : 1 = 1;
-            uint8_t m_Keep_mmWave      : 1 = 1;
-            uint8_t m_Keep_PIRInternal : 1 = 1;
-            uint8_t m_Keep_External    : 1 = 1;
+            uint8_t m_Edge_mmWave          : 1 = 1;
+            uint8_t m_Edge_PIRInternal     : 1 = 1;
+            uint8_t m_Edge_External        : 1 = 1;
+            uint8_t m_Keep_mmWave          : 1 = 1;
+            uint8_t m_Keep_PIRInternal     : 1 = 1;
+            uint8_t m_Keep_External        : 1 = 1;
+            uint8_t m_Illuminance_External : 1 = 0;
+            uint8_t m_Unused               : 1 = 0;
         };
     private:
         uint32_t m_Version = kActualStreamingVersion;
@@ -37,6 +39,7 @@ namespace zb
         auto GetPresenceDetectionMode() const { return m_PresenceDetectionMode; }
         auto GetLD2412Mode() const { return m_LD2412Mode; }
         auto GetIlluminanceThreshold() const { return m_IlluminanceThreshold; }
+        bool GetIlluminanceExternal() const { return m_PresenceDetectionMode.m_Illuminance_External; }
         auto GetExternalOnOffTimeout() const { return m_ExternalOnOffTimeout; }
         auto GetRestarts() const { return m_Restarts; }
         auto GetBindReporting() const { return m_BindReporting; }
@@ -47,6 +50,7 @@ namespace zb
         void SetPresenceDetectionMode(PresenceDetectionMode v);
         void SetLD2412Mode(LD2412::SystemMode v);
         void SetIlluminanceThreshold(uint8_t v);
+        void SetIlluminanceExternal(bool v);
         void SetExternalOnOffTimeout(uint16_t v);
         void SetBindReporting(TriState8Array v);
 

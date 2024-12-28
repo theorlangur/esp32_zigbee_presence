@@ -144,6 +144,12 @@ namespace zb
         on_change();
     }
 
+    void LocalConfig::SetIlluminanceExternal(bool v)
+    {
+        m_PresenceDetectionMode.m_Illuminance_External = v;
+        on_change();
+    }
+
     void LocalConfig::SetBindReporting(TriState8Array v)
     {
         m_BindReporting = v;

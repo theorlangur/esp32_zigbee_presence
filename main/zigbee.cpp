@@ -113,6 +113,7 @@ namespace zb
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 29;
     static constexpr const uint16_t ATTRIB_INTERNALS = 30;
     static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 31;
+    static constexpr const uint16_t ATTRIB_ILLUMINANCE_EXTERNAL = 32;
 
     /**********************************************************************/
     /* Commands IDs                                                       */
@@ -176,6 +177,7 @@ namespace zb
     using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
+    using ZclAttributeIlluminanceExternal_t                   = LD2412CustomCluster_t::Attribute<ATTRIB_ILLUMINANCE_EXTERNAL, bool>;
 
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
@@ -222,6 +224,7 @@ namespace zb
     static ZclAttributeFailureStatus_t                         g_FailureStatus;
     static ZclAttributeInternals_t                             g_Internals;
     static ZclAttributeRestartsCount_t                         g_RestartsCount;
+    static ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
 
 
     /**********************************************************************/
@@ -364,9 +367,18 @@ namespace zb
         bool m_InitialBindsChecking = true;
         bool m_NeedBindsChecking = true;
 
+        uint8_t m_ExternalIlluminance = 0;
+
         bool CanSendCommandsToBind() const
         {
             return m_Internals.m_BoundDevices || m_InitialBindsChecking;
+        }
+
+        uint8_t GetIlluminance() const
+        {
+            if (g_Config.GetIlluminanceExternal())
+                return m_ExternalIlluminance;
+            return g_ld2412.GetMeasuredLight();
         }
 
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)
@@ -792,7 +804,7 @@ namespace zb
         {
             //only if threshold is set to something below kMaxIlluminance we might have a change in the logic
             //otherwise - no effect
-            if ((g_Config.GetIlluminanceThreshold() < LocalConfig::kMaxIlluminance) && (g_ld2412.GetMeasuredLight() > g_Config.GetIlluminanceThreshold()))
+            if ((g_Config.GetIlluminanceThreshold() < LocalConfig::kMaxIlluminance) && (g_State.GetIlluminance() > g_Config.GetIlluminanceThreshold()))
                 g_State.m_SuppressedByIllulminance = true;
             else
                 g_State.m_SuppressedByIllulminance = false;
@@ -879,7 +891,7 @@ namespace zb
         //FMT_PRINT("Measurements update: move {};\n", moveBuf.sv());
         {
             APILock l;
-            if (auto status = g_LD2412EngineeringLight.Set(g_ld2412.GetMeasuredLight()); !status)
+            if (auto status = g_LD2412EngineeringLight.Set(g_State.GetIlluminance()); !status)
             {
                 FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
             }
@@ -1042,6 +1054,10 @@ namespace zb
             if (auto status = g_PresenceKeepDetectionExternal.Set(presenceDetectionMode.m_Keep_External); !status)
             {
                 FMT_PRINT("Failed to set initial detection mode keep external {:x}\n", (int)status.error());
+            }
+            if (auto status = g_IlluminanceExternal.Set(presenceDetectionMode.m_Illuminance_External); !status)
+            {
+                FMT_PRINT("Failed to set initial illuminance external {:x}\n", (int)status.error());
             }
         }
 
@@ -1537,6 +1553,25 @@ namespace zb
                 update_external_presence(*pOcc == esp_zb_zcl_occupancy_sensing_occupancy_t::ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED);
                 return ESP_OK;
             }),
+        ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT, ESP_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID,
+            [](const esp_zb_zcl_report_attr_message_t *pReport)->esp_err_t
+            {
+                //external occupancy report. treating as external presence
+                uint16_t *pVal = (uint16_t *)pReport->attribute.data.value;
+                FMT_PRINT("Got external illuminance report: from {}; value={}\n", pReport->src_address, *pVal);
+                if (g_Config.GetIlluminanceExternal())
+                {
+                    g_State.m_ExternalIlluminance = (*pVal) >> 8;
+                    if (auto status = g_LD2412EngineeringLight.Set(g_State.m_ExternalIlluminance); !status)
+                    {
+                        FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
+                    }
+                }else
+                {
+                    FMT_PRINT("Not configured to use external illuminance. Ignored\n");
+                }
+                return ESP_OK;
+            }),
         ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
             [](const esp_zb_zcl_report_attr_message_t *pReport)->esp_err_t
             {
@@ -1745,6 +1780,8 @@ namespace zb
         ESP_ERROR_CHECK(g_FailureStatus.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_Internals.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report, g_Config.GetRestarts()));
+        ESP_ERROR_CHECK(g_IlluminanceExternal.AddToCluster(custom_cluster, Access::RW, (bool)g_Config.GetIlluminanceExternal()));
+
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     }
@@ -1824,12 +1861,24 @@ namespace zb
             ESP_ERROR_CHECK(esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
         }
 
+        /**********************************************************************/
+        /* IAS Zone client cluster                                            */
+        /**********************************************************************/
         {
             esp_zb_ias_zone_cluster_cfg_t ias_client_cfg{};
             ias_client_cfg.zone_state = 0;
             //ias_client_cfg.zone_ctx.process_result_cb = ias_zone_state_change;
             esp_zb_attribute_list_t *ias_zone_cluster = esp_zb_ias_zone_cluster_create(&ias_client_cfg);
             ESP_ERROR_CHECK(esp_zb_cluster_list_add_ias_zone_cluster(cluster_list, ias_zone_cluster, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+        }
+
+        /**********************************************************************/
+        /* Illuminance measurement cluster                                    */
+        /**********************************************************************/
+        {
+            esp_zb_illuminance_meas_cluster_cfg_t illum_meas_cluster{};
+            esp_zb_attribute_list_t *illum_meas_attrs = esp_zb_illuminance_meas_cluster_create(&illum_meas_cluster);
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_illuminance_meas_cluster(cluster_list, illum_meas_attrs, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
         }
 
         /**********************************************************************/
