@@ -29,7 +29,10 @@ struct LinkedList
             if (m_pThis)
             {
                 m_pThis = m_pNext;
-                m_pNext = static_cast<N*>(m_pThis->m_pNext);
+                if (m_pThis)
+                    m_pNext = static_cast<N*>(m_pThis->m_pNext);
+                else
+                    m_pNext = nullptr;
             }
         }
         bool operator!=(Iterator const& rhs) const { return m_pThis != rhs.m_pThis; }
