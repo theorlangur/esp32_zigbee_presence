@@ -1219,22 +1219,12 @@ namespace zb
         return ESP_OK;
     }
 
-    esp_err_t ias_zone_state_change(const void *_m)
+    void update_external_presence(bool _new)
     {
-        esp_zb_zcl_ias_zone_status_change_notification_message_t *message = (esp_zb_zcl_ias_zone_status_change_notification_message_t *)_m;
-        FMT_PRINT("ias zone status change from {}: to {:x}; extended: {:x}; delay: {:x}; zone id {:x};\n"
-                , message->info.src_address
-                , message->zone_status
-                , message->extended_status
-                , message->delay
-                , message->zone_id
-                );
-
-        bool alarm1 = message->zone_status & 1;
-        if (g_State.m_LastPresenceExternal != alarm1)
+        if (g_State.m_LastPresenceExternal != _new)
         {
-            FMT_PRINT("Switching external to {} based on ias zone change\n");
-            g_State.m_LastPresenceExternal = alarm1;
+            FMT_PRINT("Switching external to {}\n", _new);
+            g_State.m_LastPresenceExternal = _new;
             g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
 
             if (g_State.m_LastPresenceExternal)
@@ -1256,7 +1246,20 @@ namespace zb
                 }
             }
         }
+    }
 
+    esp_err_t ias_zone_state_change(const void *_m)
+    {
+        esp_zb_zcl_ias_zone_status_change_notification_message_t *message = (esp_zb_zcl_ias_zone_status_change_notification_message_t *)_m;
+        FMT_PRINT("ias zone status change from {}: to {:x}; extended: {:x}; delay: {:x}; zone id {:x};\n"
+                , message->info.src_address
+                , message->zone_status
+                , message->extended_status
+                , message->delay
+                , message->zone_id
+                );
+
+        update_external_presence(message->zone_status & 1);
         return ESP_OK;
     }
 
@@ -1525,6 +1528,15 @@ namespace zb
     /* ReportAttributeHandler's                                           */
     /**********************************************************************/
     static const ReportAttributeHandler g_ReportHandlers[] = {
+        ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_OCCUPANCY_ID,
+            [](const esp_zb_zcl_report_attr_message_t *pReport)->esp_err_t
+            {
+                //external occupancy report. treating as external presence
+                esp_zb_zcl_occupancy_sensing_occupancy_t *pOcc = (esp_zb_zcl_occupancy_sensing_occupancy_t *)pReport->attribute.data.value;
+                FMT_PRINT("Got external occupancy report: from {}; State={}\n", pReport->src_address, *pOcc);
+                update_external_presence(*pOcc == esp_zb_zcl_occupancy_sensing_occupancy_t::ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED);
+                return ESP_OK;
+            }),
         ReportAttributeHandler(kAnyEP, ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
             [](const esp_zb_zcl_report_attr_message_t *pReport)->esp_err_t
             {
@@ -1763,19 +1775,31 @@ namespace zb
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_identify_cluster(cluster_list, esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY), ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
 
         /**********************************************************************/
-        /* Occupancy cluster config                                           */
+        /* Occupancy cluster config (server)                                  */
         /**********************************************************************/
-        esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
+        {
+            esp_zb_occupancy_sensing_cluster_cfg_s presence_cfg =                                                                            
             {                                                                                       
                 /*uint8_t*/  .occupancy = 0,                                                               /*!<  Bit 0 specifies the sensed occupancy as follows: 1 = occupied, 0 = unoccupied. */
                 /*uint32_t*/ .sensor_type = ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC, /*!<  The attribute specifies the type of the occupancy sensor */
                 /*uint8_t*/  .sensor_type_bitmap = uint8_t(1) << ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_SENSOR_TYPE_ULTRASONIC /*!<  The attribute specifies the types of the occupancy sensor */
             };                                                                                      
-        esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
-        uint16_t delay = 10;
-        ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
-        ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+            esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&presence_cfg);
+            uint16_t delay = 10;
+            ESP_ERROR_CHECK(esp_zb_occupancy_sensing_cluster_add_attr(pOccupancyAttributes, ESP_ZB_ZCL_ATTR_OCCUPANCY_SENSING_ULTRASONIC_OCCUPIED_TO_UNOCCUPIED_DELAY_ID, &delay));
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+        }
 
+
+        /**********************************************************************/
+        /* Client occupancy cluster                                           */
+        /**********************************************************************/
+        {
+            esp_zb_occupancy_sensing_cluster_cfg_s client_occ_cfg{};
+            client_occ_cfg.occupancy=0;                                                                            
+            esp_zb_attribute_list_t *pOccupancyAttributes = esp_zb_occupancy_sensing_cluster_create(&client_occ_cfg);
+            ESP_ERROR_CHECK(esp_zb_cluster_list_add_occupancy_sensing_cluster(cluster_list, pOccupancyAttributes, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
+        }
 
         /**********************************************************************/
         /* Custom cluster                                                     */
