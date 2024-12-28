@@ -6,7 +6,6 @@
 
 namespace zb
 {
-    bool is_coordinator(esp_zb_zcl_addr_t &addr);
 
     template<uint16_t ClusterId, int CmdId, int Retries>
     struct CmdWithRetries: NonMovable, NonCopyable
@@ -110,7 +109,7 @@ namespace zb
         static void OnCmdResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *pInfo, void *user_ctx)
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
-            if (is_coordinator(pInfo->src_address))
+            if (IsCoordinator(pInfo->src_address))
             {
                 FMT_PRINT("Response from coordinator on Cmd {:x}; status: {:x}\n", pCmd->m_ResponseNode.cmd_id, (int)status_code);
                 return;
@@ -159,7 +158,7 @@ namespace zb
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
             auto status_code = pSendStatus->status;
-            if (is_coordinator(pSendStatus->dst_addr))
+            if (IsCoordinator(pSendStatus->dst_addr))
             {
                 FMT_PRINT("Response from coordinator on Cmd {:x}; status: {:x}\n", pCmd->m_ResponseNode.cmd_id, (int)status_code);
                 return;//skipping coordinator

@@ -28,4 +28,6 @@ idf_component_register(SRCS
                     zb_helpers/zbh_cmd_sender.cpp
                     zb_helpers/zbh_handlers_cmd.hpp
                     zb_helpers/zbh_handlers_cmd.cpp
+                    zb_helpers/zbh_types.hpp
+                    zb_helpers/zbh_types.cpp
                     INCLUDE_DIRS "")
