@@ -1,8 +1,8 @@
-#include "zigbee.hpp"
 #include "zb_binds.hpp"
-#include "zb_helpers/zbh_types.hpp"
-#include "zb_helpers/zbh_handlers_cmd.hpp"
-#include "zb_helpers/zbh_bind_table.hpp"
+#include "zb_dev_def_const.hpp"
+#include "../zb_helpers/zbh_types.hpp"
+#include "../zb_helpers/zbh_handlers_cmd.hpp"
+#include "../zb_helpers/zbh_bind_table.hpp"
 
 
 template<>

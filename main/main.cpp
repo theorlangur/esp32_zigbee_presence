@@ -14,7 +14,7 @@
 #include "esp_system.h"
 #include "driver/gpio.h"
 
-#include "zigbee.hpp"
+#include "zb/zb_main.hpp"
 
 extern "C" void app_main(void)
 {

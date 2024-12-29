@@ -3,14 +3,12 @@ idf_component_register(SRCS
                     uart.cpp 
                     ld2412.cpp 
                     ld2412_component.cpp
-                    zigbee.cpp
                     device_common.hpp
                     device_config.hpp
                     device_config.cpp
                     board_led.hpp
                     board_led.cpp
-                    zb_binds.hpp
-                    zb_binds.cpp
+                    #Library stuff
                     lib/function.hpp
                     lib/array_count.hpp
                     lib/expected_results.hpp
@@ -22,6 +20,7 @@ idf_component_register(SRCS
                     lib/type_traits.hpp
                     lib/linked_list.hpp
                     lib/linked_list.cpp
+                    #ZigBee helpers
                     zb_helpers/zbh_bind_table.hpp
                     zb_helpers/zbh_bind_table.cpp
                     zb_helpers/zbh_cmd_sender.hpp
@@ -30,4 +29,21 @@ idf_component_register(SRCS
                     zb_helpers/zbh_handlers_cmd.cpp
                     zb_helpers/zbh_types.hpp
                     zb_helpers/zbh_types.cpp
+                    #ZigBee main logic
+                    zb/zb_main.cpp
+                    zb/zb_main.hpp
+                    zb/zb_binds.hpp
+                    zb/zb_binds.cpp
+                    zb/zb_dev_def_const.hpp
+                    zb/zb_dev_def.hpp
+                    zb/zb_dev_def.cpp
+                    zb/zb_dev_def_attr.hpp
+                    zb/zb_dev_def_attr.cpp
+                    zb/zb_dev_def_cmd.hpp
+                    zb/zb_dev_def_cmd.cpp
+                    zb/zb_dev_def_report.cpp
+                    zb/zb_external_trigger.cpp
+                    zb/zb_presence_logic.cpp
+                    zb/zb_reset_button.cpp
+                    zb/zb_runtime_state.cpp
                     INCLUDE_DIRS "")

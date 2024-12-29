@@ -4,12 +4,12 @@
 #include <cstddef>
 #include <cstring>
 #include "esp_zigbee_core.h"
-#include "lib/misc_helpers.hpp"
-#include "lib/object_pool.hpp"
-#include "lib/array_count.hpp"
-#include "zb_helpers/zbh_alarm.hpp"
-#include "zb_helpers/zbh_cmd_sender.hpp"
-#include "zigbee.hpp"
+#include "../lib/misc_helpers.hpp"
+#include "../lib/object_pool.hpp"
+#include "../lib/array_count.hpp"
+#include "../zb_helpers/zbh_alarm.hpp"
+#include "../zb_helpers/zbh_cmd_sender.hpp"
+#include "zb_main.hpp"
 
 namespace zb
 {
