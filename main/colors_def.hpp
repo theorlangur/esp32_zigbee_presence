@@ -1,7 +1,7 @@
 #ifndef COLORS_DEF_HPP_
 #define COLORS_DEF_HPP_
 
-#include "board_led.hpp"
+#include "periph/board_led.hpp"
 
 namespace colors
 {

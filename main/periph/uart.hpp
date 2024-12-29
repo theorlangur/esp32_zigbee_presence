@@ -3,12 +3,12 @@
 
 #include "driver/uart.h"
 #include <expected>
-#include "lib/function.hpp"
-#include "lib/misc_helpers.hpp"
-#include "lib/thread.hpp"
-#include "lib/thread_lock.hpp"
-#include "lib/expected_results.hpp"
-#include "lib/type_traits.hpp"
+#include "../lib/function.hpp"
+#include "../lib/misc_helpers.hpp"
+#include "../lib/thread.hpp"
+#include "../lib/thread_lock.hpp"
+#include "../lib/expected_results.hpp"
+#include "../lib/type_traits.hpp"
 
 namespace uart
 {

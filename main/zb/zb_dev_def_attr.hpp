@@ -3,7 +3,7 @@
 
 #include "zb_dev_def_const.hpp"
 #include "../device_common.hpp"
-#include "../ld2412_component.hpp"
+#include "../periph/ld2412_component.hpp"
 
 namespace zb
 {

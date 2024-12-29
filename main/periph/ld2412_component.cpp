@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include "ld2412_component.hpp"
 #include "driver/gpio.h"
-#include "lib/thread.hpp"
+#include "../lib/thread.hpp"
 #include <format>
 
 namespace ld2412

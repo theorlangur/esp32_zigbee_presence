@@ -1,5 +1,4 @@
 #include "zb_dev_def.hpp"
-#include "../board_led.hpp"
 #include "../colors_def.hpp"
 
 namespace zb

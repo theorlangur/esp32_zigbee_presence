@@ -1,13 +1,8 @@
 idf_component_register(SRCS 
                     main.cpp 
-                    uart.cpp 
-                    ld2412.cpp 
-                    ld2412_component.cpp
                     device_common.hpp
                     device_config.hpp
                     device_config.cpp
-                    board_led.hpp
-                    board_led.cpp
                     #Library stuff
                     lib/function.hpp
                     lib/array_count.hpp
@@ -46,4 +41,13 @@ idf_component_register(SRCS
                     zb/zb_presence_logic.cpp
                     zb/zb_reset_button.cpp
                     zb/zb_runtime_state.cpp
+                    #Periphery
+                    periph/board_led.hpp
+                    periph/board_led.cpp
+                    periph/uart.cpp 
+                    periph/uart.hpp 
+                    periph/ld2412.cpp 
+                    periph/ld2412.hpp 
+                    periph/ld2412_component.cpp
+                    periph/ld2412_component.hpp
                     INCLUDE_DIRS "")

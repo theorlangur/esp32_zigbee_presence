@@ -1,6 +1,6 @@
 #include <cstring>
 #include "ld2412.hpp"
-#include "lib/misc_helpers.hpp"
+#include "../lib/misc_helpers.hpp"
 
 #define DBG_UART Channel::DbgNow _dbg_uart{this}; 
 #define DBG_ME DbgNow _dbg_me{this}; 
