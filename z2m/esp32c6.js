@@ -308,9 +308,9 @@ const orlangurOccupactionExtended = {
             //    .withFeature(e.numeric('cmd_retry_failures', ea.STATE))
             //    .withFeature(e.numeric('cmd_total_failures', ea.STATE))
             //    .withFeature(e.text('configured_reports_for_binds', ea.STATE))
-            e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic'),
-            e.numeric('cmd_retry_failures', ea.STATE_GET).withCategory('diagnostic'),
-            e.numeric('cmd_total_failures', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
+            e.numeric('cmd_retry_failures', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
+            e.numeric('cmd_total_failures', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
             e.text('configured_reports_for_binds', ea.STATE_GET).withCategory('diagnostic')
         ];
 
