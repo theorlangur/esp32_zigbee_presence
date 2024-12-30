@@ -13,7 +13,7 @@ namespace zb
 
         struct PresenceDetectionMode
         {
-            uint8_t m_Edge_mmWave          : 1 = 1;
+            uint8_t m_Edge_mmWave          : 1 = 0;
             uint8_t m_Edge_PIRInternal     : 1 = 1;
             uint8_t m_Edge_External        : 1 = 1;
             uint8_t m_Keep_mmWave          : 1 = 1;
@@ -24,12 +24,12 @@ namespace zb
         };
     private:
         uint32_t m_Version = kActualStreamingVersion;
-        uint16_t m_OnOffTimeout = 10;//seconds
+        uint16_t m_OnOffTimeout = 7;//seconds
         OnOffMode m_OnOffMode = OnOffMode::TimedOnLocal;
         PresenceDetectionMode m_PresenceDetectionMode;
         LD2412::SystemMode m_LD2412Mode = LD2412::SystemMode::Energy;
         uint8_t m_IlluminanceThreshold = kMaxIlluminance; //Illuminance<=Threashold -> active, sending on/off commands
-        uint16_t m_ExternalOnOffTimeout = 1;
+        uint16_t m_ExternalOnOffTimeout = 3;
         uint16_t m_Restarts = 0;
         TriState8Array m_BindReporting;
     public:
