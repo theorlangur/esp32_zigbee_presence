@@ -6,6 +6,7 @@ namespace zb
 
     static void update_external_attributes()
     {
+        //FMT_PRINT("update_external_attributes. ext to {}\n", (int)g_State.m_LastPresenceExternal);
         g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         if (auto status = g_OccupancyState.Set(val); !status)
@@ -19,17 +20,21 @@ namespace zb
     /**********************************************************************/
     void on_external_on_timer_finished(void* param)
     {
-        FMT_PRINT("External timer finished\n");
+        //FMT_PRINT("External timer finished\n");
         g_State.m_LastPresenceExternal = false;
         //g_ExternalOnOff.Report(g_DestCoordinator);
         if (update_presence_state())
         {
             if (send_on_off(g_State.m_LastPresence))
+            {
+                //FMT_PRINT("ext timeout: delaying update_external_attributes\n");
                 g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
+            }
             else
                 update_external_attributes();
         }else
         {
+            //FMT_PRINT("on ext timeout no presence change. ext to {}\n", (int)g_State.m_LastPresenceExternal);
             if (auto status = g_ExternalOnOff.Set(g_State.m_LastPresenceExternal); !status)
             {
                 FMT_PRINT("Failed to set on/off state attribute with error {:x}\n", (int)status.error());
