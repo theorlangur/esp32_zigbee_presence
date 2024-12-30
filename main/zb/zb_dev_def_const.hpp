@@ -3,6 +3,8 @@
 
 #include "../zb_helpers/zbh_helpers.hpp"
 
+//#define ENABLE_ENGINEERING_ATTRIBUTES
+
 namespace zb
 {
     constexpr uint8_t PRESENCE_EP = 1;

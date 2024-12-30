@@ -20,22 +20,26 @@ namespace zb
     /**********************************************************************/
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_SENSITIVITY = 0;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_SENSITIVITY = 1;
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_ENERGY = 2;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_ENERGY = 3;
     static constexpr const uint16_t LD2412_ATTRIB_MOVE_DISTANCE = 4;
     static constexpr const uint16_t LD2412_ATTRIB_STILL_DISTANCE = 5;
+#endif
     static constexpr const uint16_t LD2412_ATTRIB_STATE = 6;
     static constexpr const uint16_t LD2412_ATTRIB_MIN_DISTANCE = 7;
     static constexpr const uint16_t LD2412_ATTRIB_MAX_DISTANCE = 8;
     static constexpr const uint16_t LD2412_ATTRIB_EX_STATE = 9;
     static constexpr const uint16_t LD2412_ATTRIB_MODE = 10;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_LIGHT = 11;
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE = 12;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL = 13;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN = 14;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN = 15;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX = 16;
     static constexpr const uint16_t LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX = 17;
+#endif
     static constexpr const uint16_t LD2412_ATTRIB_PIR_PRESENCE = 18;
     static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
@@ -76,22 +80,12 @@ namespace zb
     /**********************************************************************/
     using ZclAttributeLD2412MoveSensetivity_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_SENSITIVITY, SensitivityBufType>;
     using ZclAttributeLD2412StillSensetivity_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_SENSITIVITY, SensitivityBufType>;
-    using ZclAttributeStillDistance_t                         = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
-    using ZclAttributeMoveDistance_t                          = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_DISTANCE, uint16_t>;
-    using ZclAttributeMoveEnergy_t                            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_ENERGY, uint8_t>;
-    using ZclAttributeStillEnergy_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_ENERGY, uint8_t>;
     using ZclAttributeState_t                                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STATE , LD2412State>;
     using ZclAttributeExState_t                               = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_EX_STATE, ld2412::Component::ExtendedState>;
     using ZclAttributeMaxDistance_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MAX_DISTANCE, uint16_t>;
     using ZclAttributeMinDistance_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MIN_DISTANCE, uint16_t>;
     using ZclAttributeMode_t                                  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MODE, LD2412::SystemMode>;
     using ZclAttributeEngineeringLight_t                      = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_LIGHT, uint8_t>;
-    using ZclAttributeEngineeringEnergyStill_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMove_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyStillMin_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMoveMin_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyStillMax_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
-    using ZclAttributeEngineeringEnergyMoveMax_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
     using ZclAttributePIRPresence_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
     using ZclAttributeOnOffCommandMode_t                      = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
     using ZclAttributeOnOffCommandTimeout_t                   = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
@@ -109,6 +103,18 @@ namespace zb
     using ZclAttributeIlluminanceExternal_t                   = LD2412CustomCluster_t::Attribute<ATTRIB_ILLUMINANCE_EXTERNAL, bool>;
     using ZclAttributeInternals2_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS2, uint32_t>;
 
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
+    using ZclAttributeStillDistance_t                         = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
+    using ZclAttributeMoveDistance_t                          = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_DISTANCE, uint16_t>;
+    using ZclAttributeMoveEnergy_t                            = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MOVE_ENERGY, uint8_t>;
+    using ZclAttributeStillEnergy_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_ENERGY, uint8_t>;
+    using ZclAttributeEngineeringEnergyStill_t                = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMove_t                 = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyStillMin_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MIN, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMoveMin_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MIN, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyStillMax_t             = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_STILL_MAX, EnergyBufType>;
+    using ZclAttributeEngineeringEnergyMoveMax_t              = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_ENERGY_MOVE_MAX, EnergyBufType>;
+#endif
 
     /**********************************************************************/
     /* Inline static definitions                                          */
@@ -128,22 +134,12 @@ namespace zb
     /**********************************************************************/
     extern ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity;
     extern ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity;
-    extern ZclAttributeStillDistance_t                         g_LD2412StillDistance;
-    extern ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
-    extern ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
-    extern ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
     extern ZclAttributeState_t                                 g_LD2412State;
     extern ZclAttributeExState_t                               g_LD2412ExState;
     extern ZclAttributeMaxDistance_t                           g_LD2412MaxDistance;
     extern ZclAttributeMinDistance_t                           g_LD2412MinDistance;
     extern ZclAttributeMode_t                                  g_LD2412Mode;
     extern ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
-    extern ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
-    extern ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
-    extern ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
-    extern ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
-    extern ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
-    extern ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
     extern ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
     extern ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     extern ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
@@ -160,5 +156,18 @@ namespace zb
     extern ZclAttributeRestartsCount_t                         g_RestartsCount;
     extern ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
     extern ZclAttributeInternals2_t                            g_Internals2;
+
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
+    extern ZclAttributeStillDistance_t                         g_LD2412StillDistance;
+    extern ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
+    extern ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
+    extern ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
+    extern ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
+    extern ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
+    extern ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
+    extern ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
+    extern ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
+    extern ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
+#endif
 }
 #endif

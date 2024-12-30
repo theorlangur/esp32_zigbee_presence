@@ -783,24 +783,24 @@ const definition = {
             entityCategory: 'diagnostics',
         }),
         orlangurOccupactionExtended.presenceModeDetectionConfig(),
-        orlangurOccupactionExtended.presenceInfo('move'),
-        orlangurOccupactionExtended.presenceInfo('still'),
         orlangurOccupactionExtended.distanceConfig(),
         orlangurOccupactionExtended.sensitivity('move', 'Move Sensitivity'),
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
-        orlangurOccupactionExtended.reset_energy_stat(),
-        orlangurOccupactionExtended.measure('still', 'last', 'Last measured still energy per gate'),
-        orlangurOccupactionExtended.measure('still', 'min', 'Min measured still energy per gate'),
-        orlangurOccupactionExtended.measure('still', 'max', 'Max measured still energy per gate'),
-        orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
-        orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
-        orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
+        //orlangurOccupactionExtended.presenceInfo('move'),
+        //orlangurOccupactionExtended.presenceInfo('still'),
+        //orlangurOccupactionExtended.reset_energy_stat(),
+        //orlangurOccupactionExtended.measure('still', 'last', 'Last measured still energy per gate'),
+        //orlangurOccupactionExtended.measure('still', 'min', 'Min measured still energy per gate'),
+        //orlangurOccupactionExtended.measure('still', 'max', 'Max measured still energy per gate'),
+        //orlangurOccupactionExtended.measure('move', 'last', 'Last measured move energy per gate'),
+        //orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
+        //orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
         orlangurOccupactionExtended.internals(),
         orlangurOccupactionExtended.internals2(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
-        await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig']);
+        await reporting.bind(endpoint, coordinatorEndpoint, ['msOccupancySensing', 'customOccupationConfig', 'genOnOff']);
         await endpoint.read('customOccupationConfig', ['presence_mode','pir_presence']);
         await endpoint.read('msOccupancySensing', ['occupancy']);
         await endpoint.read('msOccupancySensing', ['occupancy','ultrasonicOToUDelay']);

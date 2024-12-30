@@ -15,22 +15,12 @@ namespace zb
     /**********************************************************************/
     ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity;
     ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity;
-    ZclAttributeStillDistance_t                         g_LD2412StillDistance;
-    ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
-    ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
-    ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
     ZclAttributeState_t                                 g_LD2412State;
     ZclAttributeExState_t                               g_LD2412ExState;
     ZclAttributeMaxDistance_t                           g_LD2412MaxDistance;
     ZclAttributeMinDistance_t                           g_LD2412MinDistance;
     ZclAttributeMode_t                                  g_LD2412Mode;
     ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
-    ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
-    ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
-    ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
-    ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
-    ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
-    ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
     ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
     ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
@@ -47,6 +37,19 @@ namespace zb
     ZclAttributeRestartsCount_t                         g_RestartsCount;
     ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
     ZclAttributeInternals2_t                            g_Internals2;
+
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
+    ZclAttributeStillDistance_t                         g_LD2412StillDistance;
+    ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
+    ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
+    ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
+    ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
+    ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
+    ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
+    ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
+    ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
+    ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
+#endif
 
     static ZbAlarmExt16 g_DelayedAttrUpdate;
     static void update_presence_attr_only()

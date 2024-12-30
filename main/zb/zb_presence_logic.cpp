@@ -178,22 +178,7 @@ namespace zb
             {
                 FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
             }
-            //if (auto status = g_LD2412MoveDistance.Set(p.m_MoveDistance); !status)
-            //{
-            //    FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
-            //{
-            //    FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412MoveEnergy.Set(p.m_MoveEnergy); !status)
-            //{
-            //    FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412StillEnergy.Set(p.m_StillEnergy); !status)
-            //{
-            //    FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
-            //}
+
             if (auto status = g_LD2412State.Set(LD2412State(g_State.m_LastLD2412State)); !status)
             {
                 FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
@@ -207,6 +192,24 @@ namespace zb
                 FMT_PRINT("Failed to set PIR presence attribute with error {:x}\n", (int)status.error());
             }
 
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
+            if (auto status = g_LD2412MoveDistance.Set(p.m_MoveDistance); !status)
+            {
+                FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412StillDistance.Set(p.m_StillDistance); !status)
+            {
+                FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412MoveEnergy.Set(p.m_MoveEnergy); !status)
+            {
+                FMT_PRINT("Failed to set move dist attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412StillEnergy.Set(p.m_StillEnergy); !status)
+            {
+                FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
+            }
+#endif
         }
     }
 
@@ -238,56 +241,52 @@ namespace zb
 
     static void on_measurements_callback()
     {
-        return;
-        //EnergyBufType moveBuf, stillBuf;
-        //EnergyBufType moveMinBuf, stillMinBuf;
-        //EnergyBufType moveMaxBuf, stillMaxBuf;
-        //for(uint8_t i = 0; auto const& m : g_ld2412.GetMeasurements())
-        //{
-        //    moveBuf.data[i] = m.move.last;
-        //    stillBuf.data[i] = m.still.last;
-        //    moveMinBuf.data[i] = m.move.min;
-        //    stillMinBuf.data[i] = m.still.min;
-        //    moveMaxBuf.data[i] = m.move.max;
-        //    stillMaxBuf.data[i] = m.still.max;
-        //    ++i;
-        //}
+#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
+        EnergyBufType moveBuf, stillBuf;
+        EnergyBufType moveMinBuf, stillMinBuf;
+        EnergyBufType moveMaxBuf, stillMaxBuf;
+        for(uint8_t i = 0; auto const& m : g_ld2412.GetMeasurements())
+        {
+            moveBuf.data[i] = m.move.last;
+            stillBuf.data[i] = m.still.last;
+            moveMinBuf.data[i] = m.move.min;
+            stillMinBuf.data[i] = m.still.min;
+            moveMaxBuf.data[i] = m.move.max;
+            stillMaxBuf.data[i] = m.still.max;
+            ++i;
+        }
 
         //FMT_PRINT("Measurements update: stillMax {};\n", stillMaxBuf.sv());
         //FMT_PRINT("Measurements update: stillMin {};\n", stillMinBuf.sv());
         //FMT_PRINT("Measurements update: move {};\n", moveBuf.sv());
         {
-            //APILock l;
-            //if (auto status = g_LD2412EngineeringLight.Set(g_State.GetIlluminance()); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
-            //}
-
-            //if (auto status = g_LD2412EngineeringEnergyMove.Set(moveBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured move energy attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412EngineeringEnergyStill.Set(stillBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured still energy attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412EngineeringEnergyMoveMin.Set(moveMinBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured min move energy attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412EngineeringEnergyStillMin.Set(stillMinBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured min still energy attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412EngineeringEnergyMoveMax.Set(moveMaxBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured max move energy attribute with error {:x}\n", (int)status.error());
-            //}
-            //if (auto status = g_LD2412EngineeringEnergyStillMax.Set(stillMaxBuf); !status)
-            //{
-            //    FMT_PRINT("Failed to set measured max still energy attribute with error {:x}\n", (int)status.error());
-            //}
+            APILock l;
+            if (auto status = g_LD2412EngineeringEnergyMove.Set(moveBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured move energy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringEnergyStill.Set(stillBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured still energy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringEnergyMoveMin.Set(moveMinBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured min move energy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringEnergyStillMin.Set(stillMinBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured min still energy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringEnergyMoveMax.Set(moveMaxBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured max move energy attribute with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412EngineeringEnergyStillMax.Set(stillMaxBuf); !status)
+            {
+                FMT_PRINT("Failed to set measured max still energy attribute with error {:x}\n", (int)status.error());
+            }
         }
+#endif
     }
 
     static void on_config_update_callback()
