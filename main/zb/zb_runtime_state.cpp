@@ -7,18 +7,16 @@ namespace zb
     {
         ++g_State.m_Internals.m_IntermediateCmdFailuireCount;
         g_State.m_LastFailedStatus = status_code;
-        g_State.m_Internals.Update();
-        if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
-        {
-            FMT_PRINT("Failed to set failure status {:x}\n", (int)status.error());
-        }
+        g_State.m_FailedStatusUpdated = true;
     }
 
     void cmd_total_failure(void *, esp_zb_zcl_status_t status_code)
     {
         led::blink_pattern(colors::kBlinkPatternCmdError, colors::kCmdError, duration_ms_t(1000));
         led::blink(false, {});
-        g_State.m_Internals.Update();
+        ++g_State.m_Internals.m_TotalFailureCount;
+        g_State.m_LastFailedStatus = status_code;
+        g_State.m_FailedStatusUpdated = true;
     }
 
     zb::seq_nr_t send_on_raw(void*)
@@ -58,6 +56,11 @@ namespace zb
     bool RuntimeState::CanSendCommandsToBind() const
     {
         return m_Internals.m_BoundDevices || m_InitialBindsChecking;
+    }
+
+    bool RuntimeState::CommandsToBindInFlight() const
+    {
+        return m_OnSender.IsActive() || m_OffSender.IsActive() || m_OnTimedSender.IsActive();
     }
 
     uint8_t RuntimeState::GetIlluminance() const
@@ -275,7 +278,38 @@ namespace zb
         }
 
         m_Internals.m_ConfiguredReports = m_ValidBinds;
-        m_Internals.Update();
+
+        if (!CommandsToBindInFlight())
+        {
+            m_Internals.Update();
+            if (g_State.m_FailedStatusUpdated)
+            {
+                g_State.m_FailedStatusUpdated = false;
+                if (auto status = g_FailureStatus.Set((uint16_t)g_State.m_LastFailedStatus); !status)
+                {
+                    FMT_PRINT("Failed to set failure status {:x}\n", (int)status.error());
+                }
+            }
+
+            if (m_NeedBindsChecking)
+            {
+                m_NeedBindsChecking = false;
+                ScheduleBindsChecking();
+            }
+
+            {
+                static uint16_t g_LastIlluminance = 0xffff;
+                auto currentIll = g_State.GetIlluminance();
+                if (currentIll != g_LastIlluminance)
+                {
+                    g_LastIlluminance = currentIll;
+                    if (auto status = g_LD2412EngineeringLight.Set(currentIll); !status)
+                    {
+                        FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
+                    }
+                }
+            }
+        }
 
         if (prevValidBinds != m_ValidBinds)
         {
@@ -290,12 +324,6 @@ namespace zb
         {
             FMT_PRINT("Updating info about report capabilities: from {:x} to {:x}\n", prevReportCaps.GetRaw(), m_BindsReportingCapable.GetRaw());
             g_Config.SetBindReporting(m_BindsReportingCapable);
-        }
-
-        if (m_NeedBindsChecking)
-        {
-            m_NeedBindsChecking = false;
-            ScheduleBindsChecking();
         }
 
         static ZbAlarm rep{"InternalsReporting"};

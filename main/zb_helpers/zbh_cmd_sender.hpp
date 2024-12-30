@@ -48,6 +48,8 @@ namespace zb
             m_SendStatusNode.tsn = kInvalidSeqNr;
         }
 
+        bool IsActive() const { return m_ResponseNode.m_pList || m_SendStatusNode.m_pList; }
+
         zb::seq_nr_t SendRaw() 
         { 
             if (m_CmdSender)
@@ -57,7 +59,7 @@ namespace zb
 
         void Send(int _CmdId = -1)
         {
-            if (m_ResponseNode.m_pList || m_SendStatusNode.m_pList)//another command is already in flight
+            if (IsActive())//another command is already in flight
             {
                 ESP_ERROR_CHECK(ESP_FAIL);
                 if (m_OnFail) 

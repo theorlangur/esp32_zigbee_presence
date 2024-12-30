@@ -132,7 +132,16 @@ namespace zb
             esp_zb_factory_reset();
             esp_restart();
             break;
+        case ESP_ZB_NLME_STATUS_INDICATION:
+            {
+                void *pParam = esp_zb_app_signal_get_params(p_sg_p);
+                g_State.m_Internals.m_LastIndicationStatus = *(uint8_t *)pParam;
+                uint16_t addr = *((uint8_t *)pParam + 1) | ((*((uint8_t *)pParam + 2)) << 8);
+                ESP_LOGW(TAG, "%s, status: 0x%x; addr: 0x%x\n", esp_zb_zdo_signal_to_string(sig_type), g_State.m_Internals.m_LastIndicationStatus, addr);
+            }
+            break;
         case ESP_ZB_ZDO_DEVICE_UNAVAILABLE:
+            ++g_State.m_Internals.m_DeviceUnavailable;
             inc_failure("dev unavailable");
             led::blink_pattern(colors::kBlinkPatternZStackError, colors::kColorBlue, duration_ms_t(1000));
             break;

@@ -100,11 +100,11 @@ namespace zb
         };
 
         uint32_t m_BoundDevices                 : 4  = 0;
-        uint32_t m_Unused2                      : 4  = 0;
+        uint32_t m_DeviceUnavailable            : 4  = 0;
         uint32_t m_ConfiguredReports            : 8  = 0;
-        uint32_t m_IntermediateCmdFailuireCount : 8  = 0;
+        uint32_t m_IntermediateCmdFailuireCount : 4  = 0;
         uint32_t m_TotalFailureCount            : 4  = 0;
-        uint32_t m_Unused                       : 4  = 0;
+        uint32_t m_LastIndicationStatus         : 8  = 0;
         //uint32_t m_HasRunningTimer : 1 = 0;
         //uint32_t m_HasExternalTimer : 1 = 0;
 
@@ -156,11 +156,15 @@ namespace zb
         uint8_t m_FoundExisting = 0;
 
         TriState8Array m_BindsReportingCapable;
-        bool m_InitialBindsChecking = true;
-        bool m_NeedBindsChecking = true;
+        struct{
+            uint8_t m_InitialBindsChecking : 1 = true;
+            uint8_t m_NeedBindsChecking    : 1= true;
+            uint8_t m_FailedStatusUpdated  : 1= false;
+        };
 
         uint8_t m_ExternalIlluminance = 0;
 
+        bool CommandsToBindInFlight() const;
         bool CanSendCommandsToBind() const;
         uint8_t GetIlluminance() const;
         static bool IsRelevant(esp_zb_zcl_cluster_id_t id)

@@ -238,29 +238,31 @@ namespace zb
 
     static void on_measurements_callback()
     {
-        EnergyBufType moveBuf, stillBuf;
-        EnergyBufType moveMinBuf, stillMinBuf;
-        EnergyBufType moveMaxBuf, stillMaxBuf;
-        for(uint8_t i = 0; auto const& m : g_ld2412.GetMeasurements())
-        {
-            moveBuf.data[i] = m.move.last;
-            stillBuf.data[i] = m.still.last;
-            moveMinBuf.data[i] = m.move.min;
-            stillMinBuf.data[i] = m.still.min;
-            moveMaxBuf.data[i] = m.move.max;
-            stillMaxBuf.data[i] = m.still.max;
-            ++i;
-        }
+        return;
+        //EnergyBufType moveBuf, stillBuf;
+        //EnergyBufType moveMinBuf, stillMinBuf;
+        //EnergyBufType moveMaxBuf, stillMaxBuf;
+        //for(uint8_t i = 0; auto const& m : g_ld2412.GetMeasurements())
+        //{
+        //    moveBuf.data[i] = m.move.last;
+        //    stillBuf.data[i] = m.still.last;
+        //    moveMinBuf.data[i] = m.move.min;
+        //    stillMinBuf.data[i] = m.still.min;
+        //    moveMaxBuf.data[i] = m.move.max;
+        //    stillMaxBuf.data[i] = m.still.max;
+        //    ++i;
+        //}
 
         //FMT_PRINT("Measurements update: stillMax {};\n", stillMaxBuf.sv());
         //FMT_PRINT("Measurements update: stillMin {};\n", stillMinBuf.sv());
         //FMT_PRINT("Measurements update: move {};\n", moveBuf.sv());
         {
-            APILock l;
-            if (auto status = g_LD2412EngineeringLight.Set(g_State.GetIlluminance()); !status)
-            {
-                FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
-            }
+            //APILock l;
+            //if (auto status = g_LD2412EngineeringLight.Set(g_State.GetIlluminance()); !status)
+            //{
+            //    FMT_PRINT("Failed to set measured light attribute with error {:x}\n", (int)status.error());
+            //}
+
             //if (auto status = g_LD2412EngineeringEnergyMove.Set(moveBuf); !status)
             //{
             //    FMT_PRINT("Failed to set measured move energy attribute with error {:x}\n", (int)status.error());
