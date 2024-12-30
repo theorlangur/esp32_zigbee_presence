@@ -378,6 +378,52 @@ const orlangurOccupactionExtended = {
             isModernExtend: true,
         };
     },
+    internals2: () => {
+        const exposes = [
+            e.numeric('last_timeout_tsn', ea.STATE_GET).withCategory('diagnostic'),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${util.inspect(data)};`, NS);
+                    if (data['internals2'] !== undefined) 
+                    {
+                        const buffer = Buffer.alloc(4);
+                        buffer.writeUInt32LE(data['internals2']);
+                        const b0 = buffer.readUInt8(0);
+                        result['last_timeout_tsn'] = b0;
+                    }
+                    else 
+                    {
+                        //logger.debug(`presenceInfo fZ nothing to process`, NS);
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            {
+                key: ['last_timeout_tsn'],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', ['internals2']);
+                },
+            }
+        ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
     presenceInfo: (prefix) => {
         const attrDistance = prefix + 'Distance'
         const attrEnergy = prefix + 'Energy'
@@ -594,6 +640,7 @@ const definition = {
                 internals: {ID:0x001e, type: Zcl.DataType.UINT32},
                 restarts_count: {ID:0x001f, type: Zcl.DataType.UINT16},
                 illuminance_external: {ID:0x0020, type: Zcl.DataType.BOOLEAN},
+                internals2: {ID:0x0021, type: Zcl.DataType.UINT32},
             },
             commands: {
                 restart: {
@@ -749,6 +796,7 @@ const definition = {
         orlangurOccupactionExtended.measure('move', 'min', 'Min measured move energy per gate'),
         orlangurOccupactionExtended.measure('move', 'max', 'Max measured move energy per gate'),
         orlangurOccupactionExtended.internals(),
+        orlangurOccupactionExtended.internals2(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
