@@ -68,6 +68,33 @@ namespace zb
         esp_err_t err_status = signal_struct->esp_err_status;
         esp_zb_app_signal_type_t sig_type = *(esp_zb_app_signal_type_t*)p_sg_p;
         static int failed_counter = 0;
+        using clock_t = std::chrono::system_clock;
+        static auto last_failed_counter_update = clock_t::now();
+        auto reset_failure = []{
+            failed_counter = 0;
+            last_failed_counter_update = clock_t::now();
+        };
+        auto inc_failure = [](const char *pInfo){
+            if (++failed_counter > 6)
+            {
+                FMT_PRINT("Many Failures on {}\n", pInfo);
+                failed_counter = 0;
+                auto n = clock_t::now();
+                if (std::chrono::duration_cast<std::chrono::seconds>(n - last_failed_counter_update).count() > 60)
+                {
+                    failed_counter = 1;
+                    last_failed_counter_update = n;
+                }else
+                    esp_restart();
+            }else
+            {
+                FMT_PRINT("Registered Failure on {}\n", pInfo);
+                auto n = clock_t::now();
+                if (std::chrono::duration_cast<std::chrono::seconds>(n - last_failed_counter_update).count() > 60)
+                    failed_counter = 1;
+                last_failed_counter_update = n;
+            }
+        };
         switch (sig_type) {
         case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
             ESP_LOGI(TAG, "Initialize Zigbee stack");
@@ -76,7 +103,7 @@ namespace zb
         case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
         case ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT:
             if (err_status == ESP_OK) {
-                failed_counter = 0;
+                reset_failure();
                 led::blink(false, {});
                 //async setup
                 InitHelpers();
@@ -93,11 +120,7 @@ namespace zb
                 }
             } else {
                 /* commissioning failed */
-                if (++failed_counter > 6)
-                {
-                    failed_counter = 0;
-                    esp_restart();
-                }
+                inc_failure("commissioning");
                 ESP_LOGW(TAG, "Failed to initialize Zigbee stack (status: %s)", esp_err_to_name(err_status));
                 led::blink_pattern(colors::kBlinkPatternZStackError, colors::kZStackError, duration_ms_t(1000));
                 led::blink(true, colors::kSteering);
@@ -110,16 +133,12 @@ namespace zb
             esp_restart();
             break;
         case ESP_ZB_ZDO_DEVICE_UNAVAILABLE:
-            if (++failed_counter > 4)
-            {
-                failed_counter = 0;
-                esp_restart();
-            }
+            inc_failure("dev unavailable");
             led::blink_pattern(colors::kBlinkPatternZStackError, colors::kColorBlue, duration_ms_t(1000));
             break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {
-                failed_counter = 0;
+                reset_failure();
                 led::blink(false, {});
                 esp_zb_ieee_addr_t extended_pan_id;
                 esp_zb_get_extended_pan_id(extended_pan_id);
@@ -130,11 +149,7 @@ namespace zb
 
                 esp_zb_ieee_address_by_short(/*coordinator*/uint16_t(0), g_State.m_CoordinatorIeee);
             } else {
-                if (++failed_counter > 4)
-                {
-                    failed_counter = 0;
-                    esp_restart();
-                }
+                inc_failure("steering");
                 ESP_LOGI(TAG, "Network steering was not successful (status: %s)", esp_err_to_name(err_status));
                 led::blink_pattern(colors::kBlinkPatternSteeringError, colors::kSteeringError, duration_ms_t(1000));
                 led::blink(true, colors::kSteering);
@@ -313,13 +328,14 @@ namespace zb
         fflush(stdout);
         esp_zb_set_trace_level_mask(ESP_ZB_TRACE_LEVEL_CRITICAL, 0);
         {
+            esp_zb_scheduler_queue_size_set(160);
             esp_zb_cfg_t zb_nwk_cfg = {                                                               
                 .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
                 .install_code_policy = false,           
                 .nwk_cfg = {
                     .zed_cfg = {                                        
                         .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_16MIN,                         
-                        .keep_alive = 3000,                            
+                        .keep_alive = 30000,                            
                     }
                 },                                                          
             };
@@ -350,6 +366,7 @@ namespace zb
                 >
         );
 
+        //esp_zb_ti
         esp_zb_zcl_command_send_status_handler_register(&zb::ZbCmdSend::handler);
         esp_zb_aps_data_indication_handler_register(apsde_data_indication_callback);
         ESP_LOGI(TAG, "ZB registered device");
