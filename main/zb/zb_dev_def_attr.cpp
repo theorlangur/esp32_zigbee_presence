@@ -46,6 +46,7 @@ namespace zb
     ZclAttributeInternals_t                             g_Internals;
     ZclAttributeRestartsCount_t                         g_RestartsCount;
     ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
+    ZclAttributeInternals2_t                            g_Internals2;
 
     static ZbAlarmExt16 g_DelayedAttrUpdate;
     static void update_presence_attr_only()

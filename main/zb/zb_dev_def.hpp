@@ -105,14 +105,18 @@ namespace zb
         uint32_t m_IntermediateCmdFailuireCount : 4  = 0;
         uint32_t m_TotalFailureCount            : 4  = 0;
         uint32_t m_LastIndicationStatus         : 8  = 0;
-        //uint32_t m_HasRunningTimer : 1 = 0;
-        //uint32_t m_HasExternalTimer : 1 = 0;
+
+        //2nd uint32_t
+        uint32_t m_LastTimeoutTSN               : 8   = 0;
+        uint32_t m_Unused                       : 24  = 0;
+
 
         uint32_t GetVal() const { return *(uint32_t*)this; }
+        uint32_t GetVal2() const { return *((uint32_t*)this + 1); }
 
         void Update();
     };
-    static_assert(sizeof(Internals) == sizeof(uint32_t));
+    static_assert(sizeof(Internals) == sizeof(uint32_t) * 2);
 
     //initialized at start
     struct RuntimeState
@@ -130,9 +134,9 @@ namespace zb
         ZbAlarm m_RunningTimer{"m_RunningTimer"};
         ZbAlarm m_ExternalRunningTimer{"m_ExternalRunningTimer"};
 
-        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2>                m_OnSender{send_on_raw, nullptr, cmd_total_failure, cmd_failure};
-        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2>               m_OffSender{send_off_raw, nullptr, cmd_total_failure, cmd_failure};
-        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2> m_OnTimedSender{send_on_timed_raw, nullptr, cmd_total_failure, cmd_failure};
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_ID, 2>                m_OnSender{send_on_raw, nullptr, cmd_total_failure, cmd_failure, &m_OnSender};
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID, 2>               m_OffSender{send_off_raw, nullptr, cmd_total_failure, cmd_failure, &m_OffSender};
+        CmdWithRetries<ESP_ZB_ZCL_CLUSTER_ID_ON_OFF, ESP_ZB_ZCL_CMD_ON_OFF_ON_WITH_TIMED_OFF_ID, 2> m_OnTimedSender{send_on_timed_raw, nullptr, cmd_total_failure, cmd_failure, &m_OnTimedSender};
 
         uint16_t m_FailureCount = 0;
         uint16_t m_TotalFailureCount = 0;

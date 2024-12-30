@@ -3,11 +3,21 @@
 
 namespace zb
 {
-    void cmd_failure(void *, esp_zb_zcl_status_t status_code)
+    void cmd_failure(void *pCtx, esp_zb_zcl_status_t status_code)
     {
         ++g_State.m_Internals.m_IntermediateCmdFailuireCount;
         g_State.m_LastFailedStatus = status_code;
         g_State.m_FailedStatusUpdated = true;
+
+        if (status_code == ESP_ZB_ZCL_STATUS_TIMEOUT)
+        {
+            if (pCtx == &g_State.m_OnSender)
+                g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OnSender.GetTSN();
+            if (pCtx == &g_State.m_OffSender)
+                g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OffSender.GetTSN();
+            if (pCtx == &g_State.m_OnTimedSender)
+                g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OnTimedSender.GetTSN();
+        }
     }
 
     void cmd_total_failure(void *, esp_zb_zcl_status_t status_code)

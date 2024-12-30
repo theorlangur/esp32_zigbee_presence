@@ -51,6 +51,7 @@ namespace zb
     static constexpr const uint16_t ATTRIB_INTERNALS = 30;
     static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 31;
     static constexpr const uint16_t ATTRIB_ILLUMINANCE_EXTERNAL = 32;
+    static constexpr const uint16_t ATTRIB_INTERNALS2 = 33;
 
     /**********************************************************************/
     /* Cluster type definitions                                           */
@@ -106,6 +107,7 @@ namespace zb
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
     using ZclAttributeIlluminanceExternal_t                   = LD2412CustomCluster_t::Attribute<ATTRIB_ILLUMINANCE_EXTERNAL, bool>;
+    using ZclAttributeInternals2_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS2, uint32_t>;
 
 
     /**********************************************************************/
@@ -157,5 +159,6 @@ namespace zb
     extern ZclAttributeInternals_t                             g_Internals;
     extern ZclAttributeRestartsCount_t                         g_RestartsCount;
     extern ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
+    extern ZclAttributeInternals2_t                            g_Internals2;
 }
 #endif

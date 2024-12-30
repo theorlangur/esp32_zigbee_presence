@@ -88,6 +88,8 @@ namespace zb
 
                 m_WaitResponseTimer.Setup(OnTimer, this, kCmdResponseWait);
             }
+
+            zb::seq_nr_t GetTSN() const { return m_SendStatusNode.tsn; }
     private:
         void SetSeqNr(uint16_t nr = kInvalidSeqNr)
         {
@@ -202,10 +204,10 @@ namespace zb
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)p;
             ++pCmd->m_FailureCount;
-            pCmd->SetSeqNr();//reset
-            pCmd->m_ResponseNode.RemoveFromList();
             if (pCmd->m_OnIntermediateFail)
                 pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, ESP_ZB_ZCL_STATUS_TIMEOUT);
+            pCmd->SetSeqNr();//reset
+            pCmd->m_ResponseNode.RemoveFromList();
 
             if (pCmd->m_RetriesLeft)
             {

@@ -242,6 +242,7 @@ namespace zb
         ESP_ERROR_CHECK(g_Internals.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report, g_Config.GetRestarts()));
         ESP_ERROR_CHECK(g_IlluminanceExternal.AddToCluster(custom_cluster, Access::RW, (bool)g_Config.GetIlluminanceExternal()));
+        ESP_ERROR_CHECK(g_Internals2.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
 
         ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(cluster_list, custom_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
