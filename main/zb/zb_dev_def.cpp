@@ -20,9 +20,15 @@ namespace zb
     /**********************************************************************/
     void Internals::Update()
     {
-        if (auto status = g_Internals.Set(GetVal()); !status)
+        static uint32_t g_LastSet = 0xffffffff;
+        uint32_t newVal = GetVal();
+        if (newVal != g_LastSet)
         {
-            FMT_PRINT("Failed to set internals in update {:x}\n", (int)status.error());
+            g_LastSet = newVal;
+            if (auto status = g_Internals.Set(newVal); !status)
+            {
+                FMT_PRINT("Failed to set internals in update {:x}\n", (int)status.error());
+            }
         }
     }
 }
