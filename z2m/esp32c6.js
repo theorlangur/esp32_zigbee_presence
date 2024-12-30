@@ -311,6 +311,8 @@ const orlangurOccupactionExtended = {
             e.numeric('bound_devices', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
             e.numeric('cmd_retry_failures', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
             e.numeric('cmd_total_failures', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
+            e.numeric('devices_unavailable_failures', ea.STATE_GET).withCategory('diagnostic').withUnit('t'),
+            e.numeric('last_indication_status', ea.STATE_GET).withCategory('diagnostic'),
             e.text('configured_reports_for_binds', ea.STATE_GET).withCategory('diagnostic')
         ];
 
@@ -326,9 +328,14 @@ const orlangurOccupactionExtended = {
                     {
                         const buffer = Buffer.alloc(4);
                         buffer.writeUInt32LE(data['internals']);
-                        result['bound_devices'] = buffer.readUInt8(0) & 0x0f;
-                        result['cmd_retry_failures'] = buffer.readUInt8(2);
-                        result['cmd_total_failures'] = buffer.readUInt8(3) & 0x0f;
+                        const b0 = buffer.readUInt8(0);
+                        result['bound_devices'] = b0 & 0x0f;
+                        result['devices_unavailable_failures'] = (b0 >> 4) & 0x0f;
+                        const b2 = buffer.readUInt8(2);
+                        result['cmd_retry_failures'] = b2 & 0x0f;
+                        result['cmd_total_failures'] = (b2 >> 4) & 0x0f;
+                        const b3 = buffer.readUInt8(3);
+                        result['last_indication_status'] = b3;
                         const v = buffer.readUInt8(1);
                         result['configured_reports_for_binds'] = ''
                         for(var i = 0; i < 8; ++i)
@@ -357,7 +364,7 @@ const orlangurOccupactionExtended = {
 
         const toZigbee = [
             {
-                key: ['bound_devices', 'configured_reports_for_binds', 'cmd_retry_failures', 'cmd_total_failures'],
+                key: ['bound_devices', 'configured_reports_for_binds', 'cmd_retry_failures', 'cmd_total_failures', 'last_indication_status', 'devices_unavailable_failures'],
                 convertGet: async (entity, key, meta) => {
                     await entity.read('customOccupationConfig', ['internals']);
                 },
