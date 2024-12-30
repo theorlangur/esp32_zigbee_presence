@@ -43,7 +43,7 @@ namespace zb
     zb::seq_nr_t send_off_raw(void*);
     zb::seq_nr_t send_on_timed_raw(void*);
 
-    void send_on_off(bool on);
+    [[nodiscard]] bool send_on_off(bool on);
     bool update_presence_state();
     void setup_sensor();
 
@@ -125,6 +125,8 @@ namespace zb
         bool m_LastPresenceMMWave = false;
         bool m_LastPresencePIRInternal = false;
         bool m_LastPresenceExternal = false;
+        LD2412::TargetState m_LastLD2412State = LD2412::TargetState::Clear;
+        ld2412::Component::ExtendedState m_LastLD2412ExtendedState = ld2412::Component::ExtendedState::Normal;
         ZbAlarm m_RunningTimer{"m_RunningTimer"};
         ZbAlarm m_ExternalRunningTimer{"m_ExternalRunningTimer"};
 

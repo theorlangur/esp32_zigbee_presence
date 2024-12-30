@@ -107,6 +107,8 @@ namespace zb
         const char *pDescr = nullptr;
         TimerList::handle_t h = TimerList::kInvalidHandle;
 
+        ~ZbAlarm() { Cancel(); }
+
         bool IsRunning() const { return h != TimerList::kInvalidHandle; }
         void Cancel() { Cancel<on_alarm>(); }
         esp_err_t Setup(callback_t cb, void *param, uint32_t time) { return Setup<callback_t, on_alarm>(cb, param, time); }
@@ -194,6 +196,8 @@ namespace zb
 
         uint32_t m_Interval = 0;
 
+        ~ZbTimer() { Cancel(); }
+
         static void on_timer(TimerList::TimerEntry const& e)
         {
             if (callback_t(e.cb)(e.param))
@@ -233,5 +237,22 @@ namespace zb
         }
     };
     using ZbTimerExt16 = ZbTimerExt<16>;
+
+    template<size_t FuncSZ = 16>
+    struct ZbAlarmExt: ZbAlarm
+    {
+        using generic_callback_t = FixedFunction<FuncSZ, void()>;
+        generic_callback_t m_Callback;
+
+        static void on_timer_ext(void *param) { (*(generic_callback_t*)param)(); }
+
+        template<class callback_t>
+        esp_err_t Setup(callback_t &&cb, uint32_t time)
+        {
+            m_Callback = std::forward<callback_t>(cb);
+            return ZbAlarm::Setup(on_timer_ext, &m_Callback, time);
+        }
+    };
+    using ZbAlarmExt16 = ZbAlarmExt<16>;
 }
 #endif

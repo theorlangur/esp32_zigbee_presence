@@ -563,16 +563,16 @@ namespace zb
         {
             if (pBind->m_AttemptsLeft--)
             {
-                FMT_PRINT("({:x})Got Bind request result {:x}. Failed. Starting another attempt (left: {})\n", pBind->m_ShortAddr, zdo_status, (int)pBind->m_AttemptsLeft);
+                FMT_PRINT("({:x})Got UnBind request result {:x}. Failed. Starting another attempt (left: {})\n", pBind->m_ShortAddr, zdo_status, (int)pBind->m_AttemptsLeft);
                 pBind->m_Timer.Setup(
                         [](void *user_ctx){
                             BindInfo *pBind = static_cast<BindInfo *>(user_ctx);
                             if (!g_BindInfoPool.IsValid(pBind)) 
                             {
-                                FMT_PRINT("(Re-try attempt)({:x})(Bind request)BindInfo is dead\n", user_ctx);
-                                pBind->SendBindRequest();
+                                FMT_PRINT("(Re-try attempt)({:x})(UnBind request)BindInfo is dead\n", user_ctx);
                                 return;//we're dead
                             }
+                            pBind->SendUnBindRequest();
                         }, pBind, kTimeout);
                 return;
             }
@@ -629,9 +629,9 @@ namespace zb
                                 if (!g_BindInfoPool.IsValid(pBind)) 
                                 {
                                     FMT_PRINT("(Re-try attempt)({:x})(Bind request)BindInfo is dead\n", user_ctx);
-                                    pBind->SendBindRequest();
                                     return;//we're dead
                                 }
+                                pBind->SendBindRequest();
                             }, pBind, kTimeout);
                     return;
                 }
@@ -664,9 +664,9 @@ namespace zb
                             if (!g_BindInfoPool.IsValid(pBind)) 
                             {
                                 FMT_PRINT("(Re-try attempt)({:x})(Get Bind Table)BindInfo is dead\n", user_ctx);
-                                pBind->GetBindTable();
                                 return;//we're dead
                             }
+                            pBind->GetBindTable();
                         }, this, kTimeout);
                 return;
             }

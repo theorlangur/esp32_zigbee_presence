@@ -47,6 +47,15 @@ namespace zb
     ZclAttributeRestartsCount_t                         g_RestartsCount;
     ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
 
+    static ZbAlarmExt16 g_DelayedAttrUpdate;
+    static void update_presence_attr_only()
+    {
+        esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
+        if (auto status = g_OccupancyState.Set(val); !status)
+        {
+            FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+        }
+    }
     /**********************************************************************/
     /* Attributes                                                         */
     /**********************************************************************/
@@ -75,12 +84,10 @@ namespace zb
 
                 if (update_presence_state())
                 {
-                    send_on_off(g_State.m_LastPresence);
-                    esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
-                    if (auto status = g_OccupancyState.Set(val); !status)
-                    {
-                        FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-                    }
+                    if (send_on_off(g_State.m_LastPresence))
+                        g_DelayedAttrUpdate.Setup(update_presence_attr_only, kDelayedAttrChangeTimeout);
+                    else
+                        update_presence_attr_only();
                 }
                 return ESP_OK;
             }

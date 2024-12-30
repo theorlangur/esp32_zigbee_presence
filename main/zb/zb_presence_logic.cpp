@@ -3,6 +3,8 @@
 
 namespace zb
 {
+    static ZbAlarmExt16 g_DelayedAttrUpdate;
+
     static void on_local_on_timer_finished(void* param)
     {
         //this runs in the context of zigbee task
@@ -27,30 +29,30 @@ namespace zb
         }
     }
 
-    void send_on_off(bool on)
+    bool send_on_off(bool on)
     {
         auto m = g_Config.GetOnOffMode();
         auto t = g_Config.GetOnOffTimeout();
         if (m == OnOffMode::Nothing)
         {
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNothing;
-            return;//nothing
+            return false;//nothing
         }
         if (on && (m == OnOffMode::OffOnly))
         {
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOffOnly;
-            return;//nothing
+            return false;//nothing
         }
         if (!on && (m == OnOffMode::OnOnly || m == OnOffMode::TimedOn || m == OnOffMode::TimedOnLocal))
         {
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnOnTimedOnTimedLocal;
-            return;//nothing
+            return false;//nothing
         }
 
         if (!g_State.CanSendCommandsToBind())
         {
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::ReturnOnNoBoundDevices;
-            return;//no bound devices with on/off cluster, no reason to send a command
+            return false;//no bound devices with on/off cluster, no reason to send a command
         }
 
         g_State.m_RunningTimer.Cancel();
@@ -59,6 +61,7 @@ namespace zb
             //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentTimedOn;
             FMT_PRINT("Sending timed on command to binded with timeout: {};\n", t);
             g_State.m_OnTimedSender.Send();
+            return true;
         }
         else if (m == OnOffMode::TimedOnLocal)
         {
@@ -76,6 +79,7 @@ namespace zb
                 g_State.StartLocalTimer(&on_local_on_timer_finished, t * 1000);
             }
             g_State.m_OnSender.Send();
+            return true;
         }
         else
         {
@@ -84,13 +88,16 @@ namespace zb
             {
                 //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOn;
                 g_State.m_OnSender.Send();
+                return true;
             }
             else
             {
                 //g_State.m_Internals.m_LastSendOnOffResult = (uint8_t)Internals::SendOnOffResult::SentOff;
                 g_State.m_OffSender.Send();
+                return true;
             }
         }
+        return false;
     }
 
     //returns 'true' if changed
@@ -160,17 +167,8 @@ namespace zb
         return changed;
     }
 
-    static void on_movement_callback(bool _presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    static void update_on_movement_attr()
     {
-        APILock l;
-        g_State.m_LastPresenceMMWave = p.mmPresence;
-        g_State.m_LastPresencePIRInternal = p.pirPresence;
-
-        bool presence_changed = update_presence_state();
-
-        if (g_State.m_SuppressedByIllulminance)
-            return;
-
         /**********************************************************************/
         /* Zigbee attributes update                                           */
         /**********************************************************************/
@@ -196,25 +194,46 @@ namespace zb
             //{
             //    FMT_PRINT("Failed to set still dist attribute with error {:x}\n", (int)status.error());
             //}
-            if (auto status = g_LD2412State.Set(LD2412State(p.m_State)); !status)
+            if (auto status = g_LD2412State.Set(LD2412State(g_State.m_LastLD2412State)); !status)
             {
                 FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412ExState.Set(exState); !status)
+            if (auto status = g_LD2412ExState.Set(g_State.m_LastLD2412ExtendedState); !status)
             {
                 FMT_PRINT("Failed to set extended state attribute with error {:x}\n", (int)status.error());
             }
-            if (auto status = g_LD2412PIRPresence.Set(p.pirPresence); !status)
+            if (auto status = g_LD2412PIRPresence.Set(g_State.m_LastPresencePIRInternal); !status)
             {
                 FMT_PRINT("Failed to set PIR presence attribute with error {:x}\n", (int)status.error());
             }
 
-            if (presence_changed)
+        }
+    }
+
+    static void on_movement_callback(bool _presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
+    {
+        APILock l;
+        g_State.m_LastPresenceMMWave = p.mmPresence;
+        g_State.m_LastPresencePIRInternal = p.pirPresence;
+        g_State.m_LastLD2412State = p.m_State;
+        g_State.m_LastLD2412ExtendedState = exState;
+
+        bool presence_changed = update_presence_state();
+
+        if (g_State.m_SuppressedByIllulminance)
+            return;
+
+        FMT_PRINT("Presence: {}; Data: {}\n", (int)g_State.m_LastPresence, p);
+        if (presence_changed)
+        {
+            if (send_on_off(g_State.m_LastPresence))
             {
-                send_on_off(g_State.m_LastPresence);
+                FMT_PRINT("Delaying attribute on presence update\n");
+                g_DelayedAttrUpdate.Setup(update_on_movement_attr, kDelayedAttrChangeTimeout);
+                return;
             }
         }
-        FMT_PRINT("Presence: {}; Data: {}\n", (int)g_State.m_LastPresence, p);
+        update_on_movement_attr();
     }
 
     static void on_measurements_callback()
