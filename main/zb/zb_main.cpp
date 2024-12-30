@@ -172,6 +172,15 @@ namespace zb
             inc_failure("dev unavailable");
             led::blink_pattern(colors::kBlinkPatternZStackError, colors::kColorBlue, duration_ms_t(1000));
             break;
+        case ESP_ZB_NWK_SIGNAL_PERMIT_JOIN_STATUS:
+            if (err_status == ESP_OK) {
+                if (*(uint8_t *)esp_zb_app_signal_get_params(p_sg_p)) {
+                    ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", esp_zb_get_pan_id(), *(uint8_t *)esp_zb_app_signal_get_params(p_sg_p));
+                } else {
+                    ESP_LOGW(TAG, "Network(0x%04hx) closed, devices joining not allowed.", esp_zb_get_pan_id());
+                }
+            }
+            break;
         case ESP_ZB_BDB_SIGNAL_STEERING:
             if (err_status == ESP_OK) {
                 reset_failure();
@@ -368,13 +377,10 @@ namespace zb
         {
             esp_zb_scheduler_queue_size_set(160);
             esp_zb_cfg_t zb_nwk_cfg = {                                                               
-                .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,                       
+                .esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER,                       
                 .install_code_policy = false,           
                 .nwk_cfg = {
-                    .zed_cfg = {                                        
-                        .ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_16MIN,                         
-                        .keep_alive = 30000,                            
-                    }
+                    .zczr_cfg = {.max_children = 10}
                 },                                                          
             };
             esp_zb_init(&zb_nwk_cfg);
