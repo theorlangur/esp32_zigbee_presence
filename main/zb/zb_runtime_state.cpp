@@ -225,10 +225,6 @@ namespace zb
     {
         ZbAlarm::check_death_count();
 
-        //m_Internals.m_HasRunningTimer = m_RunningTimer.IsRunning();
-        //m_Internals.m_HasExternalTimer = m_ExternalRunningTimer.IsRunning();
-        m_Internals.Update();//send to zigbee
-
         for(auto i = m_BindsToCleanup.begin(); i != m_BindsToCleanup.end(); ++i)
         {
             if ((*i)->GetState() == BindInfo::State::NonFunctional)
@@ -278,11 +274,8 @@ namespace zb
                 bi->m_CheckReporting = false;
         }
 
-        if (m_Internals.m_ConfiguredReports != m_ValidBinds)
-        {
-            m_Internals.m_ConfiguredReports = m_ValidBinds;
-            m_Internals.Update();
-        }
+        m_Internals.m_ConfiguredReports = m_ValidBinds;
+        m_Internals.Update();
 
         if (prevValidBinds != m_ValidBinds)
         {
