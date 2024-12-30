@@ -134,6 +134,33 @@ namespace zb
             break;
         case ESP_ZB_NLME_STATUS_INDICATION:
             {
+                /*
+                 * Copy-paste from some ZBOSS header file for reference
+                       Network command status codes
+                    typedef enum zb_nwk_command_status_e
+                    {
+                      ZB_NWK_COMMAND_STATUS_NO_ROUTE_AVAILABLE           = 0x00, /!< No route available /
+                      ZB_NWK_COMMAND_STATUS_TREE_LINK_FAILURE            = 0x01, /!< Tree link failure /
+                      ZB_NWK_COMMAND_STATUS_NONE_TREE_LINK_FAILURE       = 0x02, /!< None-tree link failure /
+                      ZB_NWK_COMMAND_STATUS_LOW_BATTERY_LEVEL            = 0x03, /!< Low battery level /
+                      ZB_NWK_COMMAND_STATUS_NO_ROUTING_CAPACITY          = 0x04, /!< No routing capacity /
+                      ZB_NWK_COMMAND_STATUS_NO_INDIRECT_CAPACITY         = 0x05, /!< No indirect capacity /
+                      ZB_NWK_COMMAND_STATUS_INDIRECT_TRANSACTION_EXPIRY  = 0x06, /!< Indirect transaction expiry /
+                      ZB_NWK_COMMAND_STATUS_TARGET_DEVICE_UNAVAILABLE    = 0x07, /!< Target device unavailable /
+                      ZB_NWK_COMMAND_STATUS_TARGET_ADDRESS_UNALLOCATED   = 0x08, /!< Target address unallocated /
+                      ZB_NWK_COMMAND_STATUS_PARENT_LINK_FAILURE          = 0x09, /!< Parent link failure /
+                      ZB_NWK_COMMAND_STATUS_VALIDATE_ROUTE               = 0x0a, /!< Validate route /
+                      ZB_NWK_COMMAND_STATUS_SOURCE_ROUTE_FAILURE         = 0x0b, /!< Source route failure /
+                      ZB_NWK_COMMAND_STATUS_MANY_TO_ONE_ROUTE_FAILURE    = 0x0c, /!< Many-to-one route failure /
+                      ZB_NWK_COMMAND_STATUS_ADDRESS_CONFLICT             = 0x0d, /!< Address conflict /
+                      ZB_NWK_COMMAND_STATUS_VERIFY_ADDRESS               = 0x0e, /!< Verify address /
+                      ZB_NWK_COMMAND_STATUS_PAN_IDENTIFIER_UPDATE        = 0x0f, /!< Pan identifier update /
+                      ZB_NWK_COMMAND_STATUS_NETWORK_ADDRESS_UPDATE       = 0x10, /!< Network address update /
+                      ZB_NWK_COMMAND_STATUS_BAD_FRAME_COUNTER            = 0x11, /!< Bad frame counter  /
+                      ZB_NWK_COMMAND_STATUS_BAD_KEY_SEQUENCE_NUMBER      = 0x12  /!< Bad key sequence number /
+                    }
+                    zb_nwk_command_status_t;
+                 * */
                 void *pParam = esp_zb_app_signal_get_params(p_sg_p);
                 g_State.m_Internals.m_LastIndicationStatus = *(uint8_t *)pParam;
                 uint16_t addr = *((uint8_t *)pParam + 1) | ((*((uint8_t *)pParam + 2)) << 8);
