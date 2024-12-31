@@ -117,6 +117,7 @@ namespace zb
             seq_nr_t tsn;
             cmd_send_handler_t cb;
             void *user_ctx;
+            bool skipCoordinator = true;
 
             void RegisterSelf();
         };

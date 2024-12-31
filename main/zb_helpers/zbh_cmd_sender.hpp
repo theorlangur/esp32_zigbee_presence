@@ -14,7 +14,7 @@ namespace zb
         static constexpr uint16_t kInvalidSeqNr = kInvalidTSN;
         using cmd_sender_t = zb::seq_nr_t(*)(void*);
         using cmd_callback_t = void(*)(void*);
-        using cmd_fail_callback_t = void(*)(void*, esp_zb_zcl_status_t);
+        using cmd_fail_callback_t = void(*)(void*, esp_zb_zcl_status_t, esp_err_t e_err);
 
         cmd_sender_t m_CmdSender;
         cmd_callback_t m_OnSuccess;
@@ -63,7 +63,7 @@ namespace zb
             {
                 ESP_ERROR_CHECK(ESP_FAIL);
                 if (m_OnFail) 
-                    m_OnFail(m_pUserCtx, ESP_ZB_ZCL_STATUS_DUPE_EXISTS);
+                    m_OnFail(m_pUserCtx, ESP_ZB_ZCL_STATUS_DUPE_EXISTS, ESP_OK);
                 return;//TODO: log? inc failure count?
             }
 
@@ -109,7 +109,7 @@ namespace zb
             m_SendStatusNode.RemoveFromList();
             SetSeqNr();
             if (m_OnFail) 
-                m_OnFail(m_pUserCtx, esp_zb_zcl_status_t::ESP_ZB_ZCL_STATUS_FAIL);
+                m_OnFail(m_pUserCtx, esp_zb_zcl_status_t::ESP_ZB_ZCL_STATUS_FAIL, ESP_OK);
         }
 
         static void OnCmdResponse(uint8_t cmd_id, esp_zb_zcl_status_t status_code, esp_zb_zcl_cmd_info_t *pInfo, void *user_ctx)
@@ -137,7 +137,7 @@ namespace zb
             {
                 ++pCmd->m_FailureCount;
                 if (pCmd->m_OnIntermediateFail)
-                    pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, esp_zb_zcl_status_t(status_code));
+                    pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, status_code, ESP_OK);
 
                 FMT_PRINT("Cmd {:x} failed with status: {:x}\n", pCmd->m_ResponseNode.cmd_id, (int)status_code);
                 if (!pCmd->m_RetriesLeft)
@@ -164,11 +164,6 @@ namespace zb
         {
             CmdWithRetries *pCmd = (CmdWithRetries *)user_ctx;
             auto status_code = pSendStatus->status;
-            if (IsCoordinator(pSendStatus->dst_addr))
-            {
-                FMT_PRINT("Response from coordinator on Cmd {:x}; status: {:x}\n", pCmd->m_ResponseNode.cmd_id, (int)status_code);
-                return;//skipping coordinator
-            }
 
 #ifndef NDEBUG
             {
@@ -178,12 +173,12 @@ namespace zb
                 FMT_PRINT("{} Send Cmd {:x} seqNr={:x} to {}; status: {:x}\n", _n, pCmd->m_ResponseNode.cmd_id, pSendStatus->tsn, pSendStatus->dst_addr, (int)status_code);
             }
 #endif
-            if (status_code != ESP_ZB_ZCL_STATUS_SUCCESS)
+            if (status_code != ESP_OK)
             {
                 pCmd->m_ResponseNode.RemoveFromList();
                 ++pCmd->m_FailureCount;
                 if (pCmd->m_OnIntermediateFail)
-                    pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, ESP_ZB_ZCL_STATUS_FAIL);
+                    pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, ESP_ZB_ZCL_STATUS_FAIL, status_code);
 
                 FMT_PRINT("Cmd {:x} failed with status: {:x}\n", pCmd->m_ResponseNode.cmd_id, (int)status_code);
                 if (!pCmd->m_RetriesLeft)
@@ -199,6 +194,8 @@ namespace zb
                 pCmd->SendAgain();
                 return;
             }
+            //re-add self, if there are more binds to wait for
+            pCmd->m_SendStatusNode.RegisterSelf();
             //sending was ok, now we expect a response
         }
 
@@ -207,7 +204,7 @@ namespace zb
             CmdWithRetries *pCmd = (CmdWithRetries *)p;
             ++pCmd->m_FailureCount;
             if (pCmd->m_OnIntermediateFail)
-                pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, ESP_ZB_ZCL_STATUS_TIMEOUT);
+                pCmd->m_OnIntermediateFail(pCmd->m_pUserCtx, ESP_ZB_ZCL_STATUS_TIMEOUT, ESP_ERR_TIMEOUT);
             pCmd->SetSeqNr();//reset
             pCmd->m_ResponseNode.RemoveFromList();
 

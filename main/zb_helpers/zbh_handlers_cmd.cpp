@@ -21,10 +21,14 @@ namespace zb
         {
             if (pN->tsn == message.tsn)
             {
-                pN->RemoveFromList();
-                if (pN->cb)
-                    pN->cb(&message, pN->user_ctx);
-                return;
+                //skip coordinator
+                if (!pN->skipCoordinator || !IsCoordinator(message.dst_addr))
+                {
+                    pN->RemoveFromList();
+                    if (pN->cb)
+                        pN->cb(&message, pN->user_ctx);
+                    return;
+                }
             }
         }
 #ifndef NDEBUG

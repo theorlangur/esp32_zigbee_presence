@@ -36,8 +36,8 @@ namespace zb
     /**********************************************************************/
     void reset_button_loop();
 
-    void cmd_failure(void *, esp_zb_zcl_status_t status_code);
-    void cmd_total_failure(void*, esp_zb_zcl_status_t status_code);
+    void cmd_failure(void *, esp_zb_zcl_status_t status_code, esp_err_t e);
+    void cmd_total_failure(void*, esp_zb_zcl_status_t status_code, esp_err_t e);
 
     zb::seq_nr_t send_on_raw(void*);
     zb::seq_nr_t send_off_raw(void*);
@@ -110,7 +110,8 @@ namespace zb
         uint32_t m_LastTimeoutTSN               : 8   = 0;
         uint32_t m_WaitForSendStatus            : 1   = 0;
         uint32_t m_WaitForResponse              : 1   = 0;
-        uint32_t m_Unused                       : 22  = 0;
+        uint32_t m_UnusedBits                   : 6   = 0;
+        uint32_t m_LastESP_ERR                  : 16  = 0;
 
 
         uint32_t GetVal() const { return *(uint32_t*)this; }

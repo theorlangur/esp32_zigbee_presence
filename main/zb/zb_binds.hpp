@@ -80,7 +80,7 @@ namespace zb
     private:
         static zb::seq_nr_t SendTryOnOffCmd(void*);
         static void OnTryOnOffSuccess(void*);
-        static void OnTryOnOffFail(void*, esp_zb_zcl_status_t);
+        static void OnTryOnOffFail(void*, esp_zb_zcl_status_t, esp_err_t);
 
         State m_State = State::New;
         ZbAlarm m_Timer;

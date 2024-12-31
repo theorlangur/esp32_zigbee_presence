@@ -3,11 +3,12 @@
 
 namespace zb
 {
-    void cmd_failure(void *pCtx, esp_zb_zcl_status_t status_code)
+    void cmd_failure(void *pCtx, esp_zb_zcl_status_t status_code, esp_err_t e)
     {
         ++g_State.m_Internals.m_IntermediateCmdFailuireCount;
         g_State.m_LastFailedStatus = status_code;
         g_State.m_FailedStatusUpdated = true;
+        g_State.m_Internals.m_LastESP_ERR = e;
 
         if (status_code == ESP_ZB_ZCL_STATUS_TIMEOUT)
         {
@@ -32,13 +33,14 @@ namespace zb
         }
     }
 
-    void cmd_total_failure(void *, esp_zb_zcl_status_t status_code)
+    void cmd_total_failure(void *, esp_zb_zcl_status_t status_code, esp_err_t e)
     {
         led::blink_pattern(colors::kBlinkPatternCmdError, colors::kCmdError, duration_ms_t(1000));
         led::blink(false, {});
         ++g_State.m_Internals.m_TotalFailureCount;
         g_State.m_LastFailedStatus = status_code;
         g_State.m_FailedStatusUpdated = true;
+        g_State.m_Internals.m_LastESP_ERR = e;
     }
 
     zb::seq_nr_t send_on_raw(void*)

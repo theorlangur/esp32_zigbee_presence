@@ -217,7 +217,7 @@ namespace zb
         }
     }
 
-    void BindInfo::OnTryOnOffFail(void *pCtx, esp_zb_zcl_status_t)
+    void BindInfo::OnTryOnOffFail(void *pCtx, esp_zb_zcl_status_t, esp_err_t)
     {
         BindInfo *pBind = static_cast<BindInfo *>(pCtx);
         if (!g_BindInfoPool.IsValid(pBind)) 
