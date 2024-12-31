@@ -12,11 +12,23 @@ namespace zb
         if (status_code == ESP_ZB_ZCL_STATUS_TIMEOUT)
         {
             if (pCtx == &g_State.m_OnSender)
+            {
                 g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OnSender.GetTSN();
+                g_State.m_Internals.m_WaitForSendStatus = g_State.m_OnSender.IsWaitingForSendStatus();
+                g_State.m_Internals.m_WaitForResponse = g_State.m_OnSender.IsWaitingForCmdResponse();
+            }
             if (pCtx == &g_State.m_OffSender)
+            {
                 g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OffSender.GetTSN();
+                g_State.m_Internals.m_WaitForSendStatus = g_State.m_OffSender.IsWaitingForSendStatus();
+                g_State.m_Internals.m_WaitForResponse = g_State.m_OffSender.IsWaitingForCmdResponse();
+            }
             if (pCtx == &g_State.m_OnTimedSender)
+            {
                 g_State.m_Internals.m_LastTimeoutTSN = g_State.m_OnTimedSender.GetTSN();
+                g_State.m_Internals.m_WaitForSendStatus = g_State.m_OnTimedSender.IsWaitingForSendStatus();
+                g_State.m_Internals.m_WaitForResponse = g_State.m_OnTimedSender.IsWaitingForCmdResponse();
+            }
         }
     }
 

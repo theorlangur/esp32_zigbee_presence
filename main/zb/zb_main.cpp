@@ -240,7 +240,7 @@ namespace zb
         ESP_ERROR_CHECK(g_Internals.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report, g_Config.GetRestarts()));
         ESP_ERROR_CHECK(g_IlluminanceExternal.AddToCluster(custom_cluster, Access::RW, (bool)g_Config.GetIlluminanceExternal()));
-        ESP_ERROR_CHECK(g_Internals2.AddToCluster(custom_cluster, Access::Read));
+        ESP_ERROR_CHECK(g_Internals2.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
         ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));

@@ -90,6 +90,8 @@ namespace zb
             }
 
             zb::seq_nr_t GetTSN() const { return m_SendStatusNode.tsn; }
+            bool IsWaitingForSendStatus() const { return m_SendStatusNode.m_pList != nullptr; }
+            bool IsWaitingForCmdResponse() const { return m_ResponseNode.m_pList != nullptr; }
     private:
         void SetSeqNr(uint16_t nr = kInvalidSeqNr)
         {

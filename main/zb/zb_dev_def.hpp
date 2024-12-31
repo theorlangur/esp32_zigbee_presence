@@ -108,7 +108,9 @@ namespace zb
 
         //2nd uint32_t
         uint32_t m_LastTimeoutTSN               : 8   = 0;
-        uint32_t m_Unused                       : 24  = 0;
+        uint32_t m_WaitForSendStatus            : 1   = 0;
+        uint32_t m_WaitForResponse              : 1   = 0;
+        uint32_t m_Unused                       : 22  = 0;
 
 
         uint32_t GetVal() const { return *(uint32_t*)this; }
