@@ -25,13 +25,8 @@ namespace zb
         //g_ExternalOnOff.Report(g_DestCoordinator);
         if (update_presence_state())
         {
-            if (send_on_off(g_State.m_LastPresence))
-            {
-                //FMT_PRINT("ext timeout: delaying update_external_attributes\n");
-                g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
-            }
-            else
-                update_external_attributes();
+            (void)send_on_off(g_State.m_LastPresence);
+            update_external_attributes();
         }else
         {
             //FMT_PRINT("on ext timeout no presence change. ext to {}\n", (int)g_State.m_LastPresenceExternal);
@@ -53,10 +48,13 @@ namespace zb
 
         if (update_presence_state())
         {
-            if (send_on_off(g_State.m_LastPresence))
-                g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
-            else
-                update_external_attributes();
+            g_DelayedExternalUpdate.Setup([lp = g_State.m_LastPresence]{
+                    if (lp == g_State.m_LastPresence)
+                    {
+                        (void)send_on_off(g_State.m_LastPresence);
+                        update_external_attributes();
+                    }
+            }, kExternalTriggerCmdDelay);
         }else
         {
             g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
@@ -71,10 +69,13 @@ namespace zb
         g_State.m_ExternalRunningTimer.Cancel();
         if (update_presence_state())
         {
-            if (send_on_off(g_State.m_LastPresence))
-                g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
-            else
-                update_external_attributes();
+            g_DelayedExternalUpdate.Setup([lp = g_State.m_LastPresence]{
+                    if (lp == g_State.m_LastPresence)
+                    {
+                        (void)send_on_off(g_State.m_LastPresence);
+                        update_external_attributes();
+                    }
+            }, kExternalTriggerCmdDelay);
         }else
             g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         return ESP_OK;
@@ -108,10 +109,13 @@ namespace zb
         }
         if (update_presence_state())
         {
-            if (send_on_off(g_State.m_LastPresence))
-                g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
-            else
-                update_external_attributes();
+            g_DelayedExternalUpdate.Setup([lp = g_State.m_LastPresence]{
+                    if (lp == g_State.m_LastPresence)
+                    {
+                        (void)send_on_off(g_State.m_LastPresence);
+                        update_external_attributes();
+                    }
+            }, kExternalTriggerCmdDelay);
         }else
             g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         return ESP_OK;
@@ -135,10 +139,13 @@ namespace zb
 
             if (update_presence_state())
             {
-                if (send_on_off(g_State.m_LastPresence))
-                    g_DelayedExternalUpdate.Setup(update_external_attributes, kDelayedAttrChangeTimeout);
-                else
-                    update_external_attributes();
+                g_DelayedExternalUpdate.Setup([lp = g_State.m_LastPresence]{
+                        if (lp == g_State.m_LastPresence)
+                        {
+                            (void)send_on_off(g_State.m_LastPresence);
+                            update_external_attributes();
+                        }
+                }, kExternalTriggerCmdDelay);
             }else
                 g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
         }

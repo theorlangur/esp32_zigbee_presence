@@ -88,10 +88,13 @@ namespace zb
 
                 if (update_presence_state())
                 {
-                    if (send_on_off(g_State.m_LastPresence))
-                        g_DelayedAttrUpdate.Setup(update_presence_attr_only, kDelayedAttrChangeTimeout);
-                    else
-                        update_presence_attr_only();
+                    g_DelayedAttrUpdate.Setup([lp = g_State.m_LastPresence]{
+                            if (lp == g_State.m_LastPresence)
+                            {
+                                (void)send_on_off(g_State.m_LastPresence);
+                                update_presence_attr_only();
+                            }
+                    }, kExternalTriggerCmdDelay);
                 }
                 return ESP_OK;
             }
