@@ -381,6 +381,8 @@ const orlangurOccupactionExtended = {
     internals2: () => {
         const exposes = [
             e.numeric('last_timeout_tsn', ea.STATE_GET).withCategory('diagnostic'),
+            e.text('last_timeout_wait_send_status', ea.STATE_GET).withCategory('diagnostic'),
+            e.text('last_timeout_wait_response', ea.STATE_GET).withCategory('diagnostic'),
         ];
 
         const fromZigbee = [
@@ -397,6 +399,9 @@ const orlangurOccupactionExtended = {
                         buffer.writeUInt32LE(data['internals2']);
                         const b0 = buffer.readUInt8(0);
                         result['last_timeout_tsn'] = b0;
+                        const b1 = buffer.readUInt8(1);
+                        result['last_timeout_wait_send_status'] = (b1 & 0x01) == 0 ? "Done" : "Waiting";
+                        result['last_timeout_wait_response'] = (b1 & 0x02) == 0 ? "Done" : "Waiting";
                     }
                     else 
                     {
@@ -410,7 +415,7 @@ const orlangurOccupactionExtended = {
 
         const toZigbee = [
             {
-                key: ['last_timeout_tsn'],
+                key: ['last_timeout_tsn', 'last_timeout_wait_send_status', 'last_timeout_wait_response'],
                 convertGet: async (entity, key, meta) => {
                     await entity.read('customOccupationConfig', ['internals2']);
                 },
