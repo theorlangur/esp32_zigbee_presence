@@ -412,7 +412,7 @@ const orlangurOccupactionExtended = {
                         const b1 = buffer.readUInt8(1);
                         result['last_timeout_wait_send_status'] = (b1 & 0x01) == 0 ? "Done" : "Waiting";
                         result['last_timeout_wait_response'] = (b1 & 0x02) == 0 ? "Done" : "Waiting";
-                        result['last_esp_err'] = buffer.readUInt16(2);
+                        result['last_esp_err'] = buffer.readUInt16LE(2);
                     }
                     else 
                     {
