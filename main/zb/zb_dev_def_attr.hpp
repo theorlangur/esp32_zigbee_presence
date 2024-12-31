@@ -44,17 +44,11 @@ namespace zb
     static constexpr const uint16_t ON_OFF_COMMAND_MODE = 19;
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
     static constexpr const uint16_t PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD = 21;
-    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_MM_WAVE = 22;
-    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_PIR_INTERNAL = 23;
-    static constexpr const uint16_t ATTRIB_PRESENCE_EDGE_DETECTION_EXTERNAL = 24;
-    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_MM_WAVE = 25;
-    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL = 26;
-    static constexpr const uint16_t ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL = 27;
+    static constexpr const uint16_t ATTRIB_PRESENCE_DETECTION_CONFIG = 22;
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 29;
     static constexpr const uint16_t ATTRIB_INTERNALS = 30;
     static constexpr const uint16_t ATTRIB_RESTARTS_COUNT = 31;
-    static constexpr const uint16_t ATTRIB_ILLUMINANCE_EXTERNAL = 32;
     static constexpr const uint16_t ATTRIB_INTERNALS2 = 33;
 
     /**********************************************************************/
@@ -90,17 +84,11 @@ namespace zb
     using ZclAttributeOnOffCommandMode_t                      = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
     using ZclAttributeOnOffCommandTimeout_t                   = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
     using ZclAttributePresenceDetectionIlluminanceThreshold_t = LD2412CustomCluster_t::Attribute<PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD, uint8_t>;
-    using ZclAttributePresenceEdgeDetectionMMWave_t           = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_MM_WAVE, bool>;
-    using ZclAttributePresenceEdgeDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_PIR_INTERNAL, bool>;
-    using ZclAttributePresenceEdgeDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_EDGE_DETECTION_EXTERNAL, bool>;
-    using ZclAttributePresenceKeepDetectionMMWave_t           = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_MM_WAVE, bool>;
-    using ZclAttributePresenceKeepDetectionPIRInternal_t      = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_PIR_INTERNAL, bool>;
-    using ZclAttributePresenceKeepDetectionExternal_t         = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_KEEP_DETECTION_EXTERNAL, bool>;
+    using ZclAttributePresenceDetectionConfig_t               = LD2412CustomCluster_t::Attribute<ATTRIB_PRESENCE_DETECTION_CONFIG, uint8_t>;
     using ZclAttributeExternalOnTime_t                        = LD2412CustomCluster_t::Attribute<EXTERNAL_ON_TIME , uint16_t>;
     using ZclAttributeFailureStatus_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_FAILURE_STATUS, uint16_t>;
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
-    using ZclAttributeIlluminanceExternal_t                   = LD2412CustomCluster_t::Attribute<ATTRIB_ILLUMINANCE_EXTERNAL, bool>;
     using ZclAttributeInternals2_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS2, uint32_t>;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
@@ -144,17 +132,11 @@ namespace zb
     extern ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     extern ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
     extern ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
-    extern ZclAttributePresenceEdgeDetectionMMWave_t           g_PresenceEdgeDetectionMMWave;
-    extern ZclAttributePresenceEdgeDetectionPIRInternal_t      g_PresenceEdgeDetectionPIRInternal;
-    extern ZclAttributePresenceEdgeDetectionExternal_t         g_PresenceEdgeDetectionExternal;
-    extern ZclAttributePresenceKeepDetectionMMWave_t           g_PresenceKeepDetectionMMWave;
-    extern ZclAttributePresenceKeepDetectionPIRInternal_t      g_PresenceKeepDetectionPIRInternal;
-    extern ZclAttributePresenceKeepDetectionExternal_t         g_PresenceKeepDetectionExternal;
+    extern ZclAttributePresenceDetectionConfig_t               g_PresenceDetectionConfig;
     extern ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
     extern ZclAttributeFailureStatus_t                         g_FailureStatus;
     extern ZclAttributeInternals_t                             g_Internals;
     extern ZclAttributeRestartsCount_t                         g_RestartsCount;
-    extern ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
     extern ZclAttributeInternals2_t                            g_Internals2;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)

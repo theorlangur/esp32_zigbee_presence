@@ -11,16 +11,19 @@ namespace zb
         static constexpr uint32_t kActualStreamingVersion = 1;
         static constexpr uint8_t kMaxIlluminance = 255;
 
-        struct PresenceDetectionMode
+        union PresenceDetectionMode
         {
-            uint8_t m_Edge_mmWave          : 1 = 0;
-            uint8_t m_Edge_PIRInternal     : 1 = 1;
-            uint8_t m_Edge_External        : 1 = 1;
-            uint8_t m_Keep_mmWave          : 1 = 1;
-            uint8_t m_Keep_PIRInternal     : 1 = 1;
-            uint8_t m_Keep_External        : 1 = 1;
-            uint8_t m_Illuminance_External : 1 = 0;
-            uint8_t m_Unused               : 1 = 0;
+            struct{
+                uint8_t m_Edge_mmWave          : 1 = 0;
+                uint8_t m_Edge_PIRInternal     : 1 = 1;
+                uint8_t m_Edge_External        : 1 = 1;
+                uint8_t m_Keep_mmWave          : 1 = 1;
+                uint8_t m_Keep_PIRInternal     : 1 = 1;
+                uint8_t m_Keep_External        : 1 = 1;
+                uint8_t m_Illuminance_External : 1 = 0;
+                uint8_t m_Unused               : 1 = 0;
+            };
+            uint8_t m_Raw;
         };
     private:
         uint32_t m_Version = kActualStreamingVersion;

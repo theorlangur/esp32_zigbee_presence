@@ -25,17 +25,11 @@ namespace zb
     ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
     ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
-    ZclAttributePresenceEdgeDetectionMMWave_t           g_PresenceEdgeDetectionMMWave;
-    ZclAttributePresenceEdgeDetectionPIRInternal_t      g_PresenceEdgeDetectionPIRInternal;
-    ZclAttributePresenceEdgeDetectionExternal_t         g_PresenceEdgeDetectionExternal;
-    ZclAttributePresenceKeepDetectionMMWave_t           g_PresenceKeepDetectionMMWave;
-    ZclAttributePresenceKeepDetectionPIRInternal_t      g_PresenceKeepDetectionPIRInternal;
-    ZclAttributePresenceKeepDetectionExternal_t         g_PresenceKeepDetectionExternal;
+    ZclAttributePresenceDetectionConfig_t               g_PresenceDetectionConfig;
     ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
     ZclAttributeFailureStatus_t                         g_FailureStatus;
     ZclAttributeInternals_t                             g_Internals;
     ZclAttributeRestartsCount_t                         g_RestartsCount;
-    ZclAttributeIlluminanceExternal_t                   g_IlluminanceExternal;
     ZclAttributeInternals2_t                            g_Internals2;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
@@ -171,67 +165,16 @@ namespace zb
                 return ESP_OK;
             }
         >{},
-        AttrDescr<ZclAttributePresenceEdgeDetectionMMWave_t, 
-            [](const bool &to, const auto *message)->esp_err_t
+        AttrDescr<ZclAttributePresenceDetectionConfig_t, 
+            [](const uint8_t &to, const auto *message)->esp_err_t
             {
-                FMT_PRINT("Changing presence edge detection mmWave to {}\n", to);
+                FMT_PRINT("Changing presence detection config to {:x}\n", to);
                 auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Edge_mmWave = to;
+                c.m_Raw = to;
                 g_Config.SetPresenceDetectionMode(c);
                 return ESP_OK;
             }
         >{},
-        AttrDescr<ZclAttributePresenceEdgeDetectionPIRInternal_t, 
-            [](const bool &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence edge detection PIR Internal to {}\n", to);
-                auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Edge_PIRInternal = to;
-                g_Config.SetPresenceDetectionMode(c);
-                return ESP_OK;
-            }
-        >{},
-        AttrDescr<ZclAttributePresenceEdgeDetectionExternal_t, 
-            [](const bool &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence edge detection external to {}\n", to);
-                auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Edge_External = to;
-                g_Config.SetPresenceDetectionMode(c);
-                return ESP_OK;
-            }
-        >{},
-        AttrDescr<ZclAttributePresenceKeepDetectionMMWave_t, 
-            [](const bool &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence Keep detection mmWave to {}\n", to);
-                auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Keep_mmWave = to;
-                g_Config.SetPresenceDetectionMode(c);
-                return ESP_OK;
-            }
-        >{},
-        AttrDescr<ZclAttributePresenceKeepDetectionPIRInternal_t, 
-            [](const bool &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence Keep detection PIR Internal to {}\n", to);
-                auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Keep_PIRInternal = to;
-                g_Config.SetPresenceDetectionMode(c);
-                return ESP_OK;
-            }
-        >{},
-        AttrDescr<ZclAttributePresenceKeepDetectionExternal_t, 
-            [](const bool &to, const auto *message)->esp_err_t
-            {
-                FMT_PRINT("Changing presence Keep detection external to {}\n", to);
-                auto c = g_Config.GetPresenceDetectionMode();
-                c.m_Keep_External = to;
-                g_Config.SetPresenceDetectionMode(c);
-                return ESP_OK;
-            }
-        >{},
-
         {}//last one
     };
 

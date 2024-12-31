@@ -398,33 +398,9 @@ namespace zb
             //        , (bool)presenceDetectionMode.m_Keep_PIRInternal
             //        , (bool)presenceDetectionMode.m_Keep_External
             //        );
-            if (auto status = g_PresenceEdgeDetectionMMWave.Set(presenceDetectionMode.m_Edge_mmWave); !status)
+            if (auto status = g_PresenceDetectionConfig.Set(presenceDetectionMode.m_Raw); !status)
             {
-                FMT_PRINT("Failed to set initial detection mode edge mmWave {:x}\n", (int)status.error());
-            }
-            if (auto status = g_PresenceEdgeDetectionPIRInternal.Set(presenceDetectionMode.m_Edge_PIRInternal); !status)
-            {
-                FMT_PRINT("Failed to set initial detection mode edge PIR Internal {:x}\n", (int)status.error());
-            }
-            if (auto status = g_PresenceEdgeDetectionExternal.Set(presenceDetectionMode.m_Edge_External); !status)
-            {
-                FMT_PRINT("Failed to set initial detection mode edge external {:x}\n", (int)status.error());
-            }
-            if (auto status = g_PresenceKeepDetectionMMWave.Set(presenceDetectionMode.m_Keep_mmWave); !status)
-            {
-                FMT_PRINT("Failed to set initial detection mode keep mmWave {:x}\n", (int)status.error());
-            }
-            if (auto status = g_PresenceKeepDetectionPIRInternal.Set(presenceDetectionMode.m_Keep_PIRInternal); !status)
-            {
-                FMT_PRINT("Failed to set initial detection mode keep PIR internal {:x}\n", (int)status.error());
-            }
-            if (auto status = g_PresenceKeepDetectionExternal.Set(presenceDetectionMode.m_Keep_External); !status)
-            {
-                FMT_PRINT("Failed to set initial detection mode keep external {:x}\n", (int)status.error());
-            }
-            if (auto status = g_IlluminanceExternal.Set(presenceDetectionMode.m_Illuminance_External); !status)
-            {
-                FMT_PRINT("Failed to set initial illuminance external {:x}\n", (int)status.error());
+                FMT_PRINT("Failed to set initial detection config {:x}\n", (int)status.error());
             }
         }
 
