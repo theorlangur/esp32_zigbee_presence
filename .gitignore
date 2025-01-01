@@ -4,5 +4,6 @@ dependencies.lock
 sdkconfig
 sdkconfig.dbg
 sdkconfig.rel
+sdkconfig.old
 .cache/
 managed_components/
