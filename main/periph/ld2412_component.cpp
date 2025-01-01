@@ -602,7 +602,9 @@ namespace ld2412
                 .pull_up_en = GPIO_PULLUP_DISABLE,
                 .pull_down_en = GPIO_PULLDOWN_ENABLE,
                 .intr_type = GPIO_INTR_ANYEDGE,
+#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
                 .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
+#endif
             };
 
             gpio_config(&ld2412_presence_pin_cfg);
@@ -616,7 +618,9 @@ namespace ld2412
                 .pull_up_en = GPIO_PULLUP_DISABLE,
                 .pull_down_en = GPIO_PULLDOWN_ENABLE,
                 .intr_type = GPIO_INTR_ANYEDGE,
+#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
                 .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
+#endif
             };
 
             gpio_config(&ld2412_presence_pin_cfg);

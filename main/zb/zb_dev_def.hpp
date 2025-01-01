@@ -21,8 +21,15 @@ namespace zb
     /**********************************************************************/
     /* PINS                                                               */
     /**********************************************************************/
-    static constexpr int LD2412_PINS_TX = 11;
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+    static constexpr int LD2412_PINS_TX = 15; 
+    static constexpr int LD2412_PINS_RX = 14;
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+    static constexpr int LD2412_PINS_TX = 11; 
     static constexpr int LD2412_PINS_RX = 10;
+#else
+#error "Unsupported board"
+#endif
     static constexpr int LD2412_PINS_PRESENCE = 4;
     static constexpr int LD2412_PINS_PIR_PRESENCE = 5;
     static constexpr int PINS_RESET = 3;

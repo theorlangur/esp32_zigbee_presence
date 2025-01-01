@@ -23,7 +23,9 @@ namespace zb
             .pull_up_en = GPIO_PULLUP_ENABLE,
             .pull_down_en = GPIO_PULLDOWN_DISABLE,
             .intr_type = GPIO_INTR_ANYEDGE,
+#if SOC_GPIO_SUPPORT_PIN_HYS_FILTER
             .hys_ctrl_mode = gpio_hys_ctrl_mode_t{}
+#endif
         };
 
         gpio_config(&reset_pin_cfg);
