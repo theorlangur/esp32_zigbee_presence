@@ -260,7 +260,7 @@ const orlangurOccupactionExtended = {
     },
     distanceConfig: () => {
         const exposes = [
-            e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(1).withValueMax(12).withCategory('config'),
+            e.numeric('min_distance', ea.ALL).withLabel("Minimum detection distance").withUnit("m").withValueMin(0).withValueMax(12).withCategory('config'),
             e.numeric('max_distance', ea.ALL).withLabel("Maximum detection distance").withUnit("m").withValueMin(1).withValueMax(12).withCategory('config'),
         ];
 
