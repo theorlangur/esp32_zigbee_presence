@@ -22,6 +22,7 @@ namespace zb
     ZclAttributeMode_t                                  g_LD2412Mode;
     ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
     ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
+    ZclAttributeDistanceRes_t                           g_LD2412DistanceRes;
     ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
     ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
@@ -31,6 +32,7 @@ namespace zb
     ZclAttributeInternals_t                             g_Internals;
     ZclAttributeRestartsCount_t                         g_RestartsCount;
     ZclAttributeInternals2_t                            g_Internals2;
+    ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     ZclAttributeStillDistance_t                         g_LD2412StillDistance;
@@ -46,12 +48,16 @@ namespace zb
 #endif
 
     static ZbAlarmExt16 g_DelayedAttrUpdate;
-    static void update_presence_attr_only()
+    void update_zb_occupancy_attr()
     {
         esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
         if (auto status = g_OccupancyState.Set(val); !status)
         {
             FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
+        }
+        if (auto status = g_ArmedForTrigger.Set(g_State.m_TriggerAllowed); !status)
+        {
+            FMT_PRINT("Failed to set 'Armed for Trigger' attribute with error {:x}\n", (int)status.error());
         }
     }
     /**********************************************************************/
@@ -63,6 +69,13 @@ namespace zb
             {
                 FMT_PRINT("Changing timeout to {}\n", to);
                 g_ld2412.ChangeTimeout(to);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeArmedForTrigger_t, [](bool const& to, const auto* msg)->esp_err_t
+            {
+                FMT_PRINT("Changing 'trigger allowed' to {}\n", to);
+                g_State.m_TriggerAllowed = to;
                 return ESP_OK;
             }
         >{},
@@ -86,7 +99,7 @@ namespace zb
                             if (lp == g_State.m_LastPresence)
                             {
                                 (void)send_on_off(g_State.m_LastPresence);
-                                update_presence_attr_only();
+                                update_zb_occupancy_attr();
                             }
                     }, kExternalTriggerCmdDelay);
                 }
@@ -130,6 +143,14 @@ namespace zb
             {
                 FMT_PRINT("Changing min distance to {}\n", to);
                 g_ld2412.ChangeMinDistance(to);
+                return ESP_OK;
+            }
+        >{},
+        AttrDescr<ZclAttributeDistanceRes_t, 
+            [](const LD2412::DistanceRes &to, const auto *message)->esp_err_t
+            {
+                FMT_PRINT("Changing distance resolution to {}\n", to);
+                g_ld2412.ChangeDistanceRes(to);
                 return ESP_OK;
             }
         >{},

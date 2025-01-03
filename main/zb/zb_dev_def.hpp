@@ -53,6 +53,7 @@ namespace zb
     [[nodiscard]] bool send_on_off(bool on);
     bool update_presence_state();
     void setup_sensor();
+    void update_zb_occupancy_attr();
 
     struct OnWithTimedOffPayload;
 

@@ -8,11 +8,7 @@ namespace zb
     {
         //FMT_PRINT("update_external_attributes. ext to {}\n", (int)g_State.m_LastPresenceExternal);
         g_ExternalOnOff.Set(g_State.m_LastPresenceExternal);
-        esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
-        if (auto status = g_OccupancyState.Set(val); !status)
-        {
-            FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-        }
+        update_zb_occupancy_attr();
     };
 
     /**********************************************************************/

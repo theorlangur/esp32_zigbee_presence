@@ -172,13 +172,8 @@ namespace zb
         /**********************************************************************/
         /* Zigbee attributes update                                           */
         /**********************************************************************/
-        esp_zb_zcl_occupancy_sensing_occupancy_t val = g_State.m_LastPresence ? ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_OCCUPIED : ESP_ZB_ZCL_OCCUPANCY_SENSING_OCCUPANCY_UNOCCUPIED;
+        update_zb_occupancy_attr();
         {
-            if (auto status = g_OccupancyState.Set(val); !status)
-            {
-                FMT_PRINT("Failed to set occupancy attribute with error {:x}\n", (int)status.error());
-            }
-
             if (auto status = g_LD2412State.Set(LD2412State(g_State.m_LastLD2412State)); !status)
             {
                 FMT_PRINT("Failed to set state attribute with error {:x}\n", (int)status.error());
@@ -329,6 +324,10 @@ namespace zb
             if (auto status = g_LD2412Mode.Set(g_ld2412.GetMode()); !status)
             {
                 FMT_PRINT("Failed to set initial system mode with error {:x}\n", (int)status.error());
+            }
+            if (auto status = g_LD2412DistanceRes.Set(g_ld2412.GetDistanceRes()); !status)
+            {
+                FMT_PRINT("Failed to set initial distance resolution with error {:x}\n", (int)status.error());
             }
         }
 

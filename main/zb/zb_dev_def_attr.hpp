@@ -45,6 +45,8 @@ namespace zb
     static constexpr const uint16_t ON_OFF_COMMAND_TIMEOUT = 20;
     static constexpr const uint16_t PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD = 21;
     static constexpr const uint16_t ATTRIB_PRESENCE_DETECTION_CONFIG = 22;
+    static constexpr const uint16_t ATTRIB_ARMED_FOR_TRIGGER = 23;
+    static constexpr const uint16_t LD2412_ATTRIB_DISTANCE_RESOLUTION = 24;
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 29;
     static constexpr const uint16_t ATTRIB_INTERNALS = 30;
@@ -81,6 +83,7 @@ namespace zb
     using ZclAttributeMode_t                                  = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_MODE, LD2412::SystemMode>;
     using ZclAttributeEngineeringLight_t                      = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_ENGINEERING_LIGHT, uint8_t>;
     using ZclAttributePIRPresence_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_PIR_PRESENCE, bool>;
+    using ZclAttributeDistanceRes_t                           = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_DISTANCE_RESOLUTION, LD2412::DistanceRes>;
     using ZclAttributeOnOffCommandMode_t                      = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_MODE, OnOffMode>;
     using ZclAttributeOnOffCommandTimeout_t                   = LD2412CustomCluster_t::Attribute<ON_OFF_COMMAND_TIMEOUT, uint16_t>;
     using ZclAttributePresenceDetectionIlluminanceThreshold_t = LD2412CustomCluster_t::Attribute<PRESENCE_DETECTION_ILLUMINANCE_THRESHOLD, uint8_t>;
@@ -90,6 +93,7 @@ namespace zb
     using ZclAttributeInternals_t                             = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS , uint32_t>;
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
     using ZclAttributeInternals2_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS2, uint32_t>;
+    using ZclAttributeArmedForTrigger_t                       = LD2412CustomCluster_t::Attribute<ATTRIB_ARMED_FOR_TRIGGER, bool>;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     using ZclAttributeStillDistance_t                         = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
@@ -129,6 +133,7 @@ namespace zb
     extern ZclAttributeMode_t                                  g_LD2412Mode;
     extern ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
     extern ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
+    extern ZclAttributeDistanceRes_t                           g_LD2412DistanceRes;
     extern ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
     extern ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
     extern ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
@@ -138,6 +143,7 @@ namespace zb
     extern ZclAttributeInternals_t                             g_Internals;
     extern ZclAttributeRestartsCount_t                         g_RestartsCount;
     extern ZclAttributeInternals2_t                            g_Internals2;
+    extern ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     extern ZclAttributeStillDistance_t                         g_LD2412StillDistance;
