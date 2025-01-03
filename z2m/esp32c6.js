@@ -1,7 +1,7 @@
 const { Buffer } = require('node:buffer');
 const util = require('node:util');
 const {Zcl} = require('zigbee-herdsman');
-const {enumLookup,numeric,deviceAddCustomCluster,onOff} = require('zigbee-herdsman-converters/lib/modernExtend');
+const {enumLookup,numeric,deviceAddCustomCluster,onOff,binary} = require('zigbee-herdsman-converters/lib/modernExtend');
 const fz = require('zigbee-herdsman-converters/converters/fromZigbee');
 const tz = require('zigbee-herdsman-converters/converters/toZigbee');
 const exposes = require('zigbee-herdsman-converters/lib/exposes');
@@ -645,11 +645,12 @@ const definition = {
                 on_off_timeout: {ID: 0x0014, type: Zcl.DataType.UINT16},
                 illuminance_threshold: {ID: 0x0015, type: Zcl.DataType.UINT8},
                 presence_detection_config: {ID: 0x0016, type: Zcl.DataType.UINT8},
+                armed_for_trigger: {ID: 0x0017, type: Zcl.DataType.BOOLEAN},
+                distance_resolution: {ID: 0x0018, type: Zcl.DataType.ENUM8},
                 external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
                 failure_status: {ID:0x001d, type: Zcl.DataType.UINT16},
                 internals: {ID:0x001e, type: Zcl.DataType.UINT32},
                 restarts_count: {ID:0x001f, type: Zcl.DataType.UINT16},
-                illuminance_external: {ID:0x0020, type: Zcl.DataType.BOOLEAN},
                 internals2: {ID:0x0021, type: Zcl.DataType.UINT32},
             },
             commands: {
@@ -724,6 +725,15 @@ const definition = {
             description: 'Extended state',
             lookup: {Normal: 0, DynamicBackgroundAnalysis: 1, Calibration: 2},
         }),
+        binary({
+            name: 'armed_for_trigger',
+            access: 'ALL',
+            cluster: 'customOccupationConfig',
+            attribute: 'armed_for_trigger',
+            valueOn: ['Armed', 1],
+            valueOff: ['Not Armed', 0],
+            description: 'Can be triggered again'
+        }),
         orlangurOccupactionExtended.mode(),
         enumLookup({
             name: 'on_off_mode',
@@ -742,6 +752,15 @@ const definition = {
             valueMin: 0,
             valueMax: 1000,
             access: 'ALL',
+            entityCategory: 'config',
+        }),
+        enumLookup({
+            name: 'distance_resolution',
+            access: 'ALL',
+            cluster: 'customOccupationConfig',
+            attribute: 'distance_resolution',
+            description: 'Distance resolution',
+            lookup: {_0_75: 0, _0_50: 1, _0_20: 3},
             entityCategory: 'config',
         }),
         numeric({
@@ -809,7 +828,7 @@ const definition = {
         await endpoint.read('customOccupationConfig', ['illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
         await endpoint.read('customOccupationConfig', ['failure_status', 'internals', 'internals2']);
-        await endpoint.read('customOccupationConfig', [ 'presence_detection_config' ]);
+        await endpoint.read('customOccupationConfig', [ 'presence_detection_config', 'armed_for_trigger', 'distance_resolution' ]);
         await endpoint.configureReporting('msOccupancySensing', [
             {
                 attribute: 'occupancy',
@@ -872,6 +891,12 @@ const definition = {
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,
             },
+            {
+                attribute: 'armed_for_trigger',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            }
         ])
 
         await endpoint.read('customOccupationConfig', ['restarts_count']);
