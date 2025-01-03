@@ -34,6 +34,7 @@ namespace ld2412
             SetMode,
             SetMoveSensitivity,
             SetStillSensitivity,
+            SetDistanceRes,
         };
 
         Type m_Type;
@@ -78,6 +79,7 @@ namespace ld2412
             uint16_t m_Timeout;
             uint16_t m_Distance;
             LD2412::SystemMode m_Mode;
+            LD2412::DistanceRes m_DistRes;
             uint8_t m_Sensitivity[14];
             bool m_Bluetooth;
         };
@@ -227,6 +229,19 @@ namespace ld2412
                     {
                         FMT_PRINT("Calibration was not running. Nothing to stop\n");
                     }
+                }
+                break;
+            case QueueMsg::Type::SetDistanceRes:
+                {
+                    FMT_PRINT("Changing distance resolution to: {}\n", msg.m_DistRes);
+                    auto te = d.ChangeConfiguration()
+                        .SetDistanceRes(msg.m_DistRes)
+                        .EndChange();
+                    if (!te)
+                    {
+                        FMT_PRINT("Setting mode has failed: {}\n", te.error());
+                    } else if (m_ConfigUpdateCallback)
+                            m_ConfigUpdateCallback();
                 }
                 break;
             case QueueMsg::Type::SetMode:
@@ -633,6 +648,11 @@ namespace ld2412
         QueueMsg msg{.m_Type = QueueMsg::Type::SetMode, .m_Mode = m};
         xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
     }
+    void Component::ChangeDistanceRes(LD2412::DistanceRes r)
+    {
+        QueueMsg msg{.m_Type = QueueMsg::Type::SetDistanceRes, .m_DistRes = r};
+        xQueueSend(m_ManagingQueue, &msg, portMAX_DELAY);
+    }
     void Component::ChangeTimeout(uint16_t to)
     {
         QueueMsg msg{.m_Type = QueueMsg::Type::SetTimeout, .m_Timeout = to};
@@ -703,6 +723,7 @@ namespace ld2412
     }
 
     LD2412::SystemMode Component::GetMode() const { return m_Sensor.GetSystemMode(); }
+    LD2412::DistanceRes Component::GetDistanceRes() const { return m_Sensor.GetDistanceRes(); }
     int Component::GetMinDistance() const { return m_Sensor.GetMinDistance(); }
     uint8_t Component::GetMinDistanceRaw() const { return m_Sensor.GetMinDistanceRaw(); }
 

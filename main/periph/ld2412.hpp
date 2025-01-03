@@ -59,10 +59,11 @@ public:
         MoveAndStill,
     };
 
-    enum class DistanceRes: uint16_t
+    enum class DistanceRes: uint8_t
     {
         _0_75 = 0,
-        _0_20 = 1,
+        _0_50 = 1,
+        _0_20 = 3,
     };
 
     enum class Drain
@@ -156,6 +157,7 @@ public:
 
 
         ConfigBlock& SetSystemMode(SystemMode mode);
+        ConfigBlock& SetDistanceRes(DistanceRes r);
 
         ConfigBlock& SetMinDistance(int dist);
         ConfigBlock& SetMinDistanceRaw(uint8_t dist);
@@ -173,6 +175,7 @@ public:
         ExpectedResult EndChange();
     private:
         SystemMode m_NewMode;
+        DistanceRes m_NewDistanceRes;
         Configuration m_Configuration;
 
         union{
@@ -185,7 +188,8 @@ public:
                 uint32_t OutPin           : 1;
                 uint32_t MoveThreshold    : 1;
                 uint32_t StillThreshold   : 1;
-                uint32_t Unused           : 25;
+                uint32_t DistanceRes      : 1;
+                uint32_t Unused           : 24;
             }m_Changed;
             
             struct{
@@ -219,7 +223,7 @@ public:
 
     auto GetTimeout() const { return m_Configuration.m_Base.m_Duration; }//seconds
     bool GetOutPinPolarity() const { return m_Configuration.m_Base.m_OutputPinPolarity; }
-    auto GetDistanceRes() const { return m_DistanceRes; }
+    auto GetDistanceRes() const { return m_DistanceResolution.m_Res; }
 
     ConfigBlock ChangeConfiguration() { return {*this}; }
 
@@ -256,6 +260,9 @@ private:
         EnterEngMode = 0x0062,
         LeaveEngMode = 0x0063,
 
+        //QueryDistanceResolution = 0x0011,
+        //SetDistanceResolution = 0x0001,
+
         SetMoveSensitivity = 0x0003,
         GetMoveSensitivity = 0x0013,
 
@@ -274,8 +281,10 @@ private:
         OpenCmd = 0x00ff,
         CloseCmd = 0x00fe,
 
-        SetDistanceRes = 0x00aa,
-        GetDistanceRes = 0x00ab,
+        //SetDistanceRes = 0x00aa,
+        //GetDistanceRes = 0x00ab,
+        SetDistanceRes = 0x0001,
+        GetDistanceRes = 0x0011,
     };
 
     friend Cmd operator|(Cmd r, uint16_t v)
@@ -468,6 +477,7 @@ private:
 
     ExpectedGenericCmdResult SetSystemModeInternal(SystemMode mode);
     ExpectedGenericCmdResult UpdateVersion();
+    ExpectedGenericCmdResult SetDistanceResInternal(DistanceRes r);
 
     ExpectedResult QueryDynamicBackgroundAnalysisRunState();
 
@@ -483,7 +493,11 @@ private:
     Engeneering m_Engeneering;
 
     uint8_t m_BluetoothMAC[6] = {0};
-    DistanceRes m_DistanceRes = DistanceRes::_0_75;
+    struct DistanceResBuf
+    {
+        DistanceRes m_Res = DistanceRes::_0_75;
+        uint8_t m_FixedBuf[5] = {0, 0, 0, 0, 0};
+    }m_DistanceResolution;
 
     bool m_DynamicBackgroundAnalysis = false;
 public:

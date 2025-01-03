@@ -72,6 +72,7 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
     TRY_UART_COMM(SendCommandV2(Cmd::GetMoveSensitivity, to_send(), to_recv(m_Configuration.m_MoveThreshold)), "ReloadConfig", ErrorCode::SendCommand_Failed);
     TRY_UART_COMM(SendCommandV2(Cmd::GetStillSensitivity, to_send(), to_recv(m_Configuration.m_StillThreshold)), "ReloadConfig", ErrorCode::SendCommand_Failed);
     TRY_UART_COMM(SendCommandV2(Cmd::GetMAC, to_send(uint16_t(0x0001)), to_recv(m_BluetoothMAC)), "ReloadConfig", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceResolution)), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
     TRY_UART_COMM(CloseCommandMode(), "ReloadConfig", ErrorCode::SendCommand_Failed);
     return std::ref(*this);
 }
@@ -79,7 +80,7 @@ LD2412::ExpectedResult LD2412::ReloadConfig()
 LD2412::ExpectedResult LD2412::UpdateDistanceRes()
 {
     TRY_UART_COMM(OpenCommandMode(), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
-    TRY_UART_COMM(SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceRes)), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
+    TRY_UART_COMM(SendCommandV2(Cmd::GetDistanceRes, to_send(), to_recv(m_DistanceResolution)), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
     TRY_UART_COMM(CloseCommandMode(), "UpdateDistanceRes", ErrorCode::SendCommand_Failed);
     return std::ref(*this);
 }
@@ -156,6 +157,11 @@ LD2412::ExpectedGenericCmdResult LD2412::SetSystemModeInternal(SystemMode mode)
     return SendCommandV2(c, to_send(), to_recv());
 }
 
+LD2412::ExpectedGenericCmdResult LD2412::SetDistanceResInternal(DistanceRes r)
+{
+    DistanceResBuf resBuf{r};
+    return SendCommandV2(Cmd::SetDistanceRes, to_send(resBuf), to_recv());
+}
 
 LD2412::ExpectedGenericCmdResult LD2412::UpdateVersion()
 {
@@ -269,6 +275,14 @@ LD2412::ConfigBlock& LD2412::ConfigBlock::SetSystemMode(SystemMode mode)
     m_NewMode = mode;
     return *this;
 }
+
+LD2412::ConfigBlock& LD2412::ConfigBlock::SetDistanceRes(DistanceRes r)
+{
+    m_Changed.DistanceRes = true;
+    m_NewDistanceRes = r;
+    return *this;
+}
+
 LD2412::ConfigBlock& LD2412::ConfigBlock::SetMinDistance(int dist)
 {
     m_Changed.MinDistance = true;
@@ -341,6 +355,11 @@ LD2412::ExpectedResult LD2412::ConfigBlock::EndChange()
     {
         d.m_Mode = m_NewMode; 
         TRY_UART_COMM(d.SetSystemModeInternal(d.m_Mode), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
+    }
+    if (m_Changed.DistanceRes)
+    {
+        d.m_DistanceResolution.m_Res = m_NewDistanceRes; 
+        TRY_UART_COMM(d.SetDistanceResInternal(m_NewDistanceRes), "LD2412::ConfigBlock::EndChange", ErrorCode::SendCommand_Failed);
     }
     if (m_Changed.MinDistance || m_Changed.MaxDistance || m_Changed.Timeout || m_Changed.OutPin)
     {

@@ -56,6 +56,7 @@ namespace ld2412
         bool Setup(setup_args_t const& args);
 
         void ChangeMode(LD2412::SystemMode m);
+        void ChangeDistanceRes(LD2412::DistanceRes r);
         void ChangeTimeout(uint16_t to);
         void ChangeMinDistance(uint16_t d);
         void ChangeMaxDistance(uint16_t d);
@@ -73,6 +74,7 @@ namespace ld2412
         void RunDynamicBackgroundAnalysis();
 
         LD2412::SystemMode GetMode() const;
+        LD2412::DistanceRes GetDistanceRes() const;
 
         int GetMinDistance() const;
         uint8_t GetMinDistanceRaw() const;
