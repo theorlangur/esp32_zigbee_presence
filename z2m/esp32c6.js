@@ -610,11 +610,11 @@ const orlangurOccupactionExtended = {
 }
 
 const definition = {
-    zigbeeModel: ['P-NextGen'],
-    model: 'P-NextGen',
-    fingerprint: [{modelID: 'P-NextGen', applicationVersion: 1, priority: -1},],
+    zigbeeModel: ['Presence-NG'],
+    model: 'Presence-NG',
+    fingerprint: [{modelID: 'Presence-NG', applicationVersion: 1, priority: -1},],
     vendor: 'Orlangur',
-    description: 'ESP32C6 Occupancy Test',
+    description: 'Overprogrammed Presence Sensor',
     fromZigbee: [fz.occupancy],
     toZigbee: [],
     exposes: [e.occupancy()],
@@ -760,7 +760,7 @@ const definition = {
             cluster: 'customOccupationConfig',
             attribute: 'distance_resolution',
             description: 'Distance resolution',
-            lookup: {_0_75: 0, _0_50: 1, _0_20: 3},
+            lookup: {_75cm: 0, _50cm: 1, _20cm: 3},
             entityCategory: 'config',
         }),
         numeric({

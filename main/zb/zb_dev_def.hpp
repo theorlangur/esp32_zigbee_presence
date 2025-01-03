@@ -14,7 +14,7 @@ namespace zb
     /**********************************************************************/
 
     [[maybe_unused]]inline static auto g_Manufacturer = ZbStr("Orlangur");
-    [[maybe_unused]]inline static auto g_Model = ZbStr("P-NextGen");
+    [[maybe_unused]]inline static auto g_Model = ZbStr("Presence-NG");
     [[maybe_unused]]inline static uint8_t g_AppVersion = 1;
     [[maybe_unused]]inline static const char *TAG = "ESP_ZB_PRESENCE_SENSOR";
 
