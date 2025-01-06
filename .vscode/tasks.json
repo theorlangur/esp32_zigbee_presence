@@ -2,6 +2,11 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Created Merged Bin",
+            "type": "shell",
+            "command": "pushd build && cat flasher_args.json | grep \"chip\" | awk -F'\"' '{print $4}' >target.env && esptool.py --chip @target.env merge_bin -o merged-firmware-$(cat target.env).bin @flash_project_args && popd"
+        },
+        {
             "label": "Set Target H2",
             "type": "shell",
             "command": "idf.py set-target esp32h2 && cp -f --update=all sdkconfig.dbg.h2 sdkconfig.dbg && cp -f --update=all sdkconfig.rel.h2 sdkconfig.rel"
