@@ -211,6 +211,33 @@ namespace zb
     static void on_movement_callback(bool _presence, ld2412::Component::PresenceResult const& p, ld2412::Component::ExtendedState exState)
     {
         APILock l;
+        using clock_t = std::chrono::system_clock;
+        if (p.pirPresence && !g_State.m_LastPresencePIRInternal)
+        {
+            //PIR off -> on
+            if (!p.mmPresence)
+            {
+                g_State.m_FalsePIRProbe = true;
+                g_State.m_LastPIRStartedTick = xTaskGetTickCount();
+                g_State.m_LastPIRTimeMS = std::chrono::time_point_cast<std::chrono::milliseconds>(clock_t::now()).time_since_epoch().count();
+            }
+        }else if (!p.pirPresence && g_State.m_LastPresencePIRInternal)
+        {
+            //PIR on -> off
+            if (g_State.m_FalsePIRProbe && !p.mmPresence)
+            {
+                g_State.m_FalsePIRProbe = false;
+                ++g_State.m_Internals.m_PIRFalsePositives;
+                g_State.m_Internals.m_LastFalsePIRTickDuration = xTaskGetTickCount() - g_State.m_LastPIRStartedTick;
+                g_State.m_Internals.m_LastFalsePIRDuration = std::chrono::time_point_cast<std::chrono::milliseconds>(clock_t::now()).time_since_epoch().count()
+                    -
+                    g_State.m_LastPIRTimeMS;
+            }
+        }
+
+        if (p.mmPresence && g_State.m_FalsePIRProbe)
+            g_State.m_FalsePIRProbe = false;
+
         g_State.m_LastPresenceMMWave = p.mmPresence;
         g_State.m_LastPresencePIRInternal = p.pirPresence;
         g_State.m_LastLD2412State = p.m_State;

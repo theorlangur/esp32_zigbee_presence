@@ -33,6 +33,7 @@ namespace zb
     ZclAttributeRestartsCount_t                         g_RestartsCount;
     ZclAttributeInternals2_t                            g_Internals2;
     ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
+    ZclAttributeInternals3_t                            g_Internals3;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     ZclAttributeStillDistance_t                         g_LD2412StillDistance;

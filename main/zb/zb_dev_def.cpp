@@ -45,5 +45,18 @@ namespace zb
                 }
             }
         }
+
+        {
+            static uint32_t g_LastSet = 0xffffffff;
+            uint32_t newVal = GetVal3();
+            if (newVal != g_LastSet)
+            {
+                g_LastSet = newVal;
+                if (auto status = g_Internals3.Set(newVal); !status)
+                {
+                    FMT_PRINT("Failed to set internals 3 in update {:x}\n", (int)status.error());
+                }
+            }
+        }
     }
 }

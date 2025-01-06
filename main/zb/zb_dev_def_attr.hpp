@@ -47,6 +47,7 @@ namespace zb
     static constexpr const uint16_t ATTRIB_PRESENCE_DETECTION_CONFIG = 22;
     static constexpr const uint16_t ATTRIB_ARMED_FOR_TRIGGER = 23;
     static constexpr const uint16_t LD2412_ATTRIB_DISTANCE_RESOLUTION = 24;
+    static constexpr const uint16_t ATTRIB_INTERNALS3 = 25;
     static constexpr const uint16_t EXTERNAL_ON_TIME = 28;
     static constexpr const uint16_t ATTRIB_FAILURE_STATUS = 29;
     static constexpr const uint16_t ATTRIB_INTERNALS = 30;
@@ -94,6 +95,7 @@ namespace zb
     using ZclAttributeRestartsCount_t                         = LD2412CustomCluster_t::Attribute<ATTRIB_RESTARTS_COUNT , uint16_t>;
     using ZclAttributeInternals2_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS2, uint32_t>;
     using ZclAttributeArmedForTrigger_t                       = LD2412CustomCluster_t::Attribute<ATTRIB_ARMED_FOR_TRIGGER, bool>;
+    using ZclAttributeInternals3_t                            = LD2412CustomCluster_t::Attribute<ATTRIB_INTERNALS3, uint32_t>;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     using ZclAttributeStillDistance_t                         = LD2412CustomCluster_t::Attribute<LD2412_ATTRIB_STILL_DISTANCE, uint16_t>;
@@ -144,6 +146,7 @@ namespace zb
     extern ZclAttributeRestartsCount_t                         g_RestartsCount;
     extern ZclAttributeInternals2_t                            g_Internals2;
     extern ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
+    extern ZclAttributeInternals3_t                            g_Internals3;
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
     extern ZclAttributeStillDistance_t                         g_LD2412StillDistance;

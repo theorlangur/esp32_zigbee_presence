@@ -118,16 +118,21 @@ namespace zb
         uint32_t m_LastTimeoutTSN               : 8   = 0;
         uint32_t m_WaitForSendStatus            : 1   = 0;
         uint32_t m_WaitForResponse              : 1   = 0;
-        uint32_t m_UnusedBits                   : 6   = 0;
+        uint32_t m_PIRFalsePositives            : 6   = 0;
         uint32_t m_LastESP_ERR                  : 16  = 0;
+
+        //3rd uint32_t
+        uint32_t m_LastFalsePIRTickDuration     : 16  = 0;
+        uint32_t m_LastFalsePIRDuration         : 16  = 0;
 
 
         uint32_t GetVal() const { return *(uint32_t*)this; }
         uint32_t GetVal2() const { return *((uint32_t*)this + 1); }
+        uint32_t GetVal3() const { return *((uint32_t*)this + 2); }
 
         void Update();
     };
-    static_assert(sizeof(Internals) == sizeof(uint32_t) * 2);
+    static_assert(sizeof(Internals) == sizeof(uint32_t) * 3);
 
     //initialized at start
     struct RuntimeState
@@ -173,11 +178,14 @@ namespace zb
         TriState8Array m_BindsReportingCapable;
         struct{
             uint8_t m_InitialBindsChecking : 1 = true;
-            uint8_t m_NeedBindsChecking    : 1= true;
-            uint8_t m_FailedStatusUpdated  : 1= false;
+            uint8_t m_NeedBindsChecking    : 1 = true;
+            uint8_t m_FailedStatusUpdated  : 1 = false;
+            uint8_t m_FalsePIRProbe        : 1 = false;
         };
 
         uint8_t m_ExternalIlluminance = 0;
+        uint32_t m_LastPIRStartedTick = 0;
+        uint32_t m_LastPIRTimeMS = 0;
 
         bool CommandsToBindInFlight() const;
         bool CanSendCommandsToBind() const;

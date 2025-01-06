@@ -393,6 +393,7 @@ const orlangurOccupactionExtended = {
             e.numeric('last_esp_err', ea.STATE_GET).withCategory('diagnostic'),
             e.text('last_timeout_wait_send_status', ea.STATE_GET).withCategory('diagnostic'),
             e.text('last_timeout_wait_response', ea.STATE_GET).withCategory('diagnostic'),
+            e.numeric('false_pir_triggers', ea.STATE_GET).withCategory('diagnostic').withUnit('times'),
         ];
 
         const fromZigbee = [
@@ -412,6 +413,7 @@ const orlangurOccupactionExtended = {
                         const b1 = buffer.readUInt8(1);
                         result['last_timeout_wait_send_status'] = (b1 & 0x01) == 0 ? "Done" : "Waiting";
                         result['last_timeout_wait_response'] = (b1 & 0x02) == 0 ? "Done" : "Waiting";
+                        result['false_pir_triggers'] = (b1 >> 2) & 0x03f;
                         result['last_esp_err'] = buffer.readUInt16LE(2);
                     }
                     else 
@@ -426,9 +428,56 @@ const orlangurOccupactionExtended = {
 
         const toZigbee = [
             {
-                key: ['last_timeout_tsn', 'last_timeout_wait_send_status', 'last_timeout_wait_response', 'last_esp_err'],
+                key: ['last_timeout_tsn', 'last_timeout_wait_send_status', 'last_timeout_wait_response', 'last_esp_err', 'false_pir_triggers'],
                 convertGet: async (entity, key, meta) => {
                     await entity.read('customOccupationConfig', ['internals2']);
+                },
+            }
+        ];
+
+        return {
+            exposes,
+            fromZigbee,
+            toZigbee,
+            isModernExtend: true,
+        };
+    },
+    internals3: () => {
+        const exposes = [
+            e.numeric('last_false_pir_ticks', ea.STATE_GET).withCategory('diagnostic').withUnit('ticks'),
+            e.numeric('last_false_pir_ms', ea.STATE_GET).withCategory('diagnostic').withUnit('ms'),
+        ];
+
+        const fromZigbee = [
+            {
+                cluster: 'customOccupationConfig',
+                type: ['attributeReport', 'readResponse'],
+                convert: (model, msg, publish, options, meta) => {
+                    const result = {};
+                    const data = msg.data;
+                    //logger.debug(`${attrDistance} + ${attrEnergy} presenceInfo fZ: ${util.inspect(data)};`, NS);
+                    if (data['internals3'] !== undefined) 
+                    {
+                        const buffer = Buffer.alloc(4);
+                        buffer.writeUInt32LE(data['internals3']);
+                        result['last_false_pir_ticks'] = buffer.readUInt16LE(0);
+                        result['last_false_pir_ms'] = buffer.readUInt16LE(2);
+                    }
+                    else 
+                    {
+                        //logger.debug(`presenceInfo fZ nothing to process`, NS);
+                        return;
+                    }
+                    return result;
+                }
+            }
+        ];
+
+        const toZigbee = [
+            {
+                key: ['last_false_pir_ms', 'last_false_pir_ticks'],
+                convertGet: async (entity, key, meta) => {
+                    await entity.read('customOccupationConfig', ['internals3']);
                 },
             }
         ];
@@ -647,6 +696,7 @@ const definition = {
                 presence_detection_config: {ID: 0x0016, type: Zcl.DataType.UINT8},
                 armed_for_trigger: {ID: 0x0017, type: Zcl.DataType.BOOLEAN},
                 distance_resolution: {ID: 0x0018, type: Zcl.DataType.ENUM8},
+                internals3: {ID:0x0019, type: Zcl.DataType.UINT32},
                 external_on_time: {ID:0x001c, type: Zcl.DataType.UINT16},
                 failure_status: {ID:0x001d, type: Zcl.DataType.UINT16},
                 internals: {ID:0x001e, type: Zcl.DataType.UINT32},
@@ -817,6 +867,7 @@ const definition = {
         orlangurOccupactionExtended.sensitivity('still', 'Still Sensitivity'),
         orlangurOccupactionExtended.internals(),
         orlangurOccupactionExtended.internals2(),
+        orlangurOccupactionExtended.internals3(),
     ],
     configure: async (device, coordinatorEndpoint) => {
         const endpoint = device.getEndpoint(1);
@@ -827,7 +878,7 @@ const definition = {
         await endpoint.read('customOccupationConfig', ['min_distance', 'max_distance']);
         await endpoint.read('customOccupationConfig', ['illuminance_threshold', 'on_off_timeout', 'on_off_mode']);
         await endpoint.read('customOccupationConfig', ['stillSensitivity','moveSensitivity','state']);
-        await endpoint.read('customOccupationConfig', ['failure_status', 'internals', 'internals2']);
+        await endpoint.read('customOccupationConfig', ['failure_status', 'internals', 'internals2', 'internals3']);
         await endpoint.read('customOccupationConfig', [ 'presence_detection_config', 'armed_for_trigger', 'distance_resolution' ]);
         await endpoint.configureReporting('msOccupancySensing', [
             {
@@ -887,6 +938,12 @@ const definition = {
             },
             {
                 attribute: 'internals2',
+                minimumReportInterval: 0,
+                maximumReportInterval: constants.repInterval.HOUR,
+                reportableChange: null,
+            },
+            {
+                attribute: 'internals3',
                 minimumReportInterval: 0,
                 maximumReportInterval: constants.repInterval.HOUR,
                 reportableChange: null,

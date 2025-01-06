@@ -237,6 +237,7 @@ namespace zb
         ESP_ERROR_CHECK(g_RestartsCount.AddToCluster(custom_cluster, Access::Read | Access::Report, g_Config.GetRestarts()));
         ESP_ERROR_CHECK(g_Internals2.AddToCluster(custom_cluster, Access::Read | Access::Report));
         ESP_ERROR_CHECK(g_ArmedForTrigger.AddToCluster(custom_cluster, Access::RWP, true));
+        ESP_ERROR_CHECK(g_Internals3.AddToCluster(custom_cluster, Access::Read | Access::Report));
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
         ESP_ERROR_CHECK(g_LD2412MoveDistance.AddToCluster(custom_cluster, Access::Read | Access::Report));
