@@ -1,6 +1,6 @@
 #ifndef UART_PRIMITIVES_HPP_
 #define UART_PRIMITIVES_HPP_
-#include "uart.hpp"
+#include "ph_uart.hpp"
 
 namespace uart
 {

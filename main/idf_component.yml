@@ -3,7 +3,6 @@ dependencies:
   joltwallet/littlefs: "~=1.14.4"
   espressif/esp-zigbee-lib: "*"
   espressif/esp-zboss-lib: "*"
-  espressif/led_strip: "^2.4.1"
   ## Required IDF version
   idf:
     version: ">=5.0"

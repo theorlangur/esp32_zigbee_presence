@@ -1,9 +1,9 @@
 #ifndef LD2412_H_
 #define LD2412_H_
 
-#include "uart.hpp"
+#include "ph_uart.hpp"
 #include <span>
-#include "uart_primitives.hpp"
+#include "ph_uart_primitives.hpp"
 
 class LD2412: public uart::Channel
 {

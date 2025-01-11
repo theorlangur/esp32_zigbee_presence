@@ -21,16 +21,12 @@ idf_component_register(SRCS
                     zb/zb_reset_button.cpp
                     zb/zb_runtime_state.cpp
                     #Periphery
-                    periph/board_led.hpp
-                    periph/board_led.cpp
-                    periph/uart.cpp 
-                    periph/uart.hpp 
                     periph/ld2412.cpp 
                     periph/ld2412.hpp 
                     periph/ld2412_component.cpp
                     periph/ld2412_component.hpp
                     INCLUDE_DIRS ""
-                    REQUIRES nvs_flash generic_lib zb_helpers
+                    REQUIRES nvs_flash generic_lib zb_helpers periphery_helpers
                     )
 
 #for being able to compile with clang
