@@ -3,6 +3,12 @@ dependencies:
   joltwallet/littlefs: "~=1.14.4"
   espressif/esp-zigbee-lib: "*"
   espressif/esp-zboss-lib: "*"
+  esp_generic_lib:
+    git: ssh://git@github.com/theorlangur/esp_generic_lib.git
+  esp_zb_helpers:
+    git: ssh://git@github.com/theorlangur/esp_zb_helpers.git
+  esp_periphery_helpers:
+    git: ssh://git@github.com/theorlangur/esp_periphery_helpers.git
   ## Required IDF version
   idf:
     version: ">=5.0"

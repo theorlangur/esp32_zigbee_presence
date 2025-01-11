@@ -26,7 +26,7 @@ idf_component_register(SRCS
                     periph/ld2412_component.cpp
                     periph/ld2412_component.hpp
                     INCLUDE_DIRS ""
-                    REQUIRES nvs_flash generic_lib zb_helpers periphery_helpers
+                    #REQUIRES nvs_flash
                     )
 
 #for being able to compile with clang
