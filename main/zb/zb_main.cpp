@@ -19,39 +19,10 @@ namespace zb
     /**********************************************************************/
     /* Bind/Unbind tracking                                               */
     /**********************************************************************/
-    bool apsde_data_indication_callback(esp_zb_apsde_data_ind_t ind)
-    {
-        if (ind.dst_short_addr == esp_zb_get_short_address() && ind.status == 0)
-        {
-            //when I'm the target
-            if (ind.asdu_length == sizeof(APSME_BindReq) + 1)
-            {
-                auto cmd = APSME_Commands(ind.cluster_id);//this will have a command id
-                switch(cmd)
-                {
-                    case APSME_Commands::Bind:
-                    case APSME_Commands::Unbind:
-                    {
-                        APSME_BindReq *pReq = (APSME_BindReq *)(ind.asdu + 1);
-                        if (pReq->cluster_id == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF)
-                        {
-                            FMT_PRINT("Got {} request via APSDE.indication for {}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst);
-                            //relevant
-                            //trigger binds re-check
-                            g_State.m_NeedBindsChecking = true;
-                        }else
-                        {
-                            FMT_PRINT("Got {} request via APSDE.indication for {}, cluster {:x}\n", (cmd == APSME_Commands::Bind ? "Bind" : "UnBind"), pReq->dst, (int)pReq->cluster_id);
-                        }
-                    }
-                    break;
-                    default:
-                        break;
-                }
-            }
-        }
-        return false;
-    }
+    BindUnbind_Handler g_OnOffBindUnbindRequestTracker{
+        .cb = [](APSME_Commands cmd, APSME_BindUnbindReq &r) { g_State.m_NeedBindsChecking = true; },
+        .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_ON_OFF
+    };
 
     /**********************************************************************/
     /* Common zigbee network handling                                     */
@@ -409,7 +380,8 @@ namespace zb
 
         //esp_zb_ti
         esp_zb_zcl_command_send_status_handler_register(&zb::ZbCmdSend::handler);
-        esp_zb_aps_data_indication_handler_register(apsde_data_indication_callback);
+        setup_generic_absde_data_indication_handling();
+        g_OnOffBindUnbindRequestTracker.Add();
         ESP_LOGI(TAG, "ZB registered device");
         fflush(stdout);
 

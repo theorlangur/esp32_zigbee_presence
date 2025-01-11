@@ -15,22 +15,6 @@ namespace zb
     bool IsCoordinator(esp_zb_zcl_addr_t &addr);
     const esp_zb_ieee_addr_t& GetMyIEEE();
 
-    enum class APSME_Commands: uint8_t
-    {
-        Bind = 0x21,
-        Unbind = 0x22,
-    };
-
-    struct APSME_BindReq
-    {
-        esp_zb_ieee_addr_t src;
-        uint8_t src_ep;
-        uint16_t cluster_id;
-        uint8_t dst_addr_mode;//only 0x03 is interesting
-        esp_zb_ieee_addr_t dst;
-        uint8_t dst_ep;
-    }__attribute__((packed));
-
     struct ZigbeeStrView
     {
         char *pStr;

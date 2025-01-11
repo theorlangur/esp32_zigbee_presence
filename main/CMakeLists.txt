@@ -24,6 +24,10 @@ idf_component_register(SRCS
                     zb_helpers/zbh_handlers_cmd.cpp
                     zb_helpers/zbh_types.hpp
                     zb_helpers/zbh_types.cpp
+                    zb_helpers/zbh_apsde.hpp
+                    zb_helpers/zbh_apsde.cpp
+                    zb_helpers/zbh_apsde_binds.hpp
+                    zb_helpers/zbh_apsde_binds.cpp
                     #ZigBee main logic
                     zb/zb_main.cpp
                     zb/zb_main.hpp
