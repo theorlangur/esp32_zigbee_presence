@@ -51,3 +51,7 @@ idf_component_register(SRCS
                     periph/ld2412_component.cpp
                     periph/ld2412_component.hpp
                     INCLUDE_DIRS "")
+
+#for being able to compile with clang
+target_compile_options(${COMPONENT_LIB} PUBLIC -D__cpp_concepts=202002L -Wno-builtin-macro-redefined -Wno-invalid-offsetof)
+
