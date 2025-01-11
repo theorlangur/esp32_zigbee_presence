@@ -59,7 +59,7 @@ LD2412::ExpectedResult LD2412::Init(int txPin, int rxPin)
 {
     SetDefaultWait(kDefaultWait);
     TRY_UART_COMM(Configure(), "Init", ErrorCode::Init);
-    SetPins(txPin, rxPin);
+    TRY_UART_COMM(SetPins(txPin, rxPin), "Init", ErrorCode::Init);
     TRY_UART_COMM(Open(), "Init", ErrorCode::Init);
     return ReloadConfig();
 }

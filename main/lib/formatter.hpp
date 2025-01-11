@@ -484,7 +484,7 @@ namespace tools
     {
         size_t res = 0;
         std::string_view::const_iterator pBegin = f.begin();
-        char prev = 0, c;
+        char prev = 0;
         size_t arg = 0;
         auto  e = f.end();
         auto b = f.begin();

@@ -28,7 +28,7 @@ namespace uart
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
             .rx_flow_ctrl_thresh = 122,
             .source_clk = UART_SCLK_DEFAULT,
-            .flags = {0}
+            .flags = {}
         }
     {
     }
@@ -290,19 +290,19 @@ namespace uart
                 printf("Nothing to read. Wait: %d\n", wait.count());
             return std::unexpected(::Err{"Channel::ReadByte no data", ESP_OK});
         }else
-            return RetVal{std::ref(*this), b};
+            return RetVal<uint8_t>{std::ref(*this), b};
     }
 
     Channel::ExpectedValue<uint8_t> Channel::PeekByte(duration_ms_t wait)
     {
         if (m_HasPeekByte)
-            return RetVal{std::ref(*this), m_PeekByte};
+            return RetVal<uint8_t>{std::ref(*this), m_PeekByte};
         if (wait == kDefaultWait) wait = m_DefaultWait;
         if (auto e = ReadByte(wait); !e) return e;
         else{
             m_HasPeekByte = true;
             m_PeekByte = e.value().v;
-            return RetVal{std::ref(*this), m_PeekByte};
+            return RetVal<uint8_t>{std::ref(*this), m_PeekByte};
         }
     }
 

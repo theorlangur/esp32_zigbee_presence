@@ -430,7 +430,7 @@ private:
     template<class... ToRecv> static auto to_recv(ToRecv&&...args) { return std::forward_as_tuple(std::forward<ToRecv>(args)...); }
 
     template<class CmdT, class... ToSend, class... ToRecv>
-    ExpectedGenericCmdResult SendCommandV2(CmdT cmd, std::tuple<ToSend&...> sendArgs, std::tuple<ToRecv&...> recvArgs)
+    ExpectedGenericCmdResult SendCommandV2(CmdT cmd, std::tuple<ToSend...> sendArgs, std::tuple<ToRecv...> recvArgs)
     {
         static_assert(sizeof(CmdT) == 2, "must be 2 bytes");
         if (GetDefaultWait() < kDefaultWait)
@@ -485,7 +485,7 @@ private:
     //data
     Version m_Version;
     SystemMode m_Mode = SystemMode::Simple;
-    OpenCmdModeResponse m_ProtoInfo{0, 0};
+    //OpenCmdModeResponse m_ProtoInfo{0, 0};
     Configuration m_Configuration;
 
     //the data will be read into as is

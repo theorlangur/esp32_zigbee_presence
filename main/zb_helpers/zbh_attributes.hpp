@@ -87,6 +87,7 @@ namespace zb
         using ESPResult = std::expected<esp_err_t, esp_err_t>;
         ZCLResult Set(const T &v, bool dbg = false)
         {
+#ifndef NDEBUG
             if (dbg)
             {
                 FMT_PRINT("Setting EP:{:x} Cluster:{:x} Attr:{:x} Val ptr:{:x}\n", EP, ClusterID, Attr, (size_t)&v);
@@ -102,6 +103,7 @@ namespace zb
                     FMT_PRINT("\n");
                 }
             }
+#endif
             auto status = esp_zb_zcl_set_attribute_val(EP, ClusterID, Role, Attr, (void*)&v, false);
             if (status != ESP_ZB_ZCL_STATUS_SUCCESS)
                 return std::unexpected(status);
