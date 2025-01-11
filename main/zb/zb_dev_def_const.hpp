@@ -1,7 +1,7 @@
 #ifndef ZB_DEV_DEF_CONST_HPP_
 #define ZB_DEV_DEF_CONST_HPP_
 
-#include "../zb_helpers/zbh_helpers.hpp"
+#include "zbh_helpers.hpp"
 
 //#define ENABLE_ENGINEERING_ATTRIBUTES
 

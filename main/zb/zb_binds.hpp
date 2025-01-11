@@ -7,8 +7,8 @@
 #include "lib_misc_helpers.hpp"
 #include "lib_object_pool.hpp"
 #include "lib_array_count.hpp"
-#include "../zb_helpers/zbh_alarm.hpp"
-#include "../zb_helpers/zbh_cmd_sender.hpp"
+#include "zbh_alarm.hpp"
+#include "zbh_cmd_sender.hpp"
 #include "zb_main.hpp"
 
 namespace zb

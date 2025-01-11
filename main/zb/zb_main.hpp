@@ -2,7 +2,7 @@
 #define ZB_MAIN_HPP_
 #include <cstdint>
 #include "lib_linked_list.hpp"
-#include "../zb_helpers/zbh_handlers_list.hpp"
+#include "zbh_handlers_list.hpp"
 #include "zcl/esp_zigbee_zcl_command.h"
 
 namespace zb

@@ -3,19 +3,6 @@ idf_component_register(SRCS
                     device_common.hpp
                     device_config.hpp
                     device_config.cpp
-                    #ZigBee helpers
-                    zb_helpers/zbh_bind_table.hpp
-                    zb_helpers/zbh_bind_table.cpp
-                    zb_helpers/zbh_cmd_sender.hpp
-                    zb_helpers/zbh_cmd_sender.cpp
-                    zb_helpers/zbh_handlers_cmd.hpp
-                    zb_helpers/zbh_handlers_cmd.cpp
-                    zb_helpers/zbh_types.hpp
-                    zb_helpers/zbh_types.cpp
-                    zb_helpers/zbh_apsde.hpp
-                    zb_helpers/zbh_apsde.cpp
-                    zb_helpers/zbh_apsde_binds.hpp
-                    zb_helpers/zbh_apsde_binds.cpp
                     #ZigBee main logic
                     zb/zb_main.cpp
                     zb/zb_main.hpp
@@ -43,7 +30,7 @@ idf_component_register(SRCS
                     periph/ld2412_component.cpp
                     periph/ld2412_component.hpp
                     INCLUDE_DIRS ""
-                    REQUIRES nvs_flash generic_lib
+                    REQUIRES nvs_flash generic_lib zb_helpers
                     )
 
 #for being able to compile with clang

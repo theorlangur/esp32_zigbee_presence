@@ -10,7 +10,7 @@ idf_component_register(SRCS
                     include/lib_thread_lock.hpp
                     include/lib_type_traits.hpp
                     include/lib_linked_list.hpp
-                    lib_linked_list.cpp
+                    src/lib_linked_list.cpp
                     INCLUDE_DIRS "include")
 
 #for being able to compile with clang

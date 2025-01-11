@@ -7,7 +7,7 @@
 #include "zb_main.hpp"
 #include "esp_zigbee_core.h"
 
-#include "../zb_helpers/zbh_helpers.hpp"
+#include "zbh_helpers.hpp"
 
 #include "../colors_def.hpp"
 

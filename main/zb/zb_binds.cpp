@@ -1,8 +1,8 @@
 #include "zb_binds.hpp"
 #include "zb_dev_def_const.hpp"
-#include "../zb_helpers/zbh_types.hpp"
-#include "../zb_helpers/zbh_handlers_cmd.hpp"
-#include "../zb_helpers/zbh_bind_table.hpp"
+#include "zbh_types.hpp"
+#include "zbh_handlers_cmd.hpp"
+#include "zbh_bind_table.hpp"
 
 
 template<>
