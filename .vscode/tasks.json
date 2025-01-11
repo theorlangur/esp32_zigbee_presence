@@ -9,12 +9,12 @@
         {
             "label": "Set Target H2",
             "type": "shell",
-            "command": "idf.py set-target esp32h2 && cp -f --update=all sdkconfig.dbg.h2 sdkconfig.dbg && cp -f --update=all sdkconfig.rel.h2 sdkconfig.rel"
+            "command": "idf.py -D IDF_TOOLCHAIN=clang set-target esp32h2 && cp -f --update=all sdkconfig.dbg.h2 sdkconfig.dbg && cp -f --update=all sdkconfig.rel.h2 sdkconfig.rel"
         },
         {
             "label": "Set Target C6",
             "type": "shell",
-            "command": "idf.py set-target esp32c6 && cp -f --update=all sdkconfig.dbg.c6 sdkconfig.dbg && cp -f --update=all sdkconfig.rel.c6 sdkconfig.rel"
+            "command": "idf.py -D IDF_TOOLCHAIN=clang  set-target esp32c6 && cp -f --update=all sdkconfig.dbg.c6 sdkconfig.dbg && cp -f --update=all sdkconfig.rel.c6 sdkconfig.rel"
         },
         {
             "label": "Build Debug",
