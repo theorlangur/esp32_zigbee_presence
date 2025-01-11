@@ -1,9 +1,9 @@
-#ifndef EXPECTED_RESULTS_HPP_
-#define EXPECTED_RESULTS_HPP_
+#ifndef LIB_EXPECTED_RESULTS_HPP_
+#define LIB_EXPECTED_RESULTS_HPP_
 
 #include "esp_err.h"
 #include <chrono>
-#include "formatter.hpp"
+#include "lib_formatter.hpp"
 
 #define CHECK_STACK(sz) /*\
     {\

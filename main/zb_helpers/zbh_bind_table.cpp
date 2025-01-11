@@ -1,5 +1,5 @@
 #include "zbh_bind_table.hpp"
-#include "../lib/object_pool.hpp"
+#include "lib_object_pool.hpp"
 #include "zbh_types.hpp"
 
 namespace zb

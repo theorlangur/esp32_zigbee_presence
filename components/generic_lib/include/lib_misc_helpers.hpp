@@ -1,9 +1,9 @@
-#ifndef MISC_HELPERS_HPP_
-#define MISC_HELPERS_HPP_
+#ifndef LIB_MISC_HELPERS_HPP_
+#define LIB_MISC_HELPERS_HPP_
 
 #include "esp_err.h"
 #include <chrono>
-#include "formatter.hpp"
+#include "lib_formatter.hpp"
 
 using duration_ms_t = std::chrono::duration<int, std::milli>;
 inline static constexpr const duration_ms_t kForever = duration_ms_t(-1);

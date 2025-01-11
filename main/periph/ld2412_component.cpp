@@ -2,7 +2,7 @@
 #include "freertos/task.h"
 #include "ld2412_component.hpp"
 #include "driver/gpio.h"
-#include "../lib/thread.hpp"
+#include "lib_thread.hpp"
 
 namespace ld2412
 {

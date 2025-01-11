@@ -1,5 +1,5 @@
-#ifndef TYPE_TRAITS_HPP_
-#define TYPE_TRAITS_HPP_
+#ifndef LIB_TYPE_TRAITS_HPP_
+#define LIB_TYPE_TRAITS_HPP_
 
 #include <cstring>
 #include <type_traits>

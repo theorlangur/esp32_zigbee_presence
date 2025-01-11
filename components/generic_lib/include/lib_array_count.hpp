@@ -1,10 +1,10 @@
-#ifndef ARRAY_COUNT_HPP_
-#define ARRAY_COUNT_HPP_
+#ifndef LIB_ARRAY_COUNT_HPP_
+#define LIB_ARRAY_COUNT_HPP_
 
 #include <cstddef>
 #include <cstring>
 #include <optional>
-#include "type_traits.hpp"
+#include "lib_type_traits.hpp"
 
 template<class T, size_t N>
 class ArrayCount

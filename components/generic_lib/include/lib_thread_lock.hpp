@@ -1,5 +1,5 @@
-#ifndef THREAD_LOCK_HPP_
-#define THREAD_LOCK_HPP_
+#ifndef LIB_THREAD_LOCK_HPP_
+#define LIB_THREAD_LOCK_HPP_
 
 #include <mutex>
 #include "spinlock.h"

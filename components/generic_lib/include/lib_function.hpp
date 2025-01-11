@@ -1,5 +1,5 @@
-#ifndef GENERIC_FUNCTION_HPP_
-#define GENERIC_FUNCTION_HPP_
+#ifndef LIB_GENERIC_FUNCTION_HPP_
+#define LIB_GENERIC_FUNCTION_HPP_
 
 #include <memory>
 #include <utility>

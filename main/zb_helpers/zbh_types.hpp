@@ -7,7 +7,7 @@
 #include <span>
 #include <expected>
 #include <utility>
-#include "../lib/misc_helpers.hpp"
+#include "lib_misc_helpers.hpp"
 
 namespace zb
 {

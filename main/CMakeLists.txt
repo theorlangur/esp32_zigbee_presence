@@ -3,18 +3,6 @@ idf_component_register(SRCS
                     device_common.hpp
                     device_config.hpp
                     device_config.cpp
-                    #Library stuff
-                    lib/function.hpp
-                    lib/array_count.hpp
-                    lib/expected_results.hpp
-                    lib/formatter.hpp
-                    lib/misc_helpers.hpp
-                    lib/object_pool.hpp
-                    lib/thread.hpp
-                    lib/thread_lock.hpp
-                    lib/type_traits.hpp
-                    lib/linked_list.hpp
-                    lib/linked_list.cpp
                     #ZigBee helpers
                     zb_helpers/zbh_bind_table.hpp
                     zb_helpers/zbh_bind_table.cpp
@@ -54,7 +42,9 @@ idf_component_register(SRCS
                     periph/ld2412.hpp 
                     periph/ld2412_component.cpp
                     periph/ld2412_component.hpp
-                    INCLUDE_DIRS "")
+                    INCLUDE_DIRS ""
+                    REQUIRES generic_lib
+                    )
 
 #for being able to compile with clang
 target_compile_options(${COMPONENT_LIB} PUBLIC -D__cpp_concepts=202002L -Wno-builtin-macro-redefined -Wno-invalid-offsetof)

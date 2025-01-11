@@ -2,7 +2,7 @@
 #define ZBH_HANDLERS_LIST_HPP_
 
 #include "zbh_types.hpp"
-#include "../lib/linked_list.hpp"
+#include "lib_linked_list.hpp"
 
 namespace zb
 {

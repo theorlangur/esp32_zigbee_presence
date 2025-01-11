@@ -1,8 +1,8 @@
-#ifndef OBJECT_POOL_HPP_
-#define OBJECT_POOL_HPP_
+#ifndef LIB_OBJECT_POOL_HPP_
+#define LIB_OBJECT_POOL_HPP_
 
 #include <bitset>
-#include "type_traits.hpp"
+#include "lib_type_traits.hpp"
 
 template<class T, size_t N>
 class ObjectPool

@@ -1,5 +1,5 @@
-#ifndef FORMATTER_HPP_
-#define FORMATTER_HPP_
+#ifndef LIB_FORMATTER_HPP_
+#define LIB_FORMATTER_HPP_
 #include <string_view>
 #include <span>
 #include <expected>

@@ -2,11 +2,11 @@
 #define ZBH_ALARM_HPP_
 #include "esp_zigbee_core.h"
 #include <cstdint>
-#include "../lib/misc_helpers.hpp"
-#include "../lib/function.hpp"
-#include "../lib/thread_lock.hpp"
-#include "../lib/object_pool.hpp"
-#include "../lib/array_count.hpp"
+#include "lib_misc_helpers.hpp"
+#include "lib_function.hpp"
+#include "lib_thread_lock.hpp"
+#include "lib_object_pool.hpp"
+#include "lib_array_count.hpp"
 
 namespace zb
 {

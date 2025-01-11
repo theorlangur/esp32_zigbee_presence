@@ -1,5 +1,5 @@
-#ifndef THREAD_HELPER_HPP_
-#define THREAD_HELPER_HPP_
+#ifndef LIB_THREAD_HELPER_HPP_
+#define LIB_THREAD_HELPER_HPP_
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"

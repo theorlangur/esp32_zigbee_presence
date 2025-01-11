@@ -3,7 +3,7 @@
 
 #include "zbh_types.hpp"
 #include "zbh_handlers.hpp"
-#include "../lib/linked_list.hpp"
+#include "lib_linked_list.hpp"
 
 namespace zb
 {

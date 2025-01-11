@@ -1,6 +1,6 @@
 #ifndef ZBH_APSDE_HPP_
 #define ZBH_APSDE_HPP_
-#include "../lib/misc_helpers.hpp"
+#include "lib_misc_helpers.hpp"
 #include "aps/esp_zigbee_aps.h"
 #include <optional>
 
