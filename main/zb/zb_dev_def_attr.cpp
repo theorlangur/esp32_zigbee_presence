@@ -3,50 +3,6 @@
 
 namespace zb
 {
-    ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
-    ZclAttributeOccupancy_t g_OccupancyState;
-
-    /**********************************************************************/
-    /* Attributes for external signal on/off server cluster               */
-    /**********************************************************************/
-    ZclAttributeExternalOnOff_t g_ExternalOnOff;
-    /**********************************************************************/
-    /* Attributes for a custom cluster                                    */
-    /**********************************************************************/
-    ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity;
-    ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity;
-    ZclAttributeState_t                                 g_LD2412State;
-    ZclAttributeExState_t                               g_LD2412ExState;
-    ZclAttributeMaxDistance_t                           g_LD2412MaxDistance;
-    ZclAttributeMinDistance_t                           g_LD2412MinDistance;
-    ZclAttributeMode_t                                  g_LD2412Mode;
-    ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
-    ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
-    ZclAttributeDistanceRes_t                           g_LD2412DistanceRes;
-    ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
-    ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
-    ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
-    ZclAttributePresenceDetectionConfig_t               g_PresenceDetectionConfig;
-    ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
-    ZclAttributeFailureStatus_t                         g_FailureStatus;
-    ZclAttributeInternals_t                             g_Internals;
-    ZclAttributeRestartsCount_t                         g_RestartsCount;
-    ZclAttributeInternals2_t                            g_Internals2;
-    ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
-    ZclAttributeInternals3_t                            g_Internals3;
-
-#if defined(ENABLE_ENGINEERING_ATTRIBUTES)
-    ZclAttributeStillDistance_t                         g_LD2412StillDistance;
-    ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
-    ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
-    ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
-    ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
-    ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
-    ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
-    ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
-    ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
-    ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
-#endif
 
     static ZbAlarmExt16 g_DelayedAttrUpdate;
     void update_zb_occupancy_attr()

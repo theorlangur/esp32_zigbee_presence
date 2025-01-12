@@ -116,49 +116,49 @@ namespace zb
     /**********************************************************************/
     /* Attributes for occupancy cluster                                   */
     /**********************************************************************/
-    extern ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout;
-    extern ZclAttributeOccupancy_t g_OccupancyState;
+    constexpr ZclAttributeOccupiedToUnoccupiedTimeout_t g_OccupiedToUnoccupiedTimeout{};
+    constexpr ZclAttributeOccupancy_t g_OccupancyState{};
 
     /**********************************************************************/
     /* Attributes for external signal on/off server cluster               */
     /**********************************************************************/
-    extern ZclAttributeExternalOnOff_t g_ExternalOnOff;
+    constexpr ZclAttributeExternalOnOff_t g_ExternalOnOff{};
     /**********************************************************************/
     /* Attributes for a custom cluster                                    */
     /**********************************************************************/
-    extern ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity;
-    extern ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity;
-    extern ZclAttributeState_t                                 g_LD2412State;
-    extern ZclAttributeExState_t                               g_LD2412ExState;
-    extern ZclAttributeMaxDistance_t                           g_LD2412MaxDistance;
-    extern ZclAttributeMinDistance_t                           g_LD2412MinDistance;
-    extern ZclAttributeMode_t                                  g_LD2412Mode;
-    extern ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight;
-    extern ZclAttributePIRPresence_t                           g_LD2412PIRPresence;
-    extern ZclAttributeDistanceRes_t                           g_LD2412DistanceRes;
-    extern ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode;
-    extern ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout;
-    extern ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold;
-    extern ZclAttributePresenceDetectionConfig_t               g_PresenceDetectionConfig;
-    extern ZclAttributeExternalOnTime_t                        g_ExternalOnTime;
-    extern ZclAttributeFailureStatus_t                         g_FailureStatus;
-    extern ZclAttributeInternals_t                             g_Internals;
-    extern ZclAttributeRestartsCount_t                         g_RestartsCount;
-    extern ZclAttributeInternals2_t                            g_Internals2;
-    extern ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger;
-    extern ZclAttributeInternals3_t                            g_Internals3;
+    constexpr ZclAttributeLD2412MoveSensetivity_t                 g_LD2412MoveSensitivity{};
+    constexpr ZclAttributeLD2412StillSensetivity_t                g_LD2412StillSensitivity{};
+    constexpr ZclAttributeState_t                                 g_LD2412State{};
+    constexpr ZclAttributeExState_t                               g_LD2412ExState{};
+    constexpr ZclAttributeMaxDistance_t                           g_LD2412MaxDistance{};
+    constexpr ZclAttributeMinDistance_t                           g_LD2412MinDistance{};
+    constexpr ZclAttributeMode_t                                  g_LD2412Mode{};
+    constexpr ZclAttributeEngineeringLight_t                      g_LD2412EngineeringLight{};
+    constexpr ZclAttributePIRPresence_t                           g_LD2412PIRPresence{};
+    constexpr ZclAttributeDistanceRes_t                           g_LD2412DistanceRes{};
+    constexpr ZclAttributeOnOffCommandMode_t                      g_OnOffCommandMode{};
+    constexpr ZclAttributeOnOffCommandTimeout_t                   g_OnOffCommandTimeout{};
+    constexpr ZclAttributePresenceDetectionIlluminanceThreshold_t g_PresenceDetectionIlluminanceThreshold{};
+    constexpr ZclAttributePresenceDetectionConfig_t               g_PresenceDetectionConfig{};
+    constexpr ZclAttributeExternalOnTime_t                        g_ExternalOnTime{};
+    constexpr ZclAttributeFailureStatus_t                         g_FailureStatus{};
+    constexpr ZclAttributeInternals_t                             g_Internals{};
+    constexpr ZclAttributeRestartsCount_t                         g_RestartsCount{};
+    constexpr ZclAttributeInternals2_t                            g_Internals2{};
+    constexpr ZclAttributeArmedForTrigger_t                       g_ArmedForTrigger{};
+    constexpr ZclAttributeInternals3_t                            g_Internals3{};
 
 #if defined(ENABLE_ENGINEERING_ATTRIBUTES)
-    extern ZclAttributeStillDistance_t                         g_LD2412StillDistance;
-    extern ZclAttributeMoveDistance_t                          g_LD2412MoveDistance;
-    extern ZclAttributeStillEnergy_t                           g_LD2412StillEnergy;
-    extern ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy;
-    extern ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove;
-    extern ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill;
-    extern ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin;
-    extern ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin;
-    extern ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax;
-    extern ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax;
+    constexpr ZclAttributeStillDistance_t                         g_LD2412StillDistance{};
+    constexpr ZclAttributeMoveDistance_t                          g_LD2412MoveDistance{};
+    constexpr ZclAttributeStillEnergy_t                           g_LD2412StillEnergy{};
+    constexpr ZclAttributeMoveEnergy_t                            g_LD2412MoveEnergy{};
+    constexpr ZclAttributeEngineeringEnergyMove_t                 g_LD2412EngineeringEnergyMove{};
+    constexpr ZclAttributeEngineeringEnergyStill_t                g_LD2412EngineeringEnergyStill{};
+    constexpr ZclAttributeEngineeringEnergyMoveMin_t              g_LD2412EngineeringEnergyMoveMin{};
+    constexpr ZclAttributeEngineeringEnergyStillMin_t             g_LD2412EngineeringEnergyStillMin{};
+    constexpr ZclAttributeEngineeringEnergyMoveMax_t              g_LD2412EngineeringEnergyMoveMax{};
+    constexpr ZclAttributeEngineeringEnergyStillMax_t             g_LD2412EngineeringEnergyStillMax{};
 #endif
 }
 #endif
