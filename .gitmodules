@@ -1,9 +1,9 @@
 [submodule "submodules/esp_generic_lib"]
 	path = submodules/esp_generic_lib
-	url = https://github.com/theorlangur/esp_generic_lib.git
+	url = ssh://git@github.com/theorlangur/esp_generic_lib.git
 [submodule "submodules/esp_zb_helpers"]
 	path = submodules/esp_zb_helpers
-	url = https://github.com/theorlangur/esp_zb_helpers.git
+	url = ssh://git@github.com/theorlangur/esp_zb_helpers.git
 [submodule "submodules/esp_periphery_helpers"]
 	path = submodules/esp_periphery_helpers
-	url = https://github.com/theorlangur/esp_periphery_helpers.git
+	url = ssh://git@github.com/theorlangur/esp_periphery_helpers.git
